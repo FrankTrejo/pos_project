@@ -1,0 +1,529 @@
+/* tables/static/css/style.css */
+:root {
+  --bg-color: #f4f7f6;
+  --success-color: #28a745; /* Verde similar a la imagen */
+  --danger-color: #dc3545;  /* Rojo similar a la imagen */
+  --text-dark: #343a40;
+  --card-text: white;
+}
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-dark);
+}
+
+.app-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 30px;
+}
+
+/* --- Header --- */
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  /* Asegura que si la pantalla es pequeña, no se monten */
+  flex-wrap: wrap; 
+  gap: 10px;
+}
+
+/* Nuevo contenedor para agrupar los botones a la derecha */
+.header-actions {
+    display: flex;
+    gap: 15px; /* Espacio entre el botón Dashboard y Crear Mesa */
+    align-items: center;
+}
+
+.app-header h1 {
+    margin: 0;
+    font-weight: 600;
+    color: #495057;
+}
+
+.add-btn {
+  background-color: #343a40; /* Botón oscuro como en la imagen */
+  color: white;
+  text-decoration: none;
+  padding: 12px 24px;
+  font-size: 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+  border: 1px solid #343a40;
+}
+
+.add-btn:hover {
+  background-color: #23272b;
+}
+
+/* Estilo para el botón secundario (Dashboard) */
+.btn-secondary {
+    background-color: white;
+    color: #343a40;
+    border: 2px solid #343a40; /* Borde oscuro elegante */
+    text-decoration: none;
+    padding: 10px 20px;
+    font-size: 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Espacio entre icono y texto */
+}
+
+.btn-secondary:hover {
+    background-color: #343a40;
+    color: white;
+    text-decoration: none;
+}
+
+/* --- CSS GRID PARA LAS MESAS --- */
+.tables-grid {
+  display: grid;
+  /* Crea columnas que tienen un ancho mínimo de 160px y se expanden */
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 20px; /* Espacio entre recuadros */
+}
+
+/* --- Tarjeta de Mesa --- */
+.table-card {
+  border-radius: 8px;
+  padding: 25px 15px;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  transition: transform 0.1s, opacity 0.2s;
+  color: var(--card-text);
+}
+
+.table-card:hover {
+    transform: translateY(-2px);
+    opacity: 0.95;
+}
+
+.table-card h3 {
+    margin: 0 0 10px 0;
+    font-weight: 500;
+    font-size: 1.2rem;
+}
+
+.status-indicator {
+    font-size: 0.95rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 5px;
+}
+
+/* Estados de color */
+.table-card.free {
+    background-color: var(--success-color);
+}
+
+.table-card.occupied {
+    background-color: var(--danger-color);
+}
+
+/* --- tables/static/css/style.css --- */
+/* ... (Mantén tus estilos anteriores para la vista grid) ... */
+
+/* =========================================
+   NUEVOS ESTILOS PARA LA VISTA DE ORDEN (POS)
+   ========================================= */
+
+/* Variables para el tema claro (basado en la imagen) */
+:root {
+    --light-bg: #f0f2f5; /* Fondo general gris claro */
+    --white-card: #ffffff;
+    --primary-blue: #3498db; /* Azul para textos e iconos */
+    --light-blue-btn: #87CEEB; /* Azul claro para botones de categoría */
+    --text-gray: #7f8c8d;
+    --shadow-soft: 0 4px 15px rgba(0,0,0,0.05);
+    --border-radius-card: 15px;
+    --border-radius-btn: 10px;
+}
+
+/* Estilo para el body en esta vista */
+body.light-theme {
+    background-color: var(--light-bg);
+}
+
+/* Arreglo para el enlace en el index.html */
+.table-link-wrapper {
+    text-decoration: none;
+    display: block;
+}
+
+/* Contenedor principal de la nueva vista */
+.pos-container {
+    max-width: 1200px;
+    margin: 20px auto;
+    padding: 20px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Estilo genérico tipo "tarjeta" blanca con sombra suave */
+.card-style {
+    background-color: var(--white-card);
+    border-radius: var(--border-radius-card);
+    box-shadow: var(--shadow-soft);
+    padding: 20px;
+}
+
+/* Estilo para tarjeta interna (como el área de categorías) */
+.card-style-inner {
+     background-color: var(--light-bg); /* Ligeramente más gris */
+     border-radius: var(--border-radius-card);
+     padding: 20px;
+}
+
+
+/* --- BARRA SUPERIOR DE ACCIONES --- */
+.top-actions-bar {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 25px;
+    flex-wrap: wrap; /* Para pantallas pequeñas */
+}
+
+.action-btn {
+    background-color: var(--white-card);
+    color: var(--primary-blue);
+    border: none;
+    padding: 15px 20px;
+    border-radius: var(--border-radius-btn);
+    box-shadow: var(--shadow-soft);
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column; /* Icono arriba del texto */
+    align-items: center;
+    gap: 8px;
+    flex: 1; /* Que ocupen el mismo ancho */
+    min-width: 100px;
+    transition: transform 0.2s;
+}
+
+.action-btn i {
+    font-size: 1.4rem;
+}
+
+.action-btn:hover {
+    transform: translateY(-3px);
+}
+
+
+/* --- LAYOUT PRINCIPAL (Grid 2 columnas) --- */
+.main-pos-grid {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr; /* Izquierda más ancha que derecha */
+    gap: 25px;
+    height: 600px; /* Altura fija para que se vea cuadrado como en el diseño */
+}
+
+
+/* --- PANEL IZQUIERDO (Productos) --- */
+.left-panel {
+    display: flex;
+    flex-direction: column;
+    /* Asegura que nada se salga del contenedor redondeado */
+    overflow: hidden;
+}
+
+.panel-title {
+    color: var(--primary-blue);
+    text-align: center;
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+
+.search-bar-container {
+    position: relative;
+    /* Aseguramos que ocupe exactamente el ancho disponible */
+    width: 100%;
+    /* Margen inferior para separar del contenedor gris de categorías */
+    margin-bottom: 20px;
+}
+
+.search-input {
+    width: 100%;
+    padding: 12px 20px 12px 45px;
+    border: 1px solid #e0e0e0;
+    border-radius: 25px;
+    outline: none;
+    font-size: 1rem;
+    background-color: var(--white-card);
+    /* Esto asegura que el input no crezca más de la cuenta */
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.search-icon {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #aaa;
+}
+
+.categories-container {
+    display: flex;
+    gap: 15px;
+    flex-grow: 1;
+    /* Eliminamos margin-top si lo tenías, el margin-bottom del search-bar ya se encarga */
+    margin-top: 0;
+}
+
+.category-btn {
+    background-color: var(--light-blue-btn);
+    color: white;
+    border: none;
+    padding: 15px 25px;
+    border-radius: var(--border-radius-btn);
+    font-weight: bold;
+    font-size: 1.1rem;
+    cursor: pointer;
+    height: fit-content;
+    transition: opacity 0.2s;
+}
+
+.category-btn:hover {
+    opacity: 0.9;
+}
+
+
+/* --- PANEL DERECHO (Carrito e Inputs) --- */
+.right-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.info-inputs {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.input-group input {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1px solid transparent;
+    background-color: var(--white-card);
+    border-radius: var(--border-radius-btn);
+    box-shadow: var(--shadow-soft);
+    outline: none;
+    color: var(--primary-blue);
+    font-weight: 500;
+}
+.input-group input::placeholder {
+    color: var(--light-blue-btn);
+    opacity: 0.7;
+}
+
+/* Resumen del Carrito */
+.cart-summary {
+    flex-grow: 1; /* Ocupa el espacio restante */
+    display: flex;
+    flex-direction: column;
+}
+
+.cart-header {
+    display: flex;
+    justify-content: space-between;
+    font-weight: bold;
+    color: var(--primary-blue);
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+    font-size: 0.9rem;
+}
+
+.cart-items-list {
+    flex-grow: 1; /* Área scrollable para items */
+    overflow-y: auto;
+}
+
+.cart-footer {
+    border-top: 2px solid #eee;
+    padding-top: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.total-label {
+    font-weight: bold;
+    color: var(--primary-blue);
+    font-size: 1.5rem;
+}
+
+.total-amount {
+    font-weight: bold;
+    color: var(--primary-blue);
+    font-size: 2rem;
+}
+
+/* Responsive simple */
+@media (max-width: 768px) {
+    .main-pos-grid {
+        grid-template-columns: 1fr; /* Una sola columna en móviles */
+        height: auto;
+    }
+}
+
+/* Estilo para campos de solo lectura */
+.input-group .readonly-field {
+    background-color: #e9ecef; /* Un gris claro estándar para campos deshabilitados */
+    color: #495057; /* Un color de texto un poco más oscuro */
+    cursor: not-allowed; /* Muestra un icono de "prohibido" al pasar el mouse */
+    font-weight: bold;
+    border-color: #dce4ec; /* Un borde ligeramente diferente si se desea */
+}
+
+/* Opcional: Si quieres que se vea aún más diferente en el tema claro */
+body.light-theme .input-group .readonly-field {
+     background-color: #dadde1; /* Un gris un poco más notable en el tema claro */
+     color: var(--primary-blue);
+}
+
+/* =========================================
+   NUEVOS ESTILOS PARA EL LAYOUT DEL DASHBOARD
+   ========================================= */
+
+/* Contenedor principal que divide la pantalla en Sidebar y Contenido */
+.dashboard-layout {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center; /* Centra horizontalmente */
+    align-items: flex-start; /* Alinea arriba, evita que se estire innecesariamente */
+    padding: 30px; /* Margen externo contra el borde de la ventana */
+}
+
+.main-app-container {
+    display: flex; /* Flexbox para poner sidebar y contenido lado a lado */
+    width: 100%;
+    max-width: 1400px; /* Ancho máximo del bloque completo */
+    /* 'card-style' ya le da fondo blanco, bordes redondeados y sombra */
+    padding: 0 !important; /* Quitamos padding interno para que los hijos toquen los bordes */
+    overflow: hidden; /* Asegura que los hijos respeten las esquinas redondeadas */
+}
+
+/* --- SIDEBAR (Menú Lateral) --- */
+.sidebar {
+    width: 260px; /* Ancho fijo ligeramente mayor */
+    flex-shrink: 0; /* Evita que se encoja */
+    padding: 30px 20px;
+    /* Le damos un fondo muy claro para distinguirlo sutilmente del contenido */
+    background-color: #f8f9fa;
+    /* Una línea sutil a la derecha para separar del contenido */
+    border-right: 1px solid #e9ecef;
+}
+
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 10px; /* Menor espacio entre items */
+}
+
+.sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    text-decoration: none;
+    color: var(--text-gray);
+    font-weight: 600;
+    padding: 12px 20px; /* Padding ajustado */
+    border-radius: 10px; /* Bordes un poco menos redondeados para el menú */
+    transition: all 0.2s ease;
+}
+
+.sidebar-link i {
+    font-size: 1.1rem;
+    color: #adb5bd; /* Iconos un poco más claros cuando no están activos */
+    transition: color 0.2s ease;
+}
+
+.sidebar-link:hover {
+    background-color: #eef4fb; /* Azul muy claro */
+    color: var(--primary-blue);
+}
+.sidebar-link:hover i {
+    color: var(--primary-blue);
+}
+
+/* Estado activo */
+.sidebar-link.active {
+    background-color: #dbeafe; /* Azul claro */
+    color: var(--primary-blue);
+}
+.sidebar-link.active i {
+    color: var(--primary-blue);
+}
+
+
+/* --- ÁREA DE CONTENIDO PRINCIPAL --- */
+.main-content-area {
+    flex-grow: 1; /* Ocupa el resto del espacio */
+    padding: 40px; /* Padding interno amplio para el contenido */
+    background-color: var(--white-card); /* Fondo blanco puro */
+}
+
+/* Grid para las tarjetas de resumen (sin cambios mayores) */
+.summary-cards-grid {
+    display: grid;
+    /* Ajustamos el minmax para que se adapten mejor */
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 25px;
+}
+
+/* ... (Mantén los estilos de .summary-card, .card-icon, etc. igual que antes) ... */
+.summary-card {
+    padding: 30px 20px;
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 1px solid #f0f0f0; /* Borde sutil para las tarjetas internas */
+    box-shadow: none; /* Quitamos sombra por defecto, la ponemos al hover */
+}
+.summary-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-soft); /* Sombra solo al pasar el mouse */
+    border-color: transparent;
+}
+
+
+/* Responsive actualizado para el nuevo layout */
+@media (max-width: 992px) { /* Punto de quiebre un poco más alto */
+    .dashboard-layout {
+        padding: 15px; /* Menos margen externo en pantallas medianas */
+    }
+    
+    .main-app-container {
+        flex-direction: column; /* Apilar verticalmente */
+    }
+
+    .sidebar {
+        width: 100%; /* Sidebar ocupa todo el ancho */
+        padding: 20px;
+        border-right: none;
+        border-bottom: 1px solid #e9ecef; /* Línea de separación abajo */
+    }
+
+    .sidebar-nav {
+        flex-direction: row; /* Menú horizontal */
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .main-content-area {
+        padding: 30px 20px; /* Menos padding interno en móviles */
+    }
+}

@@ -1,0 +1,50 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema POS - Mesas</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <h1>Sistema POS - Vista de Mesas</h1>
+            
+            <div class="header-actions">
+                <a href="{% url 'panel_control' %}" class="btn-secondary">
+                    <i class="fas fa-th-large"></i> Dashboard
+                </a>
+
+                <a href="{% url 'create_table' %}" class="add-btn">
+                    + Crear Mesa
+                </a>
+            </div>
+        </header>
+
+        <main class="tables-grid">
+            {% for table in tables %}
+                <a href="{% url 'table_order' table.id %}" class="table-link-wrapper">
+                    <div class="table-card {% if table.is_occupied %}occupied{% else %}free{% endif %}">
+                        <div class="table-content">
+                            <h3>Mesa {{ table.number }}</h3>
+                            <div class="status-indicator">
+                                {% if table.is_occupied %}
+                                    <span class="icon">✅</span> Ocupada
+                                {% else %}
+                                    <span class="icon">🍽️</span> Libre
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            {% endfor %}
+        </main>
+    </div>
+
+    {% csrf_token %}
+    
+    <script src="{% static 'js/script.js' %}"></script>
+</body>
+</html>

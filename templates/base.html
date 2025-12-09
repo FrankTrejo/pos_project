@@ -1,0 +1,47 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema POS {% block title %}{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="light-theme">
+
+    <div class="dashboard-layout">
+        <div class="main-app-container card-style">
+
+            <aside class="sidebar">
+                <nav class="sidebar-nav">
+                    <a href="#" class="sidebar-link">
+                       <i class="fas fa-box"></i> Productos
+                    </a>
+                    <a href="#" class="sidebar-link">
+                       <i class="fas fa-clipboard-list"></i> Inventario
+                    </a>
+                    <a href="#" class="sidebar-link">
+                       <i class="fas fa-chart-line"></i> Reportes
+                    </a>
+                    <a href="#" class="sidebar-link">
+                       <i class="fas fa-user-tie"></i> Personal
+                    </a>
+                    <a href="{% url 'index' %}" class="sidebar-link">
+                       <i class="fas fa-cash-register"></i> Punto de Venta
+                    </a>
+                    <a href="#" class="sidebar-link">
+                        <i class="fas fa-cog"></i> Configuración
+                    </a>
+                </nav>
+            </aside>
+
+            <main class="main-content-area">
+                {% block content %}
+                {% endblock %}
+            </main>
+
+        </div> </div>
+
+</body>
+</html>

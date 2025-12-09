@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+
+{% block title %}- Panel de Control{% endblock %}
+
+{% block content %}
+    <h2 style="color: var(--primary-blue); margin-bottom: 25px;">Panel de Control</h2>
+
+    <div class="summary-cards-grid">
+
+        <div class="card-style summary-card text-center">
+            <i class="fas fa-box card-icon"></i>
+            <h3>Productos</h3>
+            <p class="summary-text">250 Items activos</p>
+            <a href="#" class="summary-link">Ver catálogo</a>
+        </div>
+
+        <div class="card-style summary-card text-center">
+            <i class="fas fa-clipboard-list card-icon"></i>
+            <h3>Inventario</h3>
+            <p class="summary-text">Valor total: $4,500</p>
+            <a href="#" class="summary-link">Gestionar stock</a>
+        </div>
+
+        <div class="card-style summary-card text-center">
+            <i class="fas fa-chart-line card-icon"></i>
+            <h3>Reportes</h3>
+            <p class="summary-text">Ventas hoy: $1,200</p>
+            <a href="#" class="summary-link">Ver estadísticas</a>
+        </div>
+
+        <div class="card-style summary-card text-center">
+            <i class="fas fa-user-tie card-icon"></i>
+            <h3>Personal</h3>
+            <p class="summary-text">8 Empleados activos</p>
+            <a href="#" class="summary-link">Administrar equipo</a>
+        </div>
+
+        <div class="card-style summary-card text-center">
+            <i class="fas fa-cash-register card-icon"></i>
+            <h3>Punto de Venta</h3>
+            <p class="summary-text">Ir a Facturación</p>
+            <a href="{% url 'index' %}" class="action-btn-blue" style="display: inline-block; margin-top: 10px; text-decoration: none;">
+                Abrir POS
+            </a>
+        </div>
+        
+        <div class="card-style summary-card text-center">
+            <i class="fas fa-cog card-icon"></i>
+            <h3>Configuración</h3>
+            <p class="summary-text">Ajustes generales y permisos</p>
+            <a href="#" class="summary-link">Ir a ajustes</a>
+        </div>
+    </div>
+{% endblock %}
