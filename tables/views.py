@@ -5,7 +5,11 @@ from django.shortcuts import render
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.db.models import Max
-from .models import Table
+from .models import Table, Categoria, Producto, TasaBCV
+from .scrapping import obtener_tasa_bcv
+from django.contrib.auth.models import User
+from django.http import JsonResponse
+import json
 
 # El punto (.) significa "importa desde la misma carpeta donde estoy"
 try:
@@ -49,17 +53,48 @@ def toggle_status(request, table_id):
 
 # FUNCIÓN DE LA VISTA DE ORDENES
 def table_order_view(request, table_id):
-    """Vista para la pantalla de pedidos de una mesa específica."""
     table = get_object_or_404(Table, id=table_id)
-
-    # --- AQUÍ LLAMAMOS A TU FUNCIÓN ---
-    # Esto ejecutará el script de scraping en tiempo real.
-    print("Consultando BCV...") # Opcional: para ver en la consola cuándo ocurre
     tasa_actual = obtener_tasa_bcv()
+    tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
+    tasa_numerica = float(tasa_obj.precio) if tasa_obj else 0
+    categorias = Categoria.objects.all()
+    productos = Producto.objects.select_related('categoria').all()
+    
+    # --- Obtener lista de meseros ---
+    # Filtramos solo usuarios que sean staff o activos. O simplemente todos:
+    meseros = User.objects.filter(is_active=True)
 
     context = {
         'table': table,
-        # Pasamos el resultado del scraping a la plantilla
         'tasa_cambio': tasa_actual,
+        'tasa_numerica': tasa_numerica,
+        'categorias': categorias, 
+        'productos': productos,
+        'meseros': meseros, # Enviamos la lista al HTML
     }
     return render(request, 'tables/order_detail.html', context)
+
+# --- AGREGA ESTA NUEVA VISTA AL FINAL ---
+def asignar_mesero(request, table_id):
+    """Recibe un ID de usuario por AJAX y lo asigna a la mesa"""
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            user_id = data.get('user_id')
+            
+            table = Table.objects.get(id=table_id)
+            
+            if user_id:
+                user = User.objects.get(id=user_id)
+                table.mesero = user
+                nombre_mesero = user.username
+            else:
+                table.mesero = None # Desasignar
+                nombre_mesero = ""
+                
+            table.save()
+            return JsonResponse({'status': 'ok', 'mesero': nombre_mesero})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    return JsonResponse({'status': 'error'}, status=400)
+
