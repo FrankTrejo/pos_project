@@ -9,4 +9,5 @@ urlpatterns = [
     path('toggle/<int:table_id>/', views.toggle_status, name='toggle_status'),
     # Esta ruta captura el ID de la mesa en la URL, ej: /table/5/order/
     path('table/<int:table_id>/order/', views.table_order_view, name='table_order'),
+    path('table/<int:table_id>/asignar_mesero/', views.asignar_mesero, name='asignar_mesero'),
 ]
