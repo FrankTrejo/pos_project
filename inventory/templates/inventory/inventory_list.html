@@ -1,0 +1,168 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}- Inventario{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<div style="padding: 20px;">
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div>
+            <h2 style="color: var(--primary-blue); margin: 0;">Gestión de Inventario</h2>
+            <p style="color: #666; font-size: 0.9em;">
+                Valor Total Almacén: <b>${{ valor_inventario|floatformat:2 }}</b>
+            </p>
+        </div>
+        <button class="add-btn" onclick="abrirModalMovimiento()">
+            <i class="fas fa-exchange-alt"></i> Nuevo Movimiento
+        </button>
+    </div>
+
+    <div class="card-style" style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #f8f9fa; text-align: left; border-bottom: 2px solid #ddd;">
+                    <th style="padding: 12px;">Producto</th>
+                    <th style="padding: 12px;">Stock Actual</th>
+                    <th style="padding: 12px;">Precio x Unidad</th>
+                    <th style="padding: 12px;">Total Invertido</th>
+                    <th style="padding: 12px;">Estado</th>
+                    <th style="padding: 12px;">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for insumo in insumos %}
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 12px; font-weight: bold;">{{ insumo.nombre }}</td>
+                    
+                    <td style="padding: 12px;">
+                        <span style="font-weight: bold; color: #333;">{{ insumo.stock_actual|floatformat:2 }}</span>
+                        <small style="color: #888;">{{ insumo.unidad.codigo }}</small>
+                    </td>
+
+                    <td style="padding: 12px; color: #666;">
+                        ${{ insumo.costo_unitario|floatformat:2 }} / {{ insumo.unidad.codigo }}
+                    </td>
+
+                    <td style="padding: 12px; font-weight: bold; color: var(--primary-blue);">
+                        ${{ insumo.valor_total_invertido|floatformat:2 }}
+                    </td>
+
+                    <td style="padding: 12px;">
+                        {% if insumo.stock_actual <= insumo.stock_minimo %}
+                            <span style="background: #ffebee; color: #c62828; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold;">⚠️ Bajo</span>
+                        {% else %}
+                            <span style="background: #e8f5e9; color: #2e7d32; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold;">✅ OK</span>
+                        {% endif %}
+                    </td>
+
+                    <td style="padding: 12px;">
+                        <button onclick="abrirModalMovimiento('{{ insumo.id }}', 'ENTRADA')" 
+                                style="background: none; border: 1px solid #ddd; padding: 5px 10px; border-radius: 4px; cursor: pointer; color: var(--primary-blue);">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" style="text-align:center; padding:20px;">Sin inventario</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="modal-movimiento" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1000; justify-content:center; align-items:center; backdrop-filter: blur(2px);">
+    <div style="background:white; padding:30px; border-radius:12px; width:600px; max-width: 95%; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 style="margin:0; color:var(--primary-blue);">Registrar Movimiento</h3>
+            <button onclick="cerrarModal()" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+        </div>
+        
+        <form action="{% url 'add_movement' %}" method="POST">
+            {% csrf_token %}
+            
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">Insumo:</label>
+            <select name="insumo_id" id="modal-insumo-select" required style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:6px; background-color: #f9f9f9;">
+                {% for ins in insumos %}
+                    <option value="{{ ins.id }}">{{ ins.nombre }} ({{ ins.unidad.codigo }})</option>
+                {% endfor %}
+            </select>
+
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">Acción:</label>
+            <select name="tipo" id="modal-tipo-select" onchange="actualizarFormulario(this.value)" required style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:6px;">
+                <option value="ENTRADA">🟢 Entrada / Compra</option>
+                <option value="SALIDA">🔴 Salida / Merma</option>
+                <option value="AJUSTE">🔵 Ajuste Inventario</option>
+            </select>
+
+            <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                <div style="flex: 1;">
+                    <label style="display:block; margin-bottom:5px; font-weight:bold;">Cantidad (Peso/Unid):</label>
+                    <input type="text" inputmode="decimal" name="cantidad" required placeholder="Ej: 50" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px;">
+                </div>
+
+                <div id="contenedor-costo" style="flex: 1;">
+                    <label style="display:block; margin-bottom:5px; font-weight:bold;">Costo Total Factura ($):</label>
+                    <input type="text" inputmode="decimal" name="costo_total" id="input-costo" placeholder="Ej: 25.00" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px;">
+                    <small style="color:#888;">El sistema calculará el precio por Kg.</small>
+                </div>
+            </div>
+
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">Nota:</label>
+            <textarea name="nota" rows="2" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px; resize: none;"></textarea>
+
+            <div style="margin-top:25px; text-align:right;">
+                <button type="button" onclick="cerrarModal()" style="margin-right:10px; padding:10px 20px; cursor:pointer;">Cancelar</button>
+                <button type="submit" class="add-btn" style="padding:10px 25px; cursor:pointer; border:none; border-radius:6px;">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Tu script de SweetAlert y funciones del modal...
+    // (Mantén el mismo script que te di en el paso anterior, funciona igual)
+    document.addEventListener('DOMContentLoaded', function() {
+        {% if messages %}
+            {% for message in messages %}
+                Swal.fire({
+                    title: "{{ message.tags|title }}",
+                    text: "{{ message }}",
+                    icon: "{{ message.tags }}",
+                    confirmButtonColor: '#3085d6',
+                    timer: 3000
+                });
+            {% endfor %}
+        {% endif %}
+    });
+
+    function abrirModalMovimiento(insumoId = null, tipo = 'ENTRADA') {
+        document.getElementById('modal-movimiento').style.display = 'flex';
+        if(insumoId) document.getElementById('modal-insumo-select').value = insumoId;
+        
+        document.getElementById('modal-tipo-select').value = tipo;
+        actualizarFormulario(tipo);
+    }
+
+    function cerrarModal() {
+        document.getElementById('modal-movimiento').style.display = 'none';
+    }
+
+    function actualizarFormulario(tipo) {
+        const divCosto = document.getElementById('contenedor-costo');
+        const inCosto = document.getElementById('input-costo');
+        if (tipo === 'ENTRADA') {
+            divCosto.style.display = 'block';
+            inCosto.required = true;
+        } else {
+            divCosto.style.display = 'none';
+            inCosto.required = false;
+        }
+    }
+    
+    window.onclick = function(e) { if(e.target == document.getElementById('modal-movimiento')) cerrarModal(); }
+</script>
+{% endblock %}
