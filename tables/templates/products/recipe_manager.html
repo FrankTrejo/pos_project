@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}- Receta {{ producto.nombre }}{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<div style="padding: 20px; max-width: 1200px; margin: 0 auto;">
+    
+    <div style="text-align: center; margin-bottom: 30px;">
+        <h2 style="color: var(--primary-blue); margin-bottom: 5px;">Paso 2: Ingeniería de Receta</h2>
+        <p style="color: #666;">Define los ingredientes para <b>{{ producto.nombre }}</b></p>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 20px;">
+        
+        <div class="card-style" style="height: fit-content; position: sticky; top: 20px;">
+            <h3 style="margin-top: 0; color: #444;">Resumen de Costo</h3>
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+            
+            <div style="margin-bottom: 20px;">
+                <div style="font-size: 0.9em; color: #666;">Costo Acumulado</div>
+                <div style="font-size: 2em; font-weight: bold; color: #d32f2f;">
+                    ${{ costo_total|floatformat:2 }}
+                </div>
+                <small style="color: #888;">Suma de todos los ingredientes</small>
+            </div>
+
+            <a href="{% url 'product_pricing' producto.id %}" class="add-btn" style="display: block; text-align: center; text-decoration: none; padding: 15px; margin-top: 20px;">
+                Siguiente: Definir Precio <i class="fas fa-arrow-right"></i>
+            </a>
+            
+            <div style="margin-top: 10px; text-align: center;">
+                <a href="{% url 'product_edit_basic' producto.id %}" style="color: #666; font-size: 0.9em; text-decoration: none;">
+                    <i class="fas fa-arrow-left"></i> Volver a editar nombre
+                </a>
+            </div>
+        </div>
+
+        <div class="card-style">
+            <h3 style="margin-top: 0;">Ingredientes / Composición</h3>
+            
+            <form method="POST" style="background: #f1f8ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 10px; align-items: end;">
+                {% csrf_token %}
+                <div style="flex-grow: 1;">
+                    <label style="font-size: 0.8em; font-weight: bold; display: block; margin-bottom: 5px;">Seleccionar Insumo:</label>
+                    {{ form.insumo }}
+                </div>
+                <div style="width: 140px;">
+                    <label style="font-size: 0.8em; font-weight: bold; display: block; margin-bottom: 5px;">Cantidad:</label>
+                    {{ form.cantidad }}
+                </div>
+                <button type="submit" class="add-btn" style="height: 42px; width: 50px; display: flex; justify-content: center; align-items: center;">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </form>
+
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="text-align: left; border-bottom: 2px solid #eee; color: #666; font-size: 0.9em;">
+                        <th style="padding: 10px;">Insumo</th>
+                        <th style="padding: 10px;">Cantidad</th>
+                        <th style="padding: 10px;">Costo Unit. (Hoy)</th>
+                        <th style="padding: 10px;">Subtotal</th>
+                        <th style="padding: 10px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ing in ingredientes %}
+                    <tr style="border-bottom: 1px solid #f9f9f9;">
+                        <td style="padding: 10px; font-weight: bold;">{{ ing.insumo.nombre }}</td>
+                        <td style="padding: 10px;">
+                            {{ ing.cantidad }} <span style="font-size:0.8em; color:#888;">{{ ing.insumo.unidad.codigo }}</span>
+                        </td>
+                        <td style="padding: 10px; font-size: 0.9em; color: #666;">
+                            ${{ ing.insumo.costo_unitario|floatformat:2 }}
+                        </td>
+                        <td style="padding: 10px; font-weight: bold; color: #444;">
+                            ${{ ing.costo_parcial|floatformat:2 }}
+                        </td>
+                        <td style="padding: 10px; text-align: right;">
+                            <form method="POST" onsubmit="return confirm('¿Quitar este ingrediente?');">
+                                {% csrf_token %}
+                                <input type="hidden" name="delete_ingrediente" value="{{ ing.id }}">
+                                <button type="submit" style="background: none; border: none; color: #ff6b6b; cursor: pointer; padding: 5px;">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 40px; color: #999;">
+                            <i class="fas fa-basket-shopping" style="font-size: 2em; margin-bottom: 10px; display: block;"></i>
+                            Aún no has agregado ingredientes.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // Notificaciones
+    document.addEventListener('DOMContentLoaded', function() {
+        {% if messages %}
+            {% for message in messages %}
+                const icon = "{{ message.tags }}" === "success" ? "success" : "warning";
+                Swal.fire({
+                    title: "{{ message.tags|title }}",
+                    text: "{{ message }}",
+                    icon: icon,
+                    confirmButtonColor: '#3085d6',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+            {% endfor %}
+        {% endif %}
+    });
+</script>
+
+<style>
+    /* Estilos para los inputs del formulario Django */
+    .form-input {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+    .form-input:focus {
+        border-color: var(--primary-blue);
+        outline: none;
+    }
+</style>
+{% endblock %}
