@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
+from inventory.models import Insumo
+from decimal import Decimal
 
 # 1. Modelo para optimizar el BCV (Punto 1)
 class TasaBCV(models.Model):
@@ -17,28 +19,48 @@ class Categoria(models.Model):
         return self.nombre
 
 class Producto(models.Model):
-    # Opciones fijas para evitar errores de escritura
     OPCIONES_TAMANO = [
         ('IND', 'Individual'),
         ('MED', 'Mediana'),
         ('FAM', 'Familiar'),
-        ('UNI', 'Único/Bebida'), # Para cosas que no tienen tamaño (ej: Coca Cola)
+        ('UNI', 'Único/Bebida'),
     ]
 
     nombre = models.CharField(max_length=100)
-    precio = models.DecimalField(max_digits=10, decimal_places=2)
-    # Agregamos el campo tamano
-    tamano = models.CharField(
-        max_length=3, 
-        choices=OPCIONES_TAMANO, 
-        default='UNI',
-        verbose_name="Tamaño"
-    )
+    precio = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Precio Venta ($)")
+    tamano = models.CharField(max_length=3, choices=OPCIONES_TAMANO, default='UNI')
     categoria = models.ForeignKey(Categoria, on_delete=models.CASCADE, related_name='productos')
     
+    # OPCIONAL: Imagen del producto
+    # imagen = models.ImageField(upload_to='productos/', blank=True, null=True)
+
     def __str__(self):
-        # Muestra "Pizza (FAM)" o "Coca Cola (UNI)"
-        return f"{self.nombre} ({self.tamano}) - ${self.precio}"
+        return f"{self.nombre} ({self.tamano})"
+
+    # --- LÓGICA DE COSTOS AUTOMÁTICA ---
+    @property
+    def costo_receta(self):
+        """Calcula cuánto cuesta hacer este producto sumando sus ingredientes"""
+        total_costo = Decimal('0.00')
+        # Recorremos todos los ingredientes de este producto
+        for ingrediente in self.ingredientes.all():
+            if ingrediente.insumo:
+                # Costo = Cantidad de la receta * Costo Promedio actual del insumo
+                costo_insumo = ingrediente.cantidad * ingrediente.insumo.costo_unitario
+                total_costo += costo_insumo
+        return total_costo
+
+    @property
+    def ganancia_estimada(self):
+        """Muestra cuánto ganas: Precio Venta - Costo Receta"""
+        return self.precio - self.costo_receta
+    
+    @property
+    def margen_ganancia(self):
+        """Margen en porcentaje"""
+        if self.precio > 0:
+            return (self.ganancia_estimada / self.precio) * 100
+        return 0
 
 # Tu modelo original de Mesas
 class Table(models.Model):
@@ -66,3 +88,17 @@ class Table(models.Model):
     def __str__(self):
         mesero_nombre = self.mesero.username if self.mesero else "Sin mesero"
         return f"Mesa {self.number} - {mesero_nombre}"
+    
+# --- NUEVO MODELO: LA RECETA ---
+class IngredienteProducto(models.Model):
+    producto = models.ForeignKey(Producto, on_delete=models.CASCADE, related_name='ingredientes')
+    insumo = models.ForeignKey(Insumo, on_delete=models.PROTECT, verbose_name="Insumo (Inventario)")
+    cantidad = models.DecimalField(max_digits=10, decimal_places=4, help_text="Cantidad a descontar del inventario (Ej: 0.200 para 200g)")
+
+    def __str__(self):
+        return f"{self.insumo.nombre} ({self.cantidad} {self.insumo.unidad.codigo})"
+
+    # Calculamos el costo parcial solo para mostrarlo en el admin
+    @property
+    def costo_parcial(self):
+        return self.cantidad * self.insumo.costo_unitario
