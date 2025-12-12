@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% block title %}- Configurar Precio{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 40px auto; padding: 20px;">
+    
+    <div style="text-align: center; margin-bottom: 30px;">
+        <h2 style="color: var(--primary-blue);">Paso 3: Configuración de Precio</h2>
+        <p style="color: #666;">Define el precio de venta para <b>{{ producto.nombre }}</b> ({{ producto.get_tamano_display }})</p>
+    </div>
+
+    <div class="card-style" style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: start;">
+        
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
+            <h3 style="margin-top: 0; color: #444;">Estructura de Costos</h3>
+            
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                <span>Costo Ingredientes:</span>
+                <b>${{ costo_receta|floatformat:2 }}</b>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; color: #888;">
+                <span>Costos Adicionales:</span>
+                <span>$0.00</span> </div>
+            
+            <hr style="border: 1px solid #ddd;">
+            
+            <div style="display: flex; justify-content: space-between; font-size: 1.2em;">
+                <span>Costo Total:</span>
+                <b style="color: #d32f2f;">${{ costo_total_final|floatformat:2 }}</b>
+            </div>
+        </div>
+
+        <div>
+            <form method="POST">
+                {% csrf_token %}
+                
+                <label style="font-weight: bold; display: block; margin-bottom: 5px;">Precio de Venta Sugerido ($):</label>
+                {{ form.precio }}
+                
+                <div style="margin-top: 20px; padding: 15px; border: 1px solid #eee; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 0.9em; color: #666;">Ganancia Proyectada</div>
+                    <div id="live-ganancia" style="font-size: 1.5em; font-weight: bold; color: #ccc;">$0.00</div>
+                    <div id="live-margen" style="font-size: 0.9em; color: #999;">Margen: 0%</div>
+                </div>
+
+                <div style="margin-top: 25px; display: flex; gap: 10px;">
+                    <a href="{% url 'recipe_manager' producto.id %}" style="padding: 10px 20px; color: #666; text-decoration: none;">Atrás</a>
+                    <button type="submit" class="add-btn" style="flex-grow: 1;">Finalizar Producto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Script para calcular ganancia en tiempo real sin recargar
+    const inputPrecio = document.getElementById('input-precio');
+    const displayGanancia = document.getElementById('live-ganancia');
+    const displayMargen = document.getElementById('live-margen');
+    
+    // Traemos el costo desde Django
+    const costoTotal = parseFloat("{{ costo_total_final|stringformat:'f' }}");
+
+    inputPrecio.addEventListener('input', function() {
+        const precio = parseFloat(this.value) || 0;
+        
+        if (precio > 0) {
+            const ganancia = precio - costoTotal;
+            const margen = (ganancia / precio) * 100;
+            
+            displayGanancia.textContent = `$${ganancia.toFixed(2)}`;
+            displayMargen.textContent = `Margen: ${margen.toFixed(1)}%`;
+            
+            if (ganancia > 0) {
+                displayGanancia.style.color = 'var(--primary-blue)';
+                displayMargen.style.color = '#28a745';
+            } else {
+                displayGanancia.style.color = '#dc3545';
+                displayMargen.style.color = '#dc3545';
+            }
+        } else {
+            displayGanancia.textContent = "$0.00";
+            displayGanancia.style.color = "#ccc";
+        }
+    });
+</script>
+{% endblock %}

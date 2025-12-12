@@ -2,7 +2,6 @@ from django import forms
 from .models import Producto, IngredienteProducto
 from inventory.models import Insumo
 
-
 # PASO 1: SOLO DATOS BÁSICOS
 class ProductoBasicForm(forms.ModelForm):
     class Meta:
@@ -11,6 +10,17 @@ class ProductoBasicForm(forms.ModelForm):
         widgets = {
             'nombre': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Ej: Pizza Margarita'}),
             'categoria': forms.Select(attrs={'class': 'form-input'}),
+            'tamano': forms.Select(attrs={'class': 'form-input'}),
+        }
+
+class ProductoForm(forms.ModelForm):
+    class Meta:
+        model = Producto
+        fields = ['nombre', 'categoria', 'precio', 'tamano']
+        widgets = {
+            'nombre': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Ej: Pizza Margarita'}),
+            'categoria': forms.Select(attrs={'class': 'form-input'}),
+            'precio': forms.NumberInput(attrs={'class': 'form-input', 'step': '0.01'}),
             'tamano': forms.Select(attrs={'class': 'form-input'}),
         }
 
@@ -36,4 +46,3 @@ class ProductoPriceForm(forms.ModelForm):
         widgets = {
             'precio': forms.NumberInput(attrs={'class': 'form-input', 'step': '0.01', 'id': 'input-precio'}),
         }
-

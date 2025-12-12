@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block content %}
+<div style="max-width: 500px; margin: 40px auto; padding: 20px;" class="card-style">
+    <h2 style="color: var(--primary-blue); text-align: center;">{{ titulo }}</h2>
+    <form method="POST">
+        {% csrf_token %}
+        {% for field in form %}
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 5px;">{{ field.label }}</label>
+                {{ field }}
+            </div>
+        {% endfor %}
+        <button type="submit" class="add-btn" style="width: 100%; margin-top: 10px;">Guardar y Configurar Receta</button>
+    </form>
+</div>
+{% endblock %}

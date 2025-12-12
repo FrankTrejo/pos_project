@@ -5,11 +5,17 @@ from django.shortcuts import render
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.db.models import Max
-from .models import Table, Categoria, Producto, TasaBCV
+from .models import Categoria, Producto, TasaBCV, Table
 from .scrapping import obtener_tasa_bcv
 from django.contrib.auth.models import User
 from django.http import JsonResponse
 import json
+
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
+from django.contrib.admin.views.decorators import staff_member_required
+from .models import Producto, IngredienteProducto
+from .forms import ProductoBasicForm, IngredienteForm, ProductoPriceForm #
 
 # El punto (.) significa "importa desde la misma carpeta donde estoy"
 try:
@@ -98,3 +104,94 @@ def asignar_mesero(request, table_id):
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
     return JsonResponse({'status': 'error'}, status=400)
 
+# --- IMPORTS NECESARIOS AL PRINCIPIO DEL ARCHIVO ---
+from .forms import ProductoForm, IngredienteForm
+from .models import Producto, IngredienteProducto
+from django.contrib import messages
+from django.contrib.admin.views.decorators import staff_member_required
+
+# 1. LISTADO DE PRODUCTOS (CATÁLOGO)
+@staff_member_required # Solo administradores
+def product_list(request):
+    productos = Producto.objects.all().order_by('nombre')
+    return render(request, 'products/product_list.html', {'productos': productos})
+
+# 1. CREAR PRODUCTO (PASO 1)
+@staff_member_required
+def product_create(request, pk=None):
+    if pk:
+        producto = get_object_or_404(Producto, pk=pk)
+        titulo = "Editar Datos Básicos"
+    else:
+        producto = None
+        titulo = "Paso 1: Crear Producto"
+
+    if request.method == 'POST':
+        form = ProductoBasicForm(request.POST, instance=producto)
+        if form.is_valid():
+            prod = form.save(commit=False)
+            if not pk:
+                prod.precio = 0 # Precio inicial temporal
+            prod.save()
+            
+            messages.success(request, "Paso 1 completado. Ahora agrega los ingredientes.")
+            # REDIRECCIÓN AL PASO 2
+            return redirect('recipe_manager', pk=prod.pk)
+    else:
+        form = ProductoBasicForm(instance=producto)
+
+    return render(request, 'products/product_form.html', {'form': form, 'titulo': titulo})
+
+# 2. GESTOR DE RECETAS (PASO 2 - Lógica mantenida, solo cambia navegación)
+@staff_member_required
+def recipe_manager(request, pk):
+    producto = get_object_or_404(Producto, pk=pk)
+    
+    if request.method == 'POST':
+        if 'delete_ingrediente' in request.POST:
+            ing_id = request.POST.get('delete_ingrediente')
+            IngredienteProducto.objects.filter(id=ing_id).delete()
+            messages.warning(request, "Ingrediente eliminado.")
+            return redirect('recipe_manager', pk=pk)
+            
+        form = IngredienteForm(request.POST)
+        if form.is_valid():
+            ingrediente = form.save(commit=False)
+            ingrediente.producto = producto
+            ingrediente.save()
+            messages.success(request, "Ingrediente agregado.")
+            return redirect('recipe_manager', pk=pk)
+    else:
+        form = IngredienteForm()
+
+    context = {
+        'producto': producto,
+        'ingredientes': producto.ingredientes.all(),
+        'form': form,
+        'costo_total': producto.costo_receta,
+        # Nota: Aquí ya no mostramos ganancia porque el precio aún es 0 o indefinido
+    }
+    return render(request, 'products/recipe_manager.html', context)
+
+# 3. CONFIGURACIÓN DE PRECIOS (PASO 3 - NUEVO)
+@staff_member_required
+def product_pricing(request, pk):
+    producto = get_object_or_404(Producto, pk=pk)
+    
+    if request.method == 'POST':
+        form = ProductoPriceForm(request.POST, instance=producto)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"¡Producto '{producto.nombre}' finalizado y listo para venta!")
+            return redirect('product_list')
+    else:
+        form = ProductoPriceForm(instance=producto)
+
+    context = {
+        'producto': producto,
+        'form': form,
+        'costo_receta': producto.costo_receta,
+        # Aquí en el futuro sumaremos los "Costos Adicionales"
+        'costo_total_final': producto.costo_receta, 
+    }
+    return render(request, 'products/product_pricing.html', context)
