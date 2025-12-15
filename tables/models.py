@@ -71,7 +71,33 @@ class Table(models.Model):
         ordering = ['number']
 
     def __str__(self):
-        return f"Mesa {self.number}"
+        return f"{self.nombre} ({self.tamano})"
+
+    # --- LÓGICA DE COSTOS AUTOMÁTICA ---
+    @property
+    def costo_receta(self):
+        """Calcula cuánto cuesta hacer este producto sumando sus ingredientes"""
+        total_costo = Decimal('0.00')
+        # Recorremos todos los ingredientes de este producto
+        for ingrediente in self.ingredientes.all():
+            if ingrediente.insumo:
+                # Costo = Cantidad de la receta * Costo Promedio actual del insumo
+                costo_insumo = ingrediente.cantidad * ingrediente.insumo.costo_unitario
+                total_costo += costo_insumo
+        return total_costo
+
+    @property
+    def ganancia_estimada(self):
+        """Muestra cuánto ganas: Precio Venta - Costo Receta"""
+        return self.precio - self.costo_receta
+    
+    @property
+    def margen_ganancia(self):
+        """Margen en porcentaje"""
+        if self.precio > 0:
+            return (self.ganancia_estimada / self.precio) * 100
+        return 0
+
     
 class Table(models.Model):
     number = models.PositiveIntegerField(unique=True, verbose_name="Número de Mesa")
