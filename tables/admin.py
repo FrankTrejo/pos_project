@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Table, Categoria, Producto, TasaBCV, IngredienteProducto
+from .models import Table, Categoria, Producto, TasaBCV, IngredienteProducto, CostoAdicional, CostoAsignadoProducto
 
 # --- INLINE DE INGREDIENTES ---
 class IngredienteInline(admin.TabularInline):
@@ -81,3 +81,6 @@ class ProductoAdmin(admin.ModelAdmin):
 admin.site.register(Table)
 admin.site.register(Categoria)
 admin.site.register(TasaBCV)
+
+admin.site.register(CostoAdicional)
+# admin.site.register(CostoAsignadoProducto) # No es necesario registrar este, lo veremos en la vista visual

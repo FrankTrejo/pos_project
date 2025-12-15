@@ -37,13 +37,21 @@
                     <td style="padding: 12px; color: #d32f2f;">${{ prod.costo_receta|floatformat:2 }}</td>
                     
                     <td style="padding: 12px;">
-                        {% if prod.margen_ganancia > 30 %}
-                            <span style="background: #e8f5e9; color: #2e7d32; padding: 3px 8px; border-radius: 4px; font-size: 0.85em;">
+                        {% if prod.precio == 0 %}
+                            <span style="background: #eee; color: #888; padding: 3px 8px; border-radius: 4px; font-size: 0.85em;">
+                                --
+                            </span>
+                        {% elif prod.margen_ganancia >= 30 %}
+                            <span style="background: #e8f5e9; color: #2e7d32; padding: 3px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold;">
+                                {{ prod.margen_ganancia|floatformat:0 }}%
+                            </span>
+                        {% elif prod.margen_ganancia >= 0 %}
+                            <span style="background: #fff3cd; color: #856404; padding: 3px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold;">
                                 {{ prod.margen_ganancia|floatformat:0 }}%
                             </span>
                         {% else %}
-                             <span style="background: #ffebee; color: #c62828; padding: 3px 8px; border-radius: 4px; font-size: 0.85em;">
-                                {{ prod.margen_ganancia|floatformat:0 }}%
+                            <span style="background: #f8d7da; color: #721c24; padding: 3px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; border: 1px solid #f5c6cb;">
+                                {{ prod.margen_ganancia|floatformat:0 }}% 📉
                             </span>
                         {% endif %}
                     </td>

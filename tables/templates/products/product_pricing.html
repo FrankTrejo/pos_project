@@ -2,87 +2,213 @@
 {% block title %}- Configurar Precio{% endblock %}
 
 {% block content %}
-<div style="max-width: 800px; margin: 40px auto; padding: 20px;">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<div style="max-width: 900px; margin: 40px auto; padding: 20px;">
     
     <div style="text-align: center; margin-bottom: 30px;">
-        <h2 style="color: var(--primary-blue);">Paso 3: Configuración de Precio</h2>
-        <p style="color: #666;">Define el precio de venta para <b>{{ producto.nombre }}</b> ({{ producto.get_tamano_display }})</p>
+        <h2 style="color: var(--primary-blue);">Paso 3: Estructura de Costos y Precio</h2>
+        <p style="color: #666;">Define los costos indirectos y el precio para <b>{{ producto.nombre }}</b></p>
     </div>
 
-    <div class="card-style" style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: start;">
+    <div class="card-style" style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 30px; align-items: start;">
         
-        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
-            <h3 style="margin-top: 0; color: #444;">Estructura de Costos</h3>
+        <div style="background: #fff;">
             
-            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                <span>Costo Ingredientes:</span>
-                <b>${{ costo_receta|floatformat:2 }}</b>
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span><i class="fas fa-carrot"></i> Costo Materia Prima (Receta):</span>
+                    <b style="font-size: 1.1em;">${{ costo_receta|floatformat:2 }}</b>
+                </div>
+                <div style="text-align: right; font-size: 0.8em; margin-top: 5px;">
+                    <a href="{% url 'recipe_manager' producto.id %}">Editar ingredientes</a>
+                </div>
             </div>
+
+            <h4 style="margin-bottom: 10px; color: #444;">Costos Adicionales / Indirectos</h4>
             
-            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; color: #888;">
-                <span>Costos Adicionales:</span>
-                <span>$0.00</span> </div>
+            <form method="POST" style="background: #e3f2fd; padding: 10px; border-radius: 6px; display: flex; gap: 10px; align-items: end; margin-bottom: 15px;">
+                {% csrf_token %}
+                <input type="hidden" name="add_costo" value="1">
+                <div style="flex-grow: 1;">
+                    <label style="font-size: 0.75em; font-weight: bold;">Concepto:</label>
+                    {{ form_costo.costo_adicional }}
+                </div>
+                <div style="width: 80px;">
+                    <label style="font-size: 0.75em; font-weight: bold;">Valor:</label>
+                    {{ form_costo.valor_aplicado }}
+                </div>
+                <button type="submit" class="add-btn" style="height: 38px; width: 40px; display: flex; justify-content: center; align-items: center;">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </form>
+
+            <table style="width: 100%; font-size: 0.9em; border-collapse: collapse; margin-bottom: 15px;">
+                {% for ca in costos_adicionales %}
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 8px;">
+                        {{ ca.costo_adicional.nombre }}
+                        <span style="color: #888; font-size: 0.85em;">
+                            ({{ ca.valor_aplicado }}{% if ca.costo_adicional.tipo == 'PORCENTAJE' %}%{% endif %})
+                        </span>
+                    </td>
+                    <td style="padding: 8px; font-weight: bold; text-align: right; color: #555;">
+                        + ${{ ca.monto_calculado|floatformat:2 }}
+                    </td>
+                    <td style="padding: 8px; text-align: right; width: 30px;">
+                        <form method="POST">
+                            {% csrf_token %}
+                            <input type="hidden" name="delete_costo" value="{{ ca.id }}">
+                            <button style="border: none; background: none; color: #dc3545; cursor: pointer;">&times;</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                <tr style="background: #f1f1f1;">
+                    <td style="padding: 8px; font-weight: bold;">Subtotal Indirectos:</td>
+                    <td style="padding: 8px; font-weight: bold; text-align: right;">${{ total_indirectos|floatformat:2 }}</td>
+                    <td></td>
+                </tr>
+            </table>
             
-            <hr style="border: 1px solid #ddd;">
+            <hr style="border: 2px solid #eee;">
             
-            <div style="display: flex; justify-content: space-between; font-size: 1.2em;">
-                <span>Costo Total:</span>
+            <div style="display: flex; justify-content: space-between; font-size: 1.3em; margin-top: 15px;">
+                <span>COSTO TOTAL REAL:</span>
                 <b style="color: #d32f2f;">${{ costo_total_final|floatformat:2 }}</b>
             </div>
         </div>
 
-        <div>
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #ddd;">
+            <h3 style="margin-top: 0; color: var(--primary-blue);">Precio de Venta</h3>
+            
             <form method="POST">
                 {% csrf_token %}
+                <input type="hidden" name="save_price" value="1">
                 
-                <label style="font-weight: bold; display: block; margin-bottom: 5px;">Precio de Venta Sugerido ($):</label>
-                {{ form.precio }}
+                <label style="font-weight: bold; display: block; margin-bottom: 5px;">Precio Sugerido ($):</label>
+                {{ form_precio.precio }}
                 
-                <div style="margin-top: 20px; padding: 15px; border: 1px solid #eee; border-radius: 8px; text-align: center;">
-                    <div style="font-size: 0.9em; color: #666;">Ganancia Proyectada</div>
+                <div style="margin-top: 20px; padding: 15px; background: white; border: 1px solid #eee; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 0.9em; color: #666;">Ganancia Real</div>
                     <div id="live-ganancia" style="font-size: 1.5em; font-weight: bold; color: #ccc;">$0.00</div>
                     <div id="live-margen" style="font-size: 0.9em; color: #999;">Margen: 0%</div>
                 </div>
 
-                <div style="margin-top: 25px; display: flex; gap: 10px;">
-                    <a href="{% url 'recipe_manager' producto.id %}" style="padding: 10px 20px; color: #666; text-decoration: none;">Atrás</a>
-                    <button type="submit" class="add-btn" style="flex-grow: 1;">Finalizar Producto</button>
-                </div>
+                <button type="submit" class="add-btn" style="width: 100%; margin-top: 20px; padding: 12px; font-size: 1.1em;">
+                    Finalizar Producto
+                </button>
             </form>
         </div>
     </div>
 </div>
 
 <script>
-    // Script para calcular ganancia en tiempo real sin recargar
+    // 1. Script para calcular ganancia en tiempo real
     const inputPrecio = document.getElementById('input-precio');
     const displayGanancia = document.getElementById('live-ganancia');
     const displayMargen = document.getElementById('live-margen');
     
-    // Traemos el costo desde Django
+    // Traemos el costo TOTAL FINAL desde Django
     const costoTotal = parseFloat("{{ costo_total_final|stringformat:'f' }}");
 
-    inputPrecio.addEventListener('input', function() {
-        const precio = parseFloat(this.value) || 0;
+    if(inputPrecio){
+        // Ejecutar al cargar por si ya tiene precio
+        calcularGanancia(inputPrecio.value);
+
+        inputPrecio.addEventListener('input', function() {
+            calcularGanancia(this.value);
+        });
+    }
+
+    function calcularGanancia(valor) {
+        const precio = parseFloat(valor) || 0;
         
+        // Solo calculamos si hay un precio puesto
         if (precio > 0) {
             const ganancia = precio - costoTotal;
             const margen = (ganancia / precio) * 100;
             
+            // Mostramos los valores (toFixed(2) permite ver negativos como -5.00)
             displayGanancia.textContent = `$${ganancia.toFixed(2)}`;
             displayMargen.textContent = `Margen: ${margen.toFixed(1)}%`;
             
+            // LOGICA DE COLORES
             if (ganancia > 0) {
-                displayGanancia.style.color = 'var(--primary-blue)';
+                // Ganancia Positiva (Verde)
+                displayGanancia.style.color = '#28a745'; 
                 displayMargen.style.color = '#28a745';
+            } else if (ganancia === 0) {
+                // Tablas (Gris)
+                displayGanancia.style.color = '#666';
+                displayMargen.style.color = '#666';
             } else {
-                displayGanancia.style.color = '#dc3545';
+                // PÉRDIDA (Rojo Intenso)
+                displayGanancia.style.color = '#dc3545'; // Rojo peligro
                 displayMargen.style.color = '#dc3545';
+                displayMargen.textContent += " (PÉRDIDA)"; // Agregamos texto de alerta
             }
+
         } else {
+            // Si no hay precio
             displayGanancia.textContent = "$0.00";
+            displayMargen.textContent = "Margen: 0%";
             displayGanancia.style.color = "#ccc";
+            displayMargen.style.color = "#ccc";
         }
+    }
+
+    const costosDefault = {
+        {% for ca in form_costo.fields.costo_adicional.queryset %}
+            // Forzamos 2 decimales con punto (ej: "0.50") desde el servidor
+            "{{ ca.id }}": "{{ ca.valor_defecto|stringformat:'.2f' }}",
+        {% endfor %}
+    };
+
+    const selectCosto = document.getElementById('select-costo-master');
+    // Buscamos el input por su nombre, ya que ahora es type="text"
+    const inputValor = document.querySelector('input[name="valor_aplicado"]');
+
+    if(selectCosto){
+        selectCosto.addEventListener('change', function() {
+            const id = this.value;
+            if(costosDefault[id]) {
+                let valor = costosDefault[id];
+                
+                // CAMBIO VISUAL: Cambiamos el punto por coma para que el usuario lo vea familiar
+                valor = valor.replace('.', ',');
+                
+                inputValor.value = valor;
+            } else {
+                inputValor.value = "";
+            }
+        });
+    }
+    
+    // 3. Alertas
+    document.addEventListener('DOMContentLoaded', function() {
+        {% if messages %}
+            {% for message in messages %}
+                Swal.fire({
+                    title: "{{ message.tags|title }}",
+                    text: "{{ message }}",
+                    icon: "{{ message.tags }}",
+                    confirmButtonColor: '#3085d6',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+            {% endfor %}
+        {% endif %}
     });
 </script>
+
+<style>
+    .form-input {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+</style>
 {% endblock %}

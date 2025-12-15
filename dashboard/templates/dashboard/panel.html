@@ -11,14 +11,14 @@
             <i class="fas fa-box card-icon"></i>
             <h3>Productos</h3>
             <p class="summary-text">250 Items activos</p>
-            <a href="#" class="summary-link">Ver catálogo</a>
+            <a href="{% url 'product_list' %}" class="summary-link">Ver catálogo</a>
         </div>
 
         <div class="card-style summary-card text-center">
             <i class="fas fa-clipboard-list card-icon"></i>
             <h3>Inventario</h3>
             <p class="summary-text">Valor total: $4,500</p>
-            <a href="#" class="summary-link">Gestionar stock</a>
+            <a href="{% url 'inventory_index' %}" class="summary-link">Gestionar stock</a>
         </div>
 
         <div class="card-style summary-card text-center">
