@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'tables',
     'dashboard',
     'inventory',
+    'reports',
 ]
 
 MIDDLEWARE = [
