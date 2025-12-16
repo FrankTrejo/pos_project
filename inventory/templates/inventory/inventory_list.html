@@ -8,16 +8,26 @@
 
 <div style="padding: 20px;">
     
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+        
         <div>
             <h2 style="color: var(--primary-blue); margin: 0;">Gestión de Inventario</h2>
-            <p style="color: #666; font-size: 0.9em;">
-                Valor Total Almacén: <b>${{ valor_inventario|floatformat:2 }}</b>
+            <p style="color: #666; margin: 5px 0 0 0; font-size: 0.95em;">
+                Valor Total Almacén: <b style="color: #333;">${{ valor_total|floatformat:2 }}</b>
             </p>
         </div>
-        <button class="add-btn" onclick="abrirModalMovimiento()">
-            <i class="fas fa-exchange-alt"></i> Nuevo Movimiento
-        </button>
+
+        <div style="display: flex; gap: 10px;">
+            
+            <a href="{% url 'insumo_create' %}" class="add-btn" style="background-color: #28a745; text-decoration: none; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-plus-circle"></i> Nuevo Insumo
+            </a>
+
+            <a href="{% url 'inventory_move' %}" class="add-btn" style="background-color: #343a40; text-decoration: none; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-exchange-alt"></i> Nuevo Movimiento
+            </a>
+            
+        </div>
     </div>
 
     <div class="card-style" style="overflow-x: auto;">
@@ -42,11 +52,15 @@
                         <small style="color: #888;">{{ insumo.unidad.codigo }}</small>
                     </td>
 
-                    <td style="padding: 12px; color: #666;">
-                        ${{ insumo.costo_unitario|floatformat:2 }} / {{ insumo.unidad.codigo }}
+                    <td style="font-weight: bold; color: #555;">
+                        ${{ insumo.costo_unitario|floatformat:-5 }} 
+                        
+                        <span style="font-size: 0.85em; color: #999;">
+                            / {{ insumo.unidad.codigo }}
+                        </span>
                     </td>
 
-                    <td style="padding: 12px; font-weight: bold; color: var(--primary-blue);">
+                    <td style="font-weight: bold; color: var(--primary-blue);">
                         ${{ insumo.valor_total_invertido|floatformat:2 }}
                     </td>
 

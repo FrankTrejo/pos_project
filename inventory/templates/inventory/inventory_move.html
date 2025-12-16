@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% block title %}- Nuevo Movimiento{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 40px auto; padding: 20px;" class="card-style">
+    
+    <div style="text-align: center; margin-bottom: 25px;">
+        <h2 style="color: var(--primary-blue); margin: 0;">Registrar Movimiento</h2>
+        <p style="color: #666;">Entradas (Compras), Salidas (Mermas) o Ajustes.</p>
+    </div>
+
+    <form method="POST">
+        {% csrf_token %}
+
+        <div style="margin-bottom: 15px;">
+            <label style="font-weight: bold;">Insumo:</label>
+            {{ form.insumo }}
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+            <div>
+                <label style="font-weight: bold;">Tipo de Movimiento:</label>
+                {{ form.tipo }}
+            </div>
+            <div>
+                <label style="font-weight: bold;">Cantidad:</label>
+                {{ form.cantidad }}
+            </div>
+        </div>
+
+        <div style="margin-bottom: 15px;">
+            <label style="font-weight: bold;">Costo Unitario ($):</label>
+            {{ form.costo_unitario_movimiento }}
+            <small style="color: #888; display: block;">
+                Si es una COMPRA, ingresa el precio nuevo. Si es SALIDA, puedes dejarlo en 0.
+            </small>
+        </div>
+
+        <div style="margin-bottom: 25px;">
+            <label style="font-weight: bold;">Nota / Referencia:</label>
+            {{ form.nota }}
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+            <a href="{% url 'inventory_index' %}" style="padding: 10px 20px; color: #666; text-decoration: none;">Cancelar</a>
+            <button type="submit" class="add-btn" style="flex-grow: 1;">Registrar Movimiento</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    // Creamos un diccionario JS con los costos actuales
+    const preciosInsumos = {
+        {% for insumo in form.fields.insumo.queryset %}
+            "{{ insumo.id }}": "{{ insumo.costo_unitario|stringformat:'.4f' }}",
+        {% endfor %}
+    };
+
+    const selectInsumo = document.getElementById('select-insumo');
+    const inputCosto = document.querySelector('input[name="costo_unitario_movimiento"]');
+
+    if(selectInsumo && inputCosto){
+        selectInsumo.addEventListener('change', function() {
+            const id = this.value;
+            if(preciosInsumos[id]) {
+                // Rellenamos el costo automáticamente
+                inputCosto.value = parseFloat(preciosInsumos[id]).toFixed(2);
+            } else {
+                inputCosto.value = "";
+            }
+        });
+    }
+</script>
+{% endblock %}

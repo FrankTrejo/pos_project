@@ -1,6 +1,8 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib import messages
-from .models import Insumo, MovimientoInventario, CategoriaInsumo
+from .models import Insumo, MovimientoInventario, CategoriaInsumo, IngredienteCompuesto
+from .forms import InsumoForm, ComponenteForm, MovimientoInventarioForm
 from django.db import models
 import re
 from decimal import Decimal  # <--- IMPORTANTE: Importamos el tipo de dato correcto
@@ -145,3 +147,83 @@ def add_movement(request):
         return redirect('inventory_index')
     
     return redirect('inventory_index')
+
+# 1. CREAR INSUMO NUEVO
+def insumo_create(request):
+    if request.method == 'POST':
+        form = InsumoForm(request.POST)
+        if form.is_valid():
+            insumo = form.save()
+            
+            # LÓGICA DE FLUJO
+            if insumo.es_insumo_compuesto:
+                messages.info(request, "Insumo creado. Ahora define su composición.")
+                return redirect('insumo_composition', pk=insumo.pk)
+            else:
+                messages.success(request, "Insumo registrado correctamente.")
+                return redirect('inventory_index') # O a donde tengas tu lista
+    else:
+        form = InsumoForm()
+
+    return render(request, 'inventory/insumo_form.html', {'form': form})
+
+# 2. GESTIONAR COMPOSICIÓN (Para Masa, Salsa, etc.)
+def insumo_composition(request, pk):
+    insumo_padre = get_object_or_404(Insumo, pk=pk)
+    
+    # Validar seguridad
+    if not insumo_padre.es_insumo_compuesto:
+        messages.error(request, "Este insumo no está marcado como compuesto.")
+        return redirect('inventory_index')
+
+    if request.method == 'POST':
+        # Eliminar componente
+        if 'delete_componente' in request.POST:
+            cid = request.POST.get('delete_componente')
+            IngredienteCompuesto.objects.filter(id=cid).delete()
+            insumo_padre.calcular_costo_desde_subreceta() # Recalcular costo
+            messages.warning(request, "Componente eliminado.")
+            return redirect('insumo_composition', pk=pk)
+
+        # Agregar componente
+        form = ComponenteForm(request.POST)
+        if form.is_valid():
+            comp = form.save(commit=False)
+            comp.insumo_padre = insumo_padre
+            comp.save()
+            insumo_padre.calcular_costo_desde_subreceta() # Recalcular costo automáticamente
+            messages.success(request, "Componente agregado.")
+            return redirect('insumo_composition', pk=pk)
+    else:
+        form = ComponenteForm()
+
+    context = {
+        'insumo': insumo_padre,
+        'componentes': insumo_padre.componentes.all(),
+        'form': form,
+    }
+    return render(request, 'inventory/insumo_composition.html', context)
+
+@staff_member_required
+def inventory_move(request):
+    if request.method == 'POST':
+        form = MovimientoInventarioForm(request.POST)
+        if form.is_valid():
+            movimiento = form.save(commit=False)
+            insumo = movimiento.insumo
+            
+            # VALIDACIÓN DE STOCK NEGATIVO
+            # Si intenta sacar más de lo que hay, lanzamos error y no guardamos.
+            if movimiento.tipo == 'SALIDA' and movimiento.cantidad > insumo.stock_actual:
+                messages.error(request, f"Error: No tienes suficiente stock de {insumo.nombre}. (Actual: {insumo.stock_actual})")
+            else:
+                movimiento.usuario = request.user
+                movimiento.save() # Al guardar, la SEÑAL del modelo actualiza el stock y el precio automáticamente
+                
+                tipo_accion = "agregada" if movimiento.tipo == 'ENTRADA' else "registrada"
+                messages.success(request, f"{movimiento.get_tipo_display()} {tipo_accion} correctamente.")
+                return redirect('inventory_index')
+    else:
+        form = MovimientoInventarioForm()
+
+    return render(request, 'inventory/inventory_move.html', {'form': form})

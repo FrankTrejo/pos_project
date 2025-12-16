@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block title %}- Nuevo Insumo{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 40px auto; padding: 20px;" class="card-style">
+    <h2 style="color: var(--primary-blue);">Registrar Nuevo Insumo</h2>
+    
+    <form method="POST">
+        {% csrf_token %}
+        
+        <div style="margin-bottom: 15px;">
+            <label>Nombre:</label>
+            {{ form.nombre }}
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+            <div><label>Categoría:</label>{{ form.categoria }}</div>
+            <div><label>Unidad:</label>{{ form.unidad }}</div>
+        </div>
+
+        <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+            {{ form.es_insumo_compuesto }}
+            <label for="check-compuesto" style="font-weight: bold; color: #0d47a1; cursor: pointer;">
+                ¿Es un Insumo Compuesto? (Ej: Masa, Salsa)
+            </label>
+        </div>
+
+        <div id="campo-costo" style="margin-bottom: 20px;">
+            <label>Costo Inicial ($):</label>
+            {{ form.costo_unitario }}
+            <small style="display: block; color: #888;">Precio de compra si es materia prima.</small>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+             <label>Stock Mínimo (Alerta):</label>
+             {{ form.stock_minimo }}
+        </div>
+
+        <button type="submit" class="add-btn" style="width: 100%;">Guardar Insumo</button>
+    </form>
+</div>
+
+<script>
+    // Script sencillo para ocultar el campo de costo si es compuesto
+    const check = document.getElementById('check-compuesto');
+    const campoCosto = document.getElementById('campo-costo');
+    const inputCosto = document.querySelector('input[name="costo_unitario"]');
+
+    function toggleCosto() {
+        if(check.checked) {
+            campoCosto.style.display = 'none';
+            inputCosto.value = 0; // Si es compuesto, el costo lo calcula el sistema, inicia en 0
+        } else {
+            campoCosto.style.display = 'block';
+        }
+    }
+
+    check.addEventListener('change', toggleCosto);
+    toggleCosto(); // Ejecutar al inicio
+</script>
+{% endblock %}

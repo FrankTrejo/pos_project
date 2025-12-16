@@ -5,6 +5,7 @@ from decimal import Decimal
 from inventory.models import Insumo
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
+from django.contrib.auth.models import User
 
 # 1. Modelo para optimizar el BCV (Punto 1)
 class TasaBCV(models.Model):
@@ -225,4 +226,33 @@ def update_costo_por_insumo(sender, instance, **kwargs):
     for ingrediente in ingredientes_afectados:
         ingrediente.producto.actualizar_costo_receta()
 
-        
+# --- HISTORIAL DE VENTAS (Para Reportes) ---
+class Venta(models.Model):
+    METODOS_PAGO = [
+        ('EFECTIVO', 'Efectivo'),
+        ('TARJETA', 'Tarjeta / Débito'),
+        ('PAGO_MOVIL', 'Pago Móvil'),
+        ('ZELLE', 'Zelle'),
+        ('OTRO', 'Otro'),
+    ]
+
+    fecha = models.DateTimeField(auto_now_add=True)
+    codigo_factura = models.CharField(max_length=20, unique=True) # Ej: FAC-0001
+    total = models.DecimalField(max_digits=10, decimal_places=2)
+    metodo_pago = models.CharField(max_length=20, choices=METODOS_PAGO)
+    mesero = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='ventas_realizadas')
+    mesa_numero = models.IntegerField(help_text="Número de mesa donde se originó")
+
+    def __str__(self):
+        return f"Venta {self.codigo_factura} - ${self.total}"
+
+class DetalleVenta(models.Model):
+    venta = models.ForeignKey(Venta, on_delete=models.CASCADE, related_name='detalles')
+    producto = models.ForeignKey(Producto, on_delete=models.SET_NULL, null=True)
+    nombre_producto = models.CharField(max_length=100) # Guardamos el nombre por si borran el producto luego
+    cantidad = models.IntegerField()
+    precio_unitario = models.DecimalField(max_digits=10, decimal_places=2)
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def __str__(self):
+        return f"{self.cantidad}x {self.nombre_producto}"
