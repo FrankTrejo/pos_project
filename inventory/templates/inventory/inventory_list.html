@@ -72,12 +72,18 @@
                         {% endif %}
                     </td>
 
-                    <td style="padding: 12px;">
-                        <button onclick="abrirModalMovimiento('{{ insumo.id }}', 'ENTRADA')" 
-                                style="background: none; border: 1px solid #ddd; padding: 5px 10px; border-radius: 4px; cursor: pointer; color: var(--primary-blue);">
+                    <td style="white-space: nowrap;"> <a href="{% url 'insumo_edit' insumo.id %}" title="Editar Insumo" 
+       style="background-color: #ffc107; color: #333; padding: 5px 10px; border-radius: 4px; text-decoration: none; margin-right: 5px; display:     inline-block;">
+                            <i class="fas fa-edit"></i>
+                        </a>
+
+                        <a href="{% url 'inventory_move' %}" title="Agregar Stock"
+                        style="background-color: white; border: 1px solid #dee2e6; color: var(--primary-blue); padding: 5px 10px; border-radius: 4px; text-decoration: none; display: inline-block;">
                             <i class="fas fa-plus"></i>
-                        </button>
+                        </a>
+
                     </td>
+                    
                 </tr>
                 {% empty %}
                 <tr><td colspan="6" style="text-align:center; padding:20px;">Sin inventario</td></tr>

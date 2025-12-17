@@ -168,39 +168,57 @@ def insumo_create(request):
     return render(request, 'inventory/insumo_form.html', {'form': form})
 
 # 2. GESTIONAR COMPOSICIÓN (Para Masa, Salsa, etc.)
+# inventory/views.py
+
+@staff_member_required
 def insumo_composition(request, pk):
     insumo_padre = get_object_or_404(Insumo, pk=pk)
     
-    # Validar seguridad
     if not insumo_padre.es_insumo_compuesto:
-        messages.error(request, "Este insumo no está marcado como compuesto.")
+        messages.error(request, "Este insumo no es compuesto.")
         return redirect('inventory_index')
 
     if request.method == 'POST':
-        # Eliminar componente
+        # --- LÓGICA DE ELIMINAR/AGREGAR (Se mantiene igual) ---
         if 'delete_componente' in request.POST:
             cid = request.POST.get('delete_componente')
             IngredienteCompuesto.objects.filter(id=cid).delete()
-            insumo_padre.calcular_costo_desde_subreceta() # Recalcular costo
-            messages.warning(request, "Componente eliminado.")
+            insumo_padre.calcular_costo_desde_subreceta()
+            messages.warning(request, "Ingrediente eliminado.")
             return redirect('insumo_composition', pk=pk)
 
-        # Agregar componente
         form = ComponenteForm(request.POST)
         if form.is_valid():
             comp = form.save(commit=False)
             comp.insumo_padre = insumo_padre
-            comp.save()
-            insumo_padre.calcular_costo_desde_subreceta() # Recalcular costo automáticamente
-            messages.success(request, "Componente agregado.")
+            
+            if comp.insumo_hijo == insumo_padre:
+                 messages.error(request, "No puedes agregarse a sí mismo.")
+            else:
+                comp.save()
+                insumo_padre.calcular_costo_desde_subreceta()
+                messages.success(request, "Ingrediente agregado.")
             return redirect('insumo_composition', pk=pk)
     else:
         form = ComponenteForm()
 
+    # --- NUEVA LÓGICA DE CÁLCULO ---
+    componentes = insumo_padre.componentes.select_related('insumo_hijo').all()
+    
+    total_cantidad_receta = 0
+    
+    # Recorremos para calcular subtotales precisos en Python
+    for comp in componentes:
+        # Calculamos el costo exacto (Cantidad * Costo Unitario)
+        comp.costo_fila = comp.cantidad * comp.insumo_hijo.costo_unitario
+        # Sumamos al peso total
+        total_cantidad_receta += comp.cantidad
+
     context = {
         'insumo': insumo_padre,
-        'componentes': insumo_padre.componentes.all(),
+        'componentes': componentes,
         'form': form,
+        'total_cantidad': total_cantidad_receta, # Enviamos el total a la plantilla
     }
     return render(request, 'inventory/insumo_composition.html', context)
 
@@ -227,3 +245,31 @@ def inventory_move(request):
         form = MovimientoInventarioForm()
 
     return render(request, 'inventory/inventory_move.html', {'form': form})
+
+# inventory/views.py
+
+@staff_member_required
+def insumo_edit(request, pk):
+    insumo = get_object_or_404(Insumo, pk=pk)
+    
+    if request.method == 'POST':
+        form = InsumoForm(request.POST, instance=insumo)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Insumo '{insumo.nombre}' actualizado correctamente.")
+            
+            # Si es compuesto, preguntamos si quiere ir a editar la receta o volver al inicio
+            if insumo.es_insumo_compuesto:
+                # Opcional: podrías redirigir a la composición directamente si prefieres
+                # return redirect('insumo_composition', pk=insumo.pk)
+                pass 
+
+            return redirect('inventory_index')
+    else:
+        form = InsumoForm(instance=insumo)
+
+    return render(request, 'inventory/insumo_form.html', {
+        'form': form, 
+        'edit_mode': True, # Bandera para saber que estamos editando
+        'insumo': insumo   # Pasamos el objeto para sacar ID y datos extra
+    })

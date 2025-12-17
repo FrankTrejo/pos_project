@@ -7,4 +7,5 @@ urlpatterns = [
     path('nuevo/', views.insumo_create, name='insumo_create'),
     path('movimiento/', views.inventory_move, name='inventory_move'),
     path('composicion/<int:pk>/', views.insumo_composition, name='insumo_composition'),
+    path('editar/<int:pk>/', views.insumo_edit, name='insumo_edit'),
 ]

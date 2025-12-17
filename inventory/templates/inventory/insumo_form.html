@@ -1,61 +1,77 @@
 {% extends 'base.html' %}
-{% block title %}- Nuevo Insumo{% endblock %}
+
+{% block title %}
+    {# CORRECCIÓN AQUÍ: Agregamos el endif que faltaba #}
+    {% if edit_mode %}- Editar {{ insumo.nombre }}{% else %}- Nuevo Insumo{% endif %}
+{% endblock %}
 
 {% block content %}
 <div style="max-width: 600px; margin: 40px auto; padding: 20px;" class="card-style">
-    <h2 style="color: var(--primary-blue);">Registrar Nuevo Insumo</h2>
+    
+    <div style="text-align: center; margin-bottom: 20px;">
+        <h2 style="color: var(--primary-blue);">
+            {% if edit_mode %}Editar Insumo{% else %}Nuevo Insumo{% endif %}
+        </h2>
+        <p style="color: #666;">
+            {% if edit_mode %}Modifica los datos o la receta.{% else %}Registra materia prima o productos semielaborados.{% endif %}
+        </p>
+    </div>
     
     <form method="POST">
         {% csrf_token %}
         
         <div style="margin-bottom: 15px;">
-            <label>Nombre:</label>
+            <label style="font-weight: bold;">Nombre del Insumo:</label>
             {{ form.nombre }}
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-            <div><label>Categoría:</label>{{ form.categoria }}</div>
-            <div><label>Unidad:</label>{{ form.unidad }}</div>
+            <div style="text-align: center;">
+                <label style="font-weight: bold;">Categoría:</label>
+                {{ form.categoria }}
+            </div>
+            <div style="text-align: center;">
+                <label style="font-weight: bold;">Unidad Base (Almacén):</label>
+                {{ form.unidad }}
+                {% if not edit_mode %}
+                <small style="color: #999; font-size: 0.8em; display: block;">Selecciona la unidad más pequeña (Gramos/ML)</small>
+                {% endif %}
+            </div>
         </div>
 
-        <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
-            {{ form.es_insumo_compuesto }}
-            <label for="check-compuesto" style="font-weight: bold; color: #0d47a1; cursor: pointer;">
-                ¿Es un Insumo Compuesto? (Ej: Masa, Salsa)
-            </label>
-        </div>
+        <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #90caf9;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                {{ form.es_insumo_compuesto }}
+                <div>
+                    <label for="check-compuesto" style="font-weight: bold; color: #0d47a1; cursor: pointer; margin: 0;">
+                        ¿Es un Insumo Compuesto? (Ej: Masa, Salsa)
+                    </label>
+                    <div style="font-size: 0.85em; color: #555; margin-top: 2px;">
+                        Actívalo si este insumo se "fabrica" internamente.
+                    </div>
+                </div>
+            </div>
 
-        <div id="campo-costo" style="margin-bottom: 20px;">
-            <label>Costo Inicial ($):</label>
-            {{ form.costo_unitario }}
-            <small style="display: block; color: #888;">Precio de compra si es materia prima.</small>
+            {% if edit_mode and insumo.es_insumo_compuesto %}
+            <div style="margin-top: 15px; border-top: 1px solid #bbdefb; padding-top: 10px;">
+                <a href="{% url 'insumo_composition' insumo.id %}" style="display: block; text-align: center; background: white; color: #0d6efd; padding: 8px; border-radius: 5px; text-decoration: none; font-weight: bold; border: 1px solid #0d6efd;">
+                    <i class="fas fa-flask"></i> Modificar Receta / Ingredientes
+                </a>
+            </div>
+            {% endif %}
         </div>
         
-        <div style="margin-bottom: 20px;">
-             <label>Stock Mínimo (Alerta):</label>
+        <div style="margin-bottom: 25px;">
+             <label style="font-weight: bold;">Stock Mínimo (Alerta):</label>
              {{ form.stock_minimo }}
         </div>
 
-        <button type="submit" class="add-btn" style="width: 100%;">Guardar Insumo</button>
+        <div style="display: flex; gap: 10px;">
+            <a href="{% url 'inventory_index' %}" style="padding: 10px 20px; color: #666; text-decoration: none;">Cancelar</a>
+            <button type="submit" class="add-btn" style="flex-grow: 1;">
+                {% if edit_mode %}Guardar Cambios{% else %}Guardar Insumo{% endif %}
+            </button>
+        </div>
     </form>
 </div>
-
-<script>
-    // Script sencillo para ocultar el campo de costo si es compuesto
-    const check = document.getElementById('check-compuesto');
-    const campoCosto = document.getElementById('campo-costo');
-    const inputCosto = document.querySelector('input[name="costo_unitario"]');
-
-    function toggleCosto() {
-        if(check.checked) {
-            campoCosto.style.display = 'none';
-            inputCosto.value = 0; // Si es compuesto, el costo lo calcula el sistema, inicia en 0
-        } else {
-            campoCosto.style.display = 'block';
-        }
-    }
-
-    check.addEventListener('change', toggleCosto);
-    toggleCosto(); // Ejecutar al inicio
-</script>
 {% endblock %}

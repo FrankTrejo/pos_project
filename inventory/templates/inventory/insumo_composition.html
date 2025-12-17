@@ -4,63 +4,19 @@
 {% block content %}
 
 <style>
-    /* Forzamos el estilo del formulario solo en esta página */
     .composition-form {
-        background-color: #f8f9fa;
-        padding: 20px;
-        border-radius: 8px;
-        border: 1px solid #e9ecef;
-        margin-bottom: 25px;
-        
-        /* Flexbox para alinear los inputs y el botón en una fila ordenada */
-        display: flex;
-        flex-wrap: wrap; /* Permite que baje si la pantalla es muy chica */
-        gap: 15px;       /* Espacio entre columnas */
-        align-items: flex-end; /* Alinea los inputs y el botón abajo */
+        background-color: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #e9ecef; margin-bottom: 25px;
+        display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end;
     }
-
-    /* Estilo para los inputs de este form específico */
-    .composition-form input, 
-    .composition-form select {
-        width: 100%;
-        padding: 8px 10px;
-        border: 1px solid #ced4da;
-        border-radius: 5px;
-        height: 40px; /* Altura fija para que coincidan */
-        box-sizing: border-box;
+    .composition-form input, .composition-form select {
+        width: 100%; padding: 8px 10px; border: 1px solid #ced4da; border-radius: 5px; height: 40px; box-sizing: border-box;
     }
-
-    /* Estilo específico para el botón de sumar (+) */
     .btn-add-ingredient {
-        height: 40px;
-        width: 50px;
-        background-color: #343a40; /* Color oscuro */
-        color: white;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.2rem;
-        transition: background 0.2s;
+        height: 40px; width: 50px; background-color: #343a40; color: white; border: none; border-radius: 5px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;
     }
-    .btn-add-ingredient:hover {
-        background-color: #23272b;
-    }
-
-    /* Contenedores de los campos */
-    .field-group {
-        display: flex;
-        flex-direction: column;
-    }
-    .field-grow {
-        flex-grow: 1; /* El select ocupa todo el espacio sobrante */
-        min-width: 200px;
-    }
-    .field-fixed {
-        width: 150px; /* Ancho fijo para la cantidad */
-    }
+    .field-group { display: flex; flex-direction: column; }
+    .field-grow { flex-grow: 1; min-width: 200px; }
+    .field-fixed { width: 150px; }
 </style>
 
 <div style="max-width: 900px; margin: 40px auto; padding: 20px;">
@@ -68,7 +24,7 @@
     <div style="margin-bottom: 30px; text-align: center;">
         <h2 style="color: #0d6efd; margin: 0;">Composición: {{ insumo.nombre }}</h2>
         <p style="color: #666; margin-top: 10px;">
-            Define la receta para fabricar <b>1 {{ insumo.unidad.codigo }}</b> de este insumo.
+            Define la receta para fabricar <b>{{ total_cantidad }} {{ insumo.unidad.codigo }}</b> de este insumo.
         </p>
     </div>
 
@@ -78,12 +34,12 @@
             <h3 style="margin-top: 0; color: #444;">Costo Calculado</h3>
             <hr style="margin: 10px 0; border: 0; border-top: 1px solid #eee;">
             
-            <div style="font-size: 2.5em; font-weight: bold; color: #28a745; margin: 15px 0;">
+            <div style="font-size: 2.2em; font-weight: bold; color: #28a745; margin: 15px 0;">
                 ${{ insumo.costo_unitario|floatformat:4 }}
             </div>
             
             <div style="font-size: 0.9em; color: #666; margin-bottom: 20px;">
-                Costo por cada {{ insumo.unidad.nombre }}
+                Costo por cada {{ total_cantidad }} {{ insumo.unidad.nombre }}
             </div>
 
             <a href="{% url 'inventory_index' %}" class="add-btn" style="display: block; text-decoration: none; background: #343a40; color: white; padding: 10px; border-radius: 5px;">
@@ -96,21 +52,16 @@
             
             <form method="POST" class="composition-form">
                 {% csrf_token %}
-                
                 <div class="field-group field-grow">
                     <label style="font-weight: bold; margin-bottom: 5px; font-size: 0.9em;">Ingrediente (Hijo):</label>
                     {{ form.insumo_hijo }}
                 </div>
-                
                 <div class="field-group field-fixed">
                     <label style="font-weight: bold; margin-bottom: 5px; font-size: 0.9em;">Cant. ({{ insumo.unidad.codigo }}):</label>
                     {{ form.cantidad }}
                 </div>
-                
                 <div class="field-group">
-                    <button type="submit" class="btn-add-ingredient" title="Agregar Ingrediente">
-                        <i class="fas fa-plus"></i>
-                    </button>
+                    <button type="submit" class="btn-add-ingredient" title="Agregar Ingrediente"><i class="fas fa-plus"></i></button>
                 </div>
             </form>
 
@@ -131,10 +82,10 @@
                             {{ comp.cantidad }} {{ comp.insumo_hijo.unidad.codigo }}
                         </td>
                         <td style="padding: 10px; color: #666;">
-                            ${% widthratio comp.insumo_hijo.costo_unitario 1 comp.cantidad %}
+                            ${{ comp.costo_fila|floatformat:4 }}
                         </td>
                         <td style="padding: 10px; text-align: right;">
-                            <form method="POST" onsubmit="return confirm('¿Eliminar este ingrediente?');">
+                            <form method="POST" onsubmit="return confirm('¿Eliminar?');">
                                 {% csrf_token %}
                                 <input type="hidden" name="delete_componente" value="{{ comp.id }}">
                                 <button type="submit" style="background: none; border: none; color: #dc3545; cursor: pointer;">
@@ -144,13 +95,23 @@
                         </td>
                     </tr>
                     {% empty %}
-                    <tr>
-                        <td colspan="4" style="padding: 30px; text-align: center; color: #999;">
-                            Este insumo aún no tiene ingredientes asignados.
-                        </td>
-                    </tr>
+                    <tr><td colspan="4" style="padding: 30px; text-align: center; color: #999;">Sin ingredientes.</td></tr>
                     {% endfor %}
                 </tbody>
+                
+                {% if componentes %}
+                <tfoot>
+                    <tr style="background-color: #f1f8ff; border-top: 2px solid #0d6efd;">
+                        <td style="padding: 15px 10px; font-weight: bold; color: #0d6efd;">TOTAL MEZCLA:</td>
+                        <td style="padding: 15px 10px; font-weight: bold; color: #333;">
+                            {{ total_cantidad }} {{ insumo.unidad.codigo }}
+                        </td>
+                        <td colspan="2" style="padding: 15px 10px; color: #666; font-size: 0.9em;">
+                            <i>(Peso total esperado)</i>
+                        </td>
+                    </tr>
+                </tfoot>
+                {% endif %}
             </table>
         </div>
     </div>

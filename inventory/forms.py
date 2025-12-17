@@ -5,7 +5,7 @@ from .models import Insumo, IngredienteCompuesto, MovimientoInventario
 class InsumoForm(forms.ModelForm):
     class Meta:
         model = Insumo
-        fields = ['nombre', 'categoria', 'unidad', 'stock_minimo', 'es_insumo_compuesto', 'costo_unitario']
+        fields = ['nombre', 'categoria', 'unidad', 'stock_minimo', 'es_insumo_compuesto']
         widgets = {
             'nombre': forms.TextInput(attrs={'class': 'form-input'}),
             'categoria': forms.Select(attrs={'class': 'form-input'}),
