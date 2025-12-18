@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% block title %}- Producción {{ insumo.nombre }}{% endblock %}
+
+{% block content %}
+<div style="max-width: 850px; margin: 40px auto; padding: 20px;" class="card-style">
+    
+    <div style="text-align: center; margin-bottom: 30px;">
+        <h2 style="color: var(--primary-blue); margin: 0;">Producción de {{ insumo.nombre }}</h2>
+        <p style="color: #666;">Registra cuántas veces preparaste la receta completa.</p>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 30px;">
+        
+        <div>
+            <div style="background: #e3f2fd; padding: 25px; border-radius: 10px; border: 1px solid #90caf9; text-align: center;">
+                <h3 style="margin-top: 0; color: #0d47a1;">Registrar Tandas</h3>
+                
+                <form method="POST">
+                    {% csrf_token %}
+                    <div style="margin-bottom: 20px;">
+                        <label style="font-weight: bold; display: block; margin-bottom: 10px;">{{ form.cantidad_lotes.label }}</label>
+                        {{ form.cantidad_lotes }}
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        {{ form.nota }}
+                    </div>
+
+                    <div style="background: white; padding: 10px; border-radius: 5px; margin-bottom: 20px;">
+                        <span style="color: #666; font-size: 0.9em;">Total a ingresar al stock:</span><br>
+                        <b style="font-size: 1.4em; color: #28a745;" id="preview-total">{{ peso_lote|floatformat:0 }}</b> 
+                        <span style="font-weight: bold;">{{ insumo.unidad.codigo }}</span>
+                    </div>
+
+                    <button type="submit" class="add-btn" style="width: 100%; font-size: 1.1em; padding: 12px;">
+                        <i class="fas fa-check-circle"></i> Confirmar Producción
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div>
+            <h4 style="margin-top: 0; color: #444;">Por cada lote (1) se descontará:</h4>
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.95em;">
+                <thead>
+                    <tr style="border-bottom: 2px solid #eee; text-align: left; color: #888;">
+                        <th style="padding: 8px;">Ingrediente</th>
+                        <th style="padding: 8px;">Cantidad Exacta</th>
+                        <th style="padding: 8px;">Stock Disp.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for comp in componentes %}
+                    <tr style="border-bottom: 1px solid #f9f9f9;">
+                        <td style="padding: 10px; font-weight: bold;">{{ comp.insumo_hijo.nombre }}</td>
+                        <td style="padding: 10px; color: #d32f2f;">-{{ comp.cantidad|floatformat:0 }} {{ comp.insumo_hijo.unidad.codigo }}</td>
+                        <td style="padding: 10px;">
+                            {% if comp.insumo_hijo.stock_actual < comp.cantidad %}
+                                <span style="color: red; font-weight: bold;">⚠️ {{ comp.insumo_hijo.stock_actual|floatformat:0 }}</span>
+                            {% else %}
+                                <span style="color: green;">{{ comp.insumo_hijo.stock_actual|floatformat:0 }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div style="margin-top: 15px; padding: 10px; background: #fff3cd; color: #856404; border-radius: 5px; font-size: 0.9em;">
+                <i class="fas fa-info-circle"></i> Si haces <b>2 lotes</b>, se descontará el doble de lo que ves en la lista.
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Pequeño script para actualizar el total visualmente
+    const inputLotes = document.querySelector('input[name="cantidad_lotes"]');
+    const previewTotal = document.getElementById('preview-total');
+    const pesoBase = {{ peso_lote|stringformat:"f" }};
+
+    if(inputLotes){
+        inputLotes.addEventListener('input', function(){
+            const val = parseInt(this.value) || 0;
+            const total = val * pesoBase;
+            previewTotal.innerText = total.toFixed(0);
+        });
+    }
+</script>
+{% endblock %}

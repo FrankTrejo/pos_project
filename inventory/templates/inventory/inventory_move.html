@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}- Nuevo Movimiento{% endblock %}
+{% block title %}- Registrar Movimiento{% endblock %}
 
 {% block content %}
 <div style="max-width: 600px; margin: 40px auto; padding: 20px;" class="card-style">
@@ -8,6 +8,13 @@
         <h2 style="color: var(--primary-blue); margin: 0;">Registrar Movimiento</h2>
         <p style="color: #666;">Entradas (Compras), Salidas (Mermas) o Ajustes.</p>
     </div>
+
+    {% if form.errors %}
+    <div style="background-color: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #f5c6cb;">
+        <strong>Error:</strong> Por favor corrige los siguientes campos:
+        {{ form.errors }}
+    </div>
+    {% endif %}
 
     <form method="POST">
         {% csrf_token %}
@@ -20,8 +27,8 @@
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
             <div>
                 <label style="font-weight: bold;">Tipo de Movimiento:</label>
-                {{ form.tipo }}
-            </div>
+                {{ form.tipo }} 
+                </div>
             <div>
                 <label style="font-weight: bold;">Cantidad:</label>
                 {{ form.cantidad }}
@@ -29,10 +36,16 @@
         </div>
 
         <div style="margin-bottom: 15px;">
-            <label style="font-weight: bold;">Costo Unitario ($):</label>
+            <label style="font-weight: bold;">Unidad de Compra / Movimiento:</label>
+            {{ form.unidad_movimiento }} 
+            <small style="color: #666; display: block; margin-top: 2px;">Ej: Selecciona KG si compraste por Kilos.</small>
+        </div>
+
+        <div style="margin-bottom: 15px;">
+            <label style="font-weight: bold;">Costo Total o Unitario ($):</label>
             {{ form.costo_unitario_movimiento }}
             <small style="color: #888; display: block;">
-                Si es una COMPRA, ingresa el precio nuevo. Si es SALIDA, puedes dejarlo en 0.
+                Ingresa el costo correspondiente a la unidad seleccionada arriba. Si es salida, pon 0.
             </small>
         </div>
 
@@ -47,28 +60,4 @@
         </div>
     </form>
 </div>
-
-<script>
-    // Creamos un diccionario JS con los costos actuales
-    const preciosInsumos = {
-        {% for insumo in form.fields.insumo.queryset %}
-            "{{ insumo.id }}": "{{ insumo.costo_unitario|stringformat:'.4f' }}",
-        {% endfor %}
-    };
-
-    const selectInsumo = document.getElementById('select-insumo');
-    const inputCosto = document.querySelector('input[name="costo_unitario_movimiento"]');
-
-    if(selectInsumo && inputCosto){
-        selectInsumo.addEventListener('change', function() {
-            const id = this.value;
-            if(preciosInsumos[id]) {
-                // Rellenamos el costo automáticamente
-                inputCosto.value = parseFloat(preciosInsumos[id]).toFixed(2);
-            } else {
-                inputCosto.value = "";
-            }
-        });
-    }
-</script>
 {% endblock %}

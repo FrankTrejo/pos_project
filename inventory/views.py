@@ -6,6 +6,11 @@ from .forms import InsumoForm, ComponenteForm, MovimientoInventarioForm
 from django.db import models
 import re
 from decimal import Decimal  # <--- IMPORTANTE: Importamos el tipo de dato correcto
+from django.db.models import ProtectedError 
+from django.db import transaction # Importante para que no descuente uno si falla el otro
+from .forms import ProduccionForm
+from django.db import transaction
+from django.db.models import Sum
 
 def inventory_index(request):
     """Muestra el listado de insumos con alertas de stock bajo"""
@@ -272,4 +277,186 @@ def insumo_edit(request, pk):
         'form': form, 
         'edit_mode': True, # Bandera para saber que estamos editando
         'insumo': insumo   # Pasamos el objeto para sacar ID y datos extra
+    })
+
+@staff_member_required
+def insumo_delete(request, pk):
+    insumo = get_object_or_404(Insumo, pk=pk)
+    
+    if request.method == 'POST':
+        try:
+            nombre = insumo.nombre
+            insumo.delete()
+            messages.success(request, f"El insumo '{nombre}' y su historial han sido eliminados.")
+        except ProtectedError:
+            messages.error(request, f"No se puede eliminar '{insumo.nombre}' porque se está usando en una Receta (Insumo Compuesto). Elimínalo de la receta primero.")
+        except Exception as e:
+            messages.error(request, f"Ocurrió un error al eliminar: {e}")
+            
+    return redirect('inventory_index')
+
+@staff_member_required
+@staff_member_required
+def insumo_produccion(request, pk):
+    insumo_padre = get_object_or_404(Insumo, pk=pk)
+    
+    # Validaciones básicas
+    if not insumo_padre.es_insumo_compuesto:
+        messages.error(request, "Solo se pueden producir insumos con receta.")
+        return redirect('inventory_index')
+
+    componentes = insumo_padre.componentes.select_related('insumo_hijo').all()
+    if not componentes:
+        messages.warning(request, "Define la receta primero.")
+        return redirect('insumo_composition', pk=pk)
+
+    # 1. CALCULAR PESO DE 1 LOTE (Suma de todos los ingredientes)
+    # Ej: 10000 Harina + 4000 Agua = 14000 Gramos por Lote
+    peso_por_lote = sum(comp.cantidad for comp in componentes)
+
+    if request.method == 'POST':
+        form = ProduccionForm(request.POST)
+        if form.is_valid():
+            lotes = form.cleaned_data['cantidad_lotes'] # Número entero (1, 2, 3...)
+            nota = form.cleaned_data['nota']
+
+            # 2. VALIDAR STOCK (Multiplicación simple)
+            alcanza = True
+            msg_error = ""
+            
+            for comp in componentes:
+                # Si receta dice 14g y hago 1 lote -> necesito 14g. Exacto.
+                necesario = comp.cantidad * lotes
+                
+                if comp.insumo_hijo.stock_actual < necesario:
+                    alcanza = False
+                    msg_error = f"Falta {comp.insumo_hijo.nombre}. Tienes {comp.insumo_hijo.stock_actual:.0f}, necesitas {necesario:.0f}."
+                    break
+            
+            if not alcanza:
+                messages.error(request, f"⛔ No alcanza el inventario: {msg_error}")
+            else:
+                try:
+                    with transaction.atomic():
+                        # A) RESTAR INGREDIENTES
+                        for comp in componentes:
+                            cantidad_descontar = comp.cantidad * lotes
+                            
+                            MovimientoInventario.objects.create(
+                                insumo=comp.insumo_hijo,
+                                tipo='SALIDA',
+                                cantidad=cantidad_descontar,
+                                unidad_movimiento=comp.insumo_hijo.unidad,
+                                usuario=request.user,
+                                nota=f"Prod. {lotes} lote(s) de {insumo_padre.nombre}"
+                            )
+
+                        # B) SUMAR PRODUCTO TERMINADO (Peso del lote * lotes)
+                        cantidad_producida = peso_por_lote * lotes
+                        
+                        MovimientoInventario.objects.create(
+                            insumo=insumo_padre,
+                            tipo='ENTRADA',
+                            cantidad=cantidad_producida,
+                            unidad_movimiento=insumo_padre.unidad,
+                            # El costo unitario se mantiene
+                            costo_unitario_movimiento=insumo_padre.costo_unitario * cantidad_producida,
+                            usuario=request.user,
+                            nota=f"Producción {lotes} lote(s). {nota}"
+                        )
+                    
+                    messages.success(request, f"¡Listo! Se agregaron {cantidad_producida:.0f}g de {insumo_padre.nombre} (x{lotes} Lotes).")
+                    return redirect('inventory_index')
+
+                except Exception as e:
+                    messages.error(request, f"Error: {e}")
+
+    else:
+        form = ProduccionForm()
+
+    return render(request, 'inventory/produccion_form.html', {
+        'form': form,
+        'insumo': insumo_padre,
+        'componentes': componentes,
+        'peso_lote': peso_por_lote
+    })
+    insumo_padre = get_object_or_404(Insumo, pk=pk)
+    
+    if not insumo_padre.es_insumo_compuesto:
+        messages.error(request, "Solo se pueden producir insumos compuestos (Recetas).")
+        return redirect('inventory_index')
+
+    # Obtenemos la receta (componentes)
+    componentes = insumo_padre.componentes.all()
+    if not componentes:
+        messages.warning(request, "Este insumo no tiene receta definida. Ve a 'Ingeniería de Receta' primero.")
+        return redirect('insumo_composition', pk=pk)
+
+    if request.method == 'POST':
+        form = ProduccionForm(request.POST)
+        if form.is_valid():
+            cantidad_producir = form.cleaned_data['cantidad_a_producir'] # Ej: 10000 gramos
+            nota = form.cleaned_data['nota']
+
+            # 1. VALIDACIÓN DE STOCK (¿Me alcanza la harina?)
+            alcanza = True
+            msg_error = ""
+            
+            # Simulamos el consumo para ver si alcanza
+            for comp in componentes:
+                # La receta dice cuánto necesito para 1 unidad (1 gramo de masa)
+                # Multiplicamos por lo que quiero producir
+                # Ej: 0.6g Harina * 10000g Masa = 6000g Harina necesaria
+                necesario = comp.cantidad * cantidad_producir
+                
+                if comp.insumo_hijo.stock_actual < necesario:
+                    alcanza = False
+                    msg_error = f"Falta stock de {comp.insumo_hijo.nombre}. Tienes {comp.insumo_hijo.stock_actual:.2f}, necesitas {necesario:.2f}."
+                    break
+            
+            if not alcanza:
+                messages.error(request, f"No se puede producir: {msg_error}")
+            else:
+                # 2. EJECUCIÓN (Usamos transaction para que sea todo o nada)
+                try:
+                    with transaction.atomic():
+                        # A) RESTAR INGREDIENTES (Salidas)
+                        for comp in componentes:
+                            cantidad_descontar = comp.cantidad * cantidad_producir
+                            MovimientoInventario.objects.create(
+                                insumo=comp.insumo_hijo,
+                                tipo='SALIDA',
+                                cantidad=cantidad_descontar,
+                                # Asumimos que la cantidad ya está en la unidad base (Gramos)
+                                # Si tuvieras 'unidad_movimiento', habría que buscar la unidad 'Gramos'
+                                # Para simplificar, dejamos unidad_movimiento en None (Factor 1) o buscamos la unidad base.
+                                unidad_movimiento=comp.insumo_hijo.unidad, 
+                                usuario=request.user,
+                                nota=f"Prod. {insumo_padre.nombre} (ID: {insumo_padre.id})"
+                            )
+
+                        # B) SUMAR PRODUCTO TERMINADO (Entrada)
+                        MovimientoInventario.objects.create(
+                            insumo=insumo_padre,
+                            tipo='ENTRADA',
+                            cantidad=cantidad_producir,
+                            unidad_movimiento=insumo_padre.unidad,
+                            costo_unitario_movimiento=insumo_padre.costo_unitario * cantidad_producir, # Valor total
+                            usuario=request.user,
+                            nota=f"Producción Interna. {nota}"
+                        )
+                    
+                    messages.success(request, f"¡Producción exitosa! Se han creado {cantidad_producir} {insumo_padre.unidad.codigo} de {insumo_padre.nombre}.")
+                    return redirect('inventory_index')
+
+                except Exception as e:
+                    messages.error(request, f"Error en base de datos: {e}")
+
+    else:
+        form = ProduccionForm()
+
+    return render(request, 'inventory/produccion_form.html', {
+        'form': form,
+        'insumo': insumo_padre,
+        'componentes': componentes
     })

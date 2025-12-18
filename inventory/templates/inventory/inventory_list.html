@@ -36,54 +36,70 @@
                 <tr style="background: #f8f9fa; text-align: left; border-bottom: 2px solid #ddd;">
                     <th style="padding: 12px;">Producto</th>
                     <th style="padding: 12px;">Stock Actual</th>
-                    <th style="padding: 12px;">Precio x Unidad</th>
-                    <th style="padding: 12px;">Total Invertido</th>
+                    <th style="padding: 12px;">Precio Bruto</th>
+                    <th style="padding: 12px;">Precio x G</th>
                     <th style="padding: 12px;">Estado</th>
                     <th style="padding: 12px;">Acción</th>
                 </tr>
             </thead>
             <tbody>
                 {% for insumo in insumos %}
-                <tr style="border-bottom: 1px solid #eee;">
-                    <td style="padding: 12px; font-weight: bold;">{{ insumo.nombre }}</td>
+                <tr style="border-bottom: 1px solid #f1f1f1;">
                     
+                    <td style="padding: 12px; font-weight: bold;">{{ insumo.nombre }}</td>
+
                     <td style="padding: 12px;">
-                        <span style="font-weight: bold; color: #333;">{{ insumo.stock_actual|floatformat:2 }}</span>
-                        <small style="color: #888;">{{ insumo.unidad.codigo }}</small>
+                        {% if insumo.stock_actual <= insumo.stock_minimo %}
+                            <span style="color: #dc3545; font-weight: bold;">{{ insumo.stock_actual|floatformat:0 }} {{ insumo.unidad.codigo }}</span>
+                        {% else %}
+                            {{ insumo.stock_actual|floatformat:0 }} {{ insumo.unidad.codigo }}
+                        {% endif %}
                     </td>
 
-                    <td style="font-weight: bold; color: #555;">
-                        ${{ insumo.costo_unitario|floatformat:-5 }} 
-                        
-                        <span style="font-size: 0.85em; color: #999;">
-                            / {{ insumo.unidad.codigo }}
-                        </span>
+                    <td style="padding: 12px; color: #666;">
+                        ${{ insumo.precio_mercado|default:"0.00" }} 
+                        <span style="font-size: 0.8em; color: #999;"></span>
                     </td>
 
-                    <td style="font-weight: bold; color: var(--primary-blue);">
-                        ${{ insumo.valor_total_invertido|floatformat:2 }}
+                    <td style="padding: 12px 15px; background: #f0f7ff; font-weight: bold; color: #0d47a1;">
+                        ${{ insumo.costo_unitario|floatformat:5 }}
+                        <span style="font-size: 0.8em; font-weight: normal; color: #888;">/ {{ insumo.unidad.codigo }}</span>
                     </td>
 
                     <td style="padding: 12px;">
                         {% if insumo.stock_actual <= insumo.stock_minimo %}
-                            <span style="background: #ffebee; color: #c62828; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold;">⚠️ Bajo</span>
+                            <span style="background: #ffebeb; color: #dc3545; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold;">
+                                <i class="fas fa-exclamation-triangle"></i> Bajo
+                            </span>
                         {% else %}
-                            <span style="background: #e8f5e9; color: #2e7d32; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold;">✅ OK</span>
+                            <span style="background: #d1e7dd; color: #0f5132; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold;">
+                                <i class="fas fa-check"></i> OK
+                            </span>
                         {% endif %}
                     </td>
 
-                    <td style="white-space: nowrap;"> <a href="{% url 'insumo_edit' insumo.id %}" title="Editar Insumo" 
-       style="background-color: #ffc107; color: #333; padding: 5px 10px; border-radius: 4px; text-decoration: none; margin-right: 5px; display:     inline-block;">
-                            <i class="fas fa-edit"></i>
+                    <td style="white-space: nowrap; padding: 12px;">
+                        <a href="{% url 'maestro_edit' insumo.id %}" title="Editar Maestro" style="background-color: #ffc107; color: #333; padding: 6px 10px; border-radius: 4px; margin-right: 4px; text-decoration: none; display: inline-block;">
+                            <i class="fas fa-pencil-alt"></i>
                         </a>
+                        <form action="{% url 'insumo_delete' insumo.id %}" method="POST" style="display:inline-block;" onsubmit="return confirm('¿Eliminar {{ insumo.nombre }}?');">
+                            {% csrf_token %}
+                            <button type="submit" style="background-color: #dc3545; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer;">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </form>
 
-                        <a href="{% url 'inventory_move' %}" title="Agregar Stock"
-                        style="background-color: white; border: 1px solid #dee2e6; color: var(--primary-blue); padding: 5px 10px; border-radius: 4px; text-decoration: none; display: inline-block;">
+                        <a href="{% url 'inventory_move' %}" style="background-color: white; border: 1px solid #dee2e6; color: var(--primary-blue); padding: 5px 10px; border-radius: 4px; margin-left: 4px; text-decoration: none; display: inline-block;">
                             <i class="fas fa-plus"></i>
                         </a>
-
-                    </td>
-                    
+                        <td style="white-space: nowrap; padding: 12px; text-align: center;">
+                            {% if insumo.es_insumo_compuesto %}
+                                <a href="{% url 'insumo_produccion' insumo.id %}" title="Producir / Cocinar" 
+                                style="background-color: #6610f2; color: white; padding: 8px 12px; border-radius: 6px; margin-right: 5px; text-decoration: none; display: inline-block;">
+                                    <i class="fas fa-blender"></i>
+                                </a>
+                            {% endif %}
+                        </td>
                 </tr>
                 {% empty %}
                 <tr><td colspan="6" style="text-align:center; padding:20px;">Sin inventario</td></tr>

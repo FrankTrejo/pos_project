@@ -8,4 +8,6 @@ urlpatterns = [
     path('movimiento/', views.inventory_move, name='inventory_move'),
     path('composicion/<int:pk>/', views.insumo_composition, name='insumo_composition'),
     path('editar/<int:pk>/', views.insumo_edit, name='insumo_edit'),
+    path('eliminar/<int:pk>/', views.insumo_delete, name='insumo_delete'),
+    path('produccion/<int:pk>/', views.insumo_produccion, name='insumo_produccion'),
 ]

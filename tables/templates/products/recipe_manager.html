@@ -21,7 +21,7 @@
             <div style="margin-bottom: 20px;">
                 <div style="font-size: 0.9em; color: #666;">Costo Acumulado</div>
                 <div style="font-size: 2em; font-weight: bold; color: #d32f2f;">
-                    ${{ costo_total|floatformat:2 }}
+                    ${{ costo_total|floatformat:-3 }}
                 </div>
                 <small style="color: #888;">Suma de todos los ingredientes</small>
             </div>
@@ -70,13 +70,13 @@
                     <tr style="border-bottom: 1px solid #f9f9f9;">
                         <td style="padding: 10px; font-weight: bold;">{{ ing.insumo.nombre }}</td>
                         <td style="padding: 10px;">
-                            {{ ing.cantidad }} <span style="font-size:0.8em; color:#888;">{{ ing.insumo.unidad.codigo }}</span>
+                            {{ ing.cantidad|floatformat:0 }} <span style="font-size:0.8em; color:#888;">{{ ing.insumo.unidad.codigo }}</span>
                         </td>
                         <td style="padding: 10px; font-size: 0.9em; color: #666;">
-                            ${{ ing.insumo.costo_unitario|floatformat:2 }}
+                            ${{ ing.insumo.costo_unitario|floatformat:-4 }}
                         </td>
                         <td style="padding: 10px; font-weight: bold; color: #444;">
-                            ${{ ing.costo_parcial|floatformat:2 }}
+                            ${{ ing.costo_parcial|floatformat:-3 }}
                         </td>
                         <td style="padding: 10px; text-align: right;">
                             <form method="POST" onsubmit="return confirm('¿Quitar este ingrediente?');">

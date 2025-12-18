@@ -24,7 +24,7 @@
     <div style="margin-bottom: 30px; text-align: center;">
         <h2 style="color: #0d6efd; margin: 0;">Composición: {{ insumo.nombre }}</h2>
         <p style="color: #666; margin-top: 10px;">
-            Define la receta para fabricar <b>{{ total_cantidad }} {{ insumo.unidad.codigo }}</b> de este insumo.
+            Define la receta para fabricar <b>{{ total_cantidad|floatformat:0 }} {{ insumo.unidad.codigo }}</b> de este insumo.
         </p>
     </div>
 
@@ -39,7 +39,7 @@
             </div>
             
             <div style="font-size: 0.9em; color: #666; margin-bottom: 20px;">
-                Costo por cada {{ total_cantidad }} {{ insumo.unidad.nombre }}
+                Costo por cada {{ total_cantidad|floatformat:0 }} {{ insumo.unidad.nombre }}
             </div>
 
             <a href="{% url 'inventory_index' %}" class="add-btn" style="display: block; text-decoration: none; background: #343a40; color: white; padding: 10px; border-radius: 5px;">
@@ -79,7 +79,7 @@
                     <tr style="border-bottom: 1px solid #f9f9f9;">
                         <td style="padding: 10px; font-weight: bold;">{{ comp.insumo_hijo.nombre }}</td>
                         <td style="padding: 10px;">
-                            {{ comp.cantidad }} {{ comp.insumo_hijo.unidad.codigo }}
+                            {{ comp.cantidad|floatformat:0  }} {{ comp.insumo_hijo.unidad.codigo|floatformat:0 }}
                         </td>
                         <td style="padding: 10px; color: #666;">
                             ${{ comp.costo_fila|floatformat:4 }}
@@ -104,10 +104,10 @@
                     <tr style="background-color: #f1f8ff; border-top: 2px solid #0d6efd;">
                         <td style="padding: 15px 10px; font-weight: bold; color: #0d6efd;">TOTAL MEZCLA:</td>
                         <td style="padding: 15px 10px; font-weight: bold; color: #333;">
-                            {{ total_cantidad }} {{ insumo.unidad.codigo }}
+                            {{ total_cantidad|floatformat:0  }} {{ insumo.unidad.codigo }}
                         </td>
                         <td colspan="2" style="padding: 15px 10px; color: #666; font-size: 0.9em;">
-                            <i>(Peso total esperado)</i>
+                            <i>{{ insumo.costo_unitario|floatformat:4 }}</i>
                         </td>
                     </tr>
                 </tfoot>

@@ -13,7 +13,7 @@ from .forms import CostoAdicionalForm # Importar form nuevo
 
 # Tus modelos y formularios
 from .models import Table, Categoria, Producto, TasaBCV, IngredienteProducto
-from .forms import ProductoBasicForm, IngredienteForm, ProductoPriceForm
+from .forms import ProductoBasicForm, RecetaProductoForm, ProductoPriceForm
 from .scrapping import obtener_tasa_bcv
 
 # ==========================================
@@ -137,7 +137,7 @@ def recipe_manager(request, pk):
             messages.warning(request, "Ingrediente eliminado.")
             return redirect('recipe_manager', pk=pk)
             
-        form = IngredienteForm(request.POST)
+        form = RecetaProductoForm(request.POST)
         if form.is_valid():
             ingrediente = form.save(commit=False)
             ingrediente.producto = producto
@@ -145,7 +145,7 @@ def recipe_manager(request, pk):
             messages.success(request, "Ingrediente agregado.")
             return redirect('recipe_manager', pk=pk)
     else:
-        form = IngredienteForm()
+        form = RecetaProductoForm()
 
     context = {
         'producto': producto,
@@ -268,3 +268,14 @@ def product_pricing(request, pk):
         'costo_total_final': producto.costo_total_real, # La suma maestra
     }
     return render(request, 'products/product_pricing.html', context)
+
+@staff_member_required
+def product_delete(request, pk):
+    producto = get_object_or_404(Producto, pk=pk)
+    
+    if request.method == 'POST':
+        nombre = producto.nombre
+        producto.delete()
+        messages.success(request, f"Producto '{nombre}' eliminado correctamente.")
+        
+    return redirect('product_list')

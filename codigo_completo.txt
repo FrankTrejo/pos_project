@@ -1,0 +1,3853 @@
+
+==================================================
+ARCHIVO: .\manage.py
+==================================================
+#!/usr/bin/env python
+"""Django's command-line utility for administrative tasks."""
+import os
+import sys
+
+
+def main():
+    """Run administrative tasks."""
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pos_core.settings')
+    try:
+        from django.core.management import execute_from_command_line
+    except ImportError as exc:
+        raise ImportError(
+            "Couldn't import Django. Are you sure it's installed and "
+            "available on your PYTHONPATH environment variable? Did you "
+            "forget to activate a virtual environment?"
+        ) from exc
+    execute_from_command_line(sys.argv)
+
+
+if __name__ == '__main__':
+    main()
+
+==================================================
+ARCHIVO: .\reparar_db.py
+==================================================
+import sqlite3
+
+# Nombre de tu base de datos
+db_name = "db.sqlite3"
+
+try:
+    print(f"🔌 Conectando a {db_name}...")
+    conn = sqlite3.connect(db_name)
+    cursor = conn.cursor()
+    
+    # 1. Verificar qué columnas existen realmente
+    print("🔍 Inspeccionando tabla 'tables_producto'...")
+    cursor.execute("PRAGMA table_info(tables_producto)")
+    columnas = [col[1] for col in cursor.fetchall()]
+    print(f"   Columnas encontradas: {columnas}")
+
+    # 2. Si falta la columna, la creamos a la fuerza
+    if 'costo_materia_prima' not in columnas:
+        print("⚠️ La columna 'costo_materia_prima' NO existe. Creándola ahora...")
+        cursor.execute("ALTER TABLE tables_producto ADD COLUMN costo_materia_prima decimal DEFAULT 0;")
+        conn.commit()
+        print("✅ ¡COLUMNA CREADA CON ÉXITO!")
+    else:
+        print("ℹ️ La columna YA existe. El problema podría ser otro.")
+
+    conn.close()
+
+except Exception as e:
+    print(f"❌ Error crítico: {e}")
+==================================================
+ARCHIVO: .\dashboard\admin.py
+==================================================
+from django.contrib import admin
+
+# Register your models here.
+
+==================================================
+ARCHIVO: .\dashboard\apps.py
+==================================================
+from django.apps import AppConfig
+
+
+class DashboardConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'dashboard'
+
+==================================================
+ARCHIVO: .\dashboard\models.py
+==================================================
+from django.db import models
+
+# Create your models here.
+
+==================================================
+ARCHIVO: .\dashboard\tests.py
+==================================================
+from django.test import TestCase
+
+# Create your tests here.
+
+==================================================
+ARCHIVO: .\dashboard\urls.py
+==================================================
+# dashboard/urls.py
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('', views.panel_control, name='panel_control'),
+]
+==================================================
+ARCHIVO: .\dashboard\views.py
+==================================================
+# dashboard/views.py
+from django.shortcuts import render
+
+def panel_control(request):
+    # En el futuro, aquí consultarías la BD para obtener los números reales
+    # (ej. conteo de productos, total de ventas hoy, etc.)
+    return render(request, 'dashboard/panel.html')
+==================================================
+ARCHIVO: .\dashboard\__init__.py
+==================================================
+
+==================================================
+ARCHIVO: .\dashboard\templates\dashboard\panel.html
+==================================================
+{% extends 'base.html' %}
+
+{% block title %}- Panel de Control{% endblock %}
+
+{% block content %}
+    <h2 style="color: var(--primary-blue); margin-bottom: 25px;">Panel de Control</h2>
+
+    <div class="summary-cards-grid">
+
+        <div class="card-style summary-card text-center">
+            <i class="fas fa-box card-icon"></i>
+            <h3>Productos</h3>
+            <p class="summary-text">250 Items activos</p>
+            <a href="{% url 'product_list' %}" class="summary-link">Ver catálogo</a>
+        </div>
+
+        <div class="card-style summary-card text-center">
+            <i class="fas fa-clipboard-list card-icon"></i>
+            <h3>Inventario</h3>
+            <p class="summary-text">Valor total: $4,500</p>
+            <a href="{% url 'inventory_index' %}" class="summary-link">Gestionar stock</a>
+        </div>
+
+        <div class="card-style summary-card text-center">
+            <i class="fas fa-chart-line card-icon"></i>
+            <h3>Reportes</h3>
+            <p class="summary-text">Ventas hoy: $1,200</p>
+            <a href="#" class="summary-link">Ver estadísticas</a>
+        </div>
+
+        <div class="card-style summary-card text-center">
+            <i class="fas fa-user-tie card-icon"></i>
+            <h3>Personal</h3>
+            <p class="summary-text">8 Empleados activos</p>
+            <a href="#" class="summary-link">Administrar equipo</a>
+        </div>
+
+        <div class="card-style summary-card text-center">
+            <i class="fas fa-cash-register card-icon"></i>
+            <h3>Punto de Venta</h3>
+            <p class="summary-text">Ir a Facturación</p>
+            <a href="{% url 'index' %}" class="action-btn-blue" style="display: inline-block; margin-top: 10px; text-decoration: none;">
+                Abrir POS
+            </a>
+        </div>
+        
+        <div class="card-style summary-card text-center">
+            <i class="fas fa-cog card-icon"></i>
+            <h3>Configuración</h3>
+            <p class="summary-text">Ajustes generales y permisos</p>
+            <a href="#" class="summary-link">Ir a ajustes</a>
+        </div>
+    </div>
+{% endblock %}
+==================================================
+ARCHIVO: .\inventory\admin.py
+==================================================
+from django.contrib import admin
+
+# Register your models here.
+from django.contrib import admin
+from .models import UnidadMedida, CategoriaInsumo, Insumo, MovimientoInventario
+
+class InsumoAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'categoria', 'stock_actual', 'unidad', 'costo_unitario', 'stock_minimo')
+    list_filter = ('categoria',)
+    search_fields = ('nombre',)
+
+class MovimientoAdmin(admin.ModelAdmin):
+    list_display = ('fecha', 'tipo', 'insumo', 'cantidad', 'costo_unitario_movimiento', 'usuario')
+    list_filter = ('tipo', 'fecha')
+    ordering = ('-fecha',)
+
+admin.site.register(UnidadMedida)
+admin.site.register(CategoriaInsumo)
+admin.site.register(Insumo, InsumoAdmin)
+admin.site.register(MovimientoInventario, MovimientoAdmin)
+==================================================
+ARCHIVO: .\inventory\apps.py
+==================================================
+from django.apps import AppConfig
+
+
+class InventoryConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'inventory'
+
+==================================================
+ARCHIVO: .\inventory\forms.py
+==================================================
+from django import forms
+from .models import Insumo, IngredienteCompuesto, MovimientoInventario
+
+# 1. FORMULARIO PARA CREAR EL INSUMO (Datos Básicos)
+class InsumoForm(forms.ModelForm):
+    class Meta:
+        model = Insumo
+        fields = ['nombre', 'categoria', 'unidad', 'stock_minimo', 'es_insumo_compuesto']
+        widgets = {
+            'nombre': forms.TextInput(attrs={'class': 'form-input'}),
+            'categoria': forms.Select(attrs={'class': 'form-input'}),
+            'unidad': forms.Select(attrs={'class': 'form-input'}),
+            'stock_minimo': forms.NumberInput(attrs={'class': 'form-input', 'step': '0.1'}),
+            'costo_unitario': forms.NumberInput(attrs={'class': 'form-input', 'step': '0.01'}), # Se habilitará solo si NO es compuesto
+            'es_insumo_compuesto': forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'check-compuesto'}),
+        }
+
+# 2. FORMULARIO PARA AGREGAR INGREDIENTES A UN COMPUESTO
+class ComponenteForm(forms.ModelForm):
+    class Meta:
+        model = IngredienteCompuesto
+        fields = ['insumo_hijo', 'cantidad']
+        widgets = {
+            'insumo_hijo': forms.Select(attrs={'class': 'form-input'}),
+            'cantidad': forms.NumberInput(attrs={'class': 'form-input', 'step': '0.001'}),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        # Excluir insumos compuestos para evitar ciclos infinitos (Masa dentro de Masa) por seguridad básica
+        super().__init__(*args, **kwargs)
+        self.fields['insumo_hijo'].queryset = Insumo.objects.all().order_by('nombre')
+
+from django import forms
+from .models import Insumo, MovimientoInventario, UnidadMedida
+
+class MovimientoInventarioForm(forms.ModelForm):
+    class Meta:
+        model = MovimientoInventario
+        fields = ['insumo', 'tipo', 'cantidad', 'unidad_movimiento', 'costo_unitario_movimiento', 'nota']
+        widgets = {
+            'insumo': forms.Select(attrs={'class': 'form-input'}),
+            'tipo': forms.Select(attrs={'class': 'form-input'}),
+            'cantidad': forms.NumberInput(attrs={'class': 'form-input', 'placeholder': 'Ej: 1 (Saco)'}),
+            'unidad_movimiento': forms.Select(attrs={'class': 'form-input'}), # Aquí seleccionas KG
+            'costo_unitario_movimiento': forms.NumberInput(attrs={'class': 'form-input', 'placeholder': 'Precio total del saco o kilo'}),
+            'nota': forms.TextInput(attrs={'class': 'form-input'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Por defecto seleccionamos Kilogramo si existe, para facilitar la vida
+        try:
+            kg_unit = UnidadMedida.objects.filter(codigo__iexact='kg').first()
+            if kg_unit:
+                self.fields['unidad_movimiento'].initial = kg_unit
+        except:
+            pass
+
+        
+==================================================
+ARCHIVO: .\inventory\models.py
+==================================================
+from django.db import models
+from django.contrib.auth.models import User
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+# 1. UNIDAD DE MEDIDA CON FACTOR DE CONVERSIÓN
+class UnidadMedida(models.Model):
+    nombre = models.CharField(max_length=50) # Ej: Gramo, Kilogramo, Litro
+    codigo = models.CharField(max_length=10) # Ej: g, kg, l
+    
+    # NUEVO CAMPO: Factor respecto a la unidad base (Gramo/ML)
+    # Gramo = 1
+    # Kilogramo = 1000
+    # Litro = 1000
+    # Libra = 453.59
+    factor = models.DecimalField(max_digits=10, decimal_places=4, default=1, help_text="1 para Gramos/ML. 1000 para KG/L.")
+
+    def __str__(self):
+        return f"{self.nombre} ({self.codigo})"
+
+class CategoriaInsumo(models.Model):
+    nombre = models.CharField(max_length=100)
+    def __str__(self): return self.nombre
+
+
+class Insumo(models.Model):
+    # DATOS BÁSICOS
+    nombre = models.CharField(max_length=200)
+    categoria = models.ForeignKey(CategoriaInsumo, on_delete=models.SET_NULL, null=True)
+    unidad = models.ForeignKey(UnidadMedida, on_delete=models.PROTECT, verbose_name="Unidad Base")
+
+    # NUEVO CAMPO: Equivalente a la columna C de tu Excel (1000, 3000, 1)
+    cantidad_por_precio = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=1000, 
+        verbose_name="Cant. por Precio",
+        help_text="Ej: 1000 si el precio es por Kilo. 1 si es por unidad."
+    )
+    
+    # --- NUEVOS CAMPOS "TIPO EXCEL" (MAESTRO DE COSTOS) ---
+    
+    # 1. Precio de Mercado: Lo que te cuesta comprarlo bruto (ej: Papa con cáscara)
+    precio_mercado = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Precio Mercado ($)")
+    
+    # 2. Merma (%): Porcentaje que se pierde al limpiar (ej: 15% cáscara)
+    merma_porcentaje = models.DecimalField(max_digits=5, decimal_places=2, default=0, verbose_name="% Merma")
+    
+    # 3. Costo Real (Neto): Calculado automáticamente (Precio Mercado / Rendimiento)
+    # Este es el campo que usaremos para tus recetas y valor de inventario.
+    costo_unitario = models.DecimalField(max_digits=12, decimal_places=6, default=0, verbose_name="Costo Real x Gramo")
+    
+    stock_actual = models.DecimalField(max_digits=12, decimal_places=3, default=0)
+    stock_minimo = models.DecimalField(max_digits=12, decimal_places=3, default=500)
+    es_insumo_compuesto = models.BooleanField(default=False)
+
+    def __str__(self): return f"{self.nombre}"
+    
+    # LÓGICA DE CÁLCULO DE COSTO REAL CON MERMA
+    # LÓGICA MATEMÁTICA CORREGIDA
+    def save(self, *args, **kwargs):
+        if not self.es_insumo_compuesto and self.precio_mercado > 0:
+            
+            # 1. Calcular Rendimiento (100% - Merma)
+            # Ej: 100% - 2% = 0.98
+            rendimiento = 1 - (self.merma_porcentaje / 100)
+            
+            # 2. Calcular Precio Base por GRAMO
+            # Ej: $14.00 / 1000 = $0.014
+            precio_base = self.precio_mercado / self.cantidad_por_precio
+            
+            if rendimiento > 0:
+                # 3. Aplicar Merma al precio chiquito
+                # Ej: $0.014 / 0.98 = $0.01428 (ESTO ES LO CORRECTO)
+                self.costo_unitario = precio_base / rendimiento
+                
+        super().save(*args, **kwargs)
+class IngredienteCompuesto(models.Model):
+    insumo_padre = models.ForeignKey(Insumo, on_delete=models.CASCADE, related_name='componentes')
+    insumo_hijo = models.ForeignKey(Insumo, on_delete=models.PROTECT, related_name='usado_en_compuestos')
+    cantidad = models.DecimalField(max_digits=10, decimal_places=4) # Cantidad en gramos
+
+class MovimientoInventario(models.Model):
+    TIPOS_MOVIMIENTO = [('ENTRADA', 'Compra'), ('SALIDA', 'Consumo'), ('AJUSTE', 'Ajuste')]
+    insumo = models.ForeignKey(Insumo, on_delete=models.CASCADE, related_name='movimientos')
+    tipo = models.CharField(max_length=10, choices=TIPOS_MOVIMIENTO)
+    
+    # DATOS DE LA COMPRA (LO QUE ESCRIBE EL USUARIO)
+    cantidad = models.DecimalField(max_digits=10, decimal_places=3, verbose_name="Cantidad Comprada")
+    
+    # NUEVO: En qué unidad lo compraste (Ej: Compré en KG)
+    unidad_movimiento = models.ForeignKey(UnidadMedida, on_delete=models.SET_NULL, null=True, verbose_name="Unidad de Compra")
+    
+    costo_unitario_movimiento = models.DecimalField(max_digits=12, decimal_places=4, default=0, verbose_name="Costo por Unidad de Compra")
+    
+    fecha = models.DateTimeField(auto_now_add=True)
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    nota = models.CharField(max_length=255, blank=True, null=True)
+
+# --- LA MAGIA MATEMÁTICA (SEÑAL) ---
+@receiver(post_save, sender=MovimientoInventario)
+def actualizar_stock_conversion(sender, instance, created, **kwargs):
+    if created:
+        insumo = instance.insumo
+        
+        # 1. OBTENER FACTOR DE CONVERSIÓN
+        # Si eligió KG, el factor es 1000. Si eligió Gramos, es 1.
+        factor = instance.unidad_movimiento.factor if instance.unidad_movimiento else 1
+        
+        # 2. CONVERTIR A GRAMOS (Para el Stock)
+        cantidad_en_gramos = instance.cantidad * factor
+        
+        # 3. CONVERTIR PRECIO A "POR GRAMO"
+        # Si pagué $10 por 1KG (1000g) -> $10 / 1000 = $0.01 por gramo
+        costo_por_gramo_nuevo = 0
+        if instance.costo_unitario_movimiento > 0:
+            costo_por_gramo_nuevo = instance.costo_unitario_movimiento / factor
+
+        # 4. APLICAR AL INSUMO
+        if instance.tipo == 'ENTRADA':
+            insumo.stock_actual += cantidad_en_gramos
+            # Actualizamos el costo base del insumo al nuevo precio por gramo
+            if not insumo.es_insumo_compuesto and costo_por_gramo_nuevo > 0:
+                insumo.costo_unitario = costo_por_gramo_nuevo
+
+        elif instance.tipo == 'SALIDA':
+            insumo.stock_actual -= cantidad_en_gramos
+            if insumo.stock_actual < 0: insumo.stock_actual = 0
+
+        elif instance.tipo == 'AJUSTE':
+            insumo.stock_actual += cantidad_en_gramos
+            if not insumo.es_insumo_compuesto and instance.cantidad > 0 and costo_por_gramo_nuevo > 0:
+                insumo.costo_unitario = costo_por_gramo_nuevo
+
+        insumo.save()
+
+    
+==================================================
+ARCHIVO: .\inventory\tests.py
+==================================================
+from django.test import TestCase
+
+# Create your tests here.
+
+==================================================
+ARCHIVO: .\inventory\urls.py
+==================================================
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('', views.inventory_index, name='inventory_index'),
+    path('movimiento/nuevo/', views.add_movement, name='add_movement'),
+    path('nuevo/', views.insumo_create, name='insumo_create'),
+    path('movimiento/', views.inventory_move, name='inventory_move'),
+    path('composicion/<int:pk>/', views.insumo_composition, name='insumo_composition'),
+    path('editar/<int:pk>/', views.insumo_edit, name='insumo_edit'),
+    path('eliminar/<int:pk>/', views.insumo_delete, name='insumo_delete'),
+]
+==================================================
+ARCHIVO: .\inventory\views.py
+==================================================
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib import messages
+from .models import Insumo, MovimientoInventario, CategoriaInsumo, IngredienteCompuesto
+from .forms import InsumoForm, ComponenteForm, MovimientoInventarioForm
+from django.db import models
+import re
+from decimal import Decimal  # <--- IMPORTANTE: Importamos el tipo de dato correcto
+from django.db.models import ProtectedError 
+
+def inventory_index(request):
+    """Muestra el listado de insumos con alertas de stock bajo"""
+    insumos = Insumo.objects.all().order_by('nombre')
+    categorias = CategoriaInsumo.objects.all()
+    
+    alertas_stock = insumos.filter(stock_actual__lte=models.F('stock_minimo')).count()
+    
+    valor_inventario = 0
+    for i in insumos:
+        # Ahora multiplicamos Decimal con Decimal, todo compatible
+        valor_inventario += (i.stock_actual * i.costo_unitario)
+
+    context = {
+        'insumos': insumos,
+        'categorias': categorias,
+        'alertas_stock': alertas_stock,
+        'valor_inventario': valor_inventario,
+    }
+    return render(request, 'inventory/inventory_list.html', context)
+
+def add_movement(request):
+    if request.method == 'POST':
+        insumo_id = request.POST.get('insumo_id')
+        tipo = request.POST.get('tipo')
+        nota = request.POST.get('nota')
+        
+        # --- FUNCIÓN DE LIMPIEZA (La misma que ya teníamos) ---
+        def limpiar_numero(valor):
+            if not valor: return Decimal('0.0')
+            val_str = str(valor).strip()
+            val_str = re.sub(r'[^\d,.-]', '', val_str)
+            if ',' in val_str and '.' in val_str:
+                if val_str.find(',') > val_str.find('.'):
+                    val_str = val_str.replace('.', '').replace(',', '.')
+                else:
+                    val_str = val_str.replace(',', '')
+            elif ',' in val_str:
+                val_str = val_str.replace(',', '.')
+            try:
+                return Decimal(val_str) 
+            except:
+                return Decimal('0.0')
+
+        # 1. Obtenemos CANTIDAD (Peso) y COSTO TOTAL (Factura)
+        cantidad = limpiar_numero(request.POST.get('cantidad'))
+        
+        # OJO: Este ahora es el precio total que pagaste (ej: $50 por el saco)
+        costo_total_factura = limpiar_numero(request.POST.get('costo_total'))
+
+        if cantidad <= 0:
+            messages.error(request, "Error: La cantidad debe ser mayor a 0.")
+            return redirect('inventory_index')
+
+        insumo = get_object_or_404(Insumo, id=insumo_id)
+
+        # 2. CÁLCULO DEL COSTO UNITARIO (Precio x Kg)
+        costo_unitario_calculado = insumo.costo_unitario # Por defecto (si es salida)
+
+        if tipo == 'ENTRADA':
+            # Si compré $50 y son 25kg -> 50 / 25 = $2.00 c/u
+            if cantidad > 0:
+                costo_unitario_calculado = costo_total_factura / cantidad
+            else:
+                costo_unitario_calculado = Decimal('0.0')
+
+        try:
+            MovimientoInventario.objects.create(
+                insumo=insumo,
+                tipo=tipo,
+                cantidad=cantidad,
+                # Guardamos el costo unitario ya calculado (la división)
+                costo_unitario_movimiento=costo_unitario_calculado,
+                usuario=request.user if request.user.is_authenticated else None,
+                nota=nota
+            )
+            messages.success(request, f"Exito: {tipo} registrada.")
+        except Exception as e:
+            messages.error(request, f"Error: {e}")
+
+        return redirect('inventory_index')
+    
+    return redirect('inventory_index')
+    """Procesa el formulario usando Decimal para evitar errores de base de datos"""
+    if request.method == 'POST':
+        insumo_id = request.POST.get('insumo_id')
+        tipo = request.POST.get('tipo')
+        nota = request.POST.get('nota')
+        
+        # --- FUNCIÓN DE LIMPIEZA CORREGIDA (Retorna Decimal) ---
+        def limpiar_numero(valor):
+            if not valor: return Decimal('0.0') # Retornamos Decimal
+            
+            val_str = str(valor).strip()
+            
+            # Limpieza de caracteres no numéricos
+            val_str = re.sub(r'[^\d,.-]', '', val_str)
+
+            # Lógica de conversión (Punto vs Coma)
+            if ',' in val_str and '.' in val_str:
+                if val_str.find(',') > val_str.find('.'): # 1.200,50
+                    val_str = val_str.replace('.', '').replace(',', '.')
+                else: # 1,200.50
+                    val_str = val_str.replace(',', '')
+            elif ',' in val_str:
+                val_str = val_str.replace(',', '.')
+            
+            try:
+                # AQUÍ ESTABA EL ERROR: Antes era float(val_str)
+                return Decimal(val_str) 
+            except:
+                return Decimal('0.0')
+
+        # Procesamos
+        cantidad = limpiar_numero(request.POST.get('cantidad'))
+        costo = limpiar_numero(request.POST.get('costo'))
+
+        if cantidad <= 0:
+            messages.error(request, "Error: La cantidad debe ser mayor a 0.")
+            return redirect('inventory_index')
+
+        insumo = get_object_or_404(Insumo, id=insumo_id)
+
+        try:
+            MovimientoInventario.objects.create(
+                insumo=insumo,
+                tipo=tipo,
+                cantidad=cantidad,
+                # Operador ternario corregido para asegurar Decimales
+                costo_unitario_movimiento=costo if tipo == 'ENTRADA' else insumo.costo_unitario,
+                usuario=request.user if request.user.is_authenticated else None,
+                nota=nota
+            )
+            messages.success(request, f"Exito: {tipo} registrada correctamente.")
+        except Exception as e:
+            # Este mensaje te dirá si hay otro error oculto
+            messages.error(request, f"Error de Base de Datos: {e}")
+
+        return redirect('inventory_index')
+    
+    return redirect('inventory_index')
+
+# 1. CREAR INSUMO NUEVO
+def insumo_create(request):
+    if request.method == 'POST':
+        form = InsumoForm(request.POST)
+        if form.is_valid():
+            insumo = form.save()
+            
+            # LÓGICA DE FLUJO
+            if insumo.es_insumo_compuesto:
+                messages.info(request, "Insumo creado. Ahora define su composición.")
+                return redirect('insumo_composition', pk=insumo.pk)
+            else:
+                messages.success(request, "Insumo registrado correctamente.")
+                return redirect('inventory_index') # O a donde tengas tu lista
+    else:
+        form = InsumoForm()
+
+    return render(request, 'inventory/insumo_form.html', {'form': form})
+
+# 2. GESTIONAR COMPOSICIÓN (Para Masa, Salsa, etc.)
+# inventory/views.py
+
+@staff_member_required
+def insumo_composition(request, pk):
+    insumo_padre = get_object_or_404(Insumo, pk=pk)
+    
+    if not insumo_padre.es_insumo_compuesto:
+        messages.error(request, "Este insumo no es compuesto.")
+        return redirect('inventory_index')
+
+    if request.method == 'POST':
+        # --- LÓGICA DE ELIMINAR/AGREGAR (Se mantiene igual) ---
+        if 'delete_componente' in request.POST:
+            cid = request.POST.get('delete_componente')
+            IngredienteCompuesto.objects.filter(id=cid).delete()
+            insumo_padre.calcular_costo_desde_subreceta()
+            messages.warning(request, "Ingrediente eliminado.")
+            return redirect('insumo_composition', pk=pk)
+
+        form = ComponenteForm(request.POST)
+        if form.is_valid():
+            comp = form.save(commit=False)
+            comp.insumo_padre = insumo_padre
+            
+            if comp.insumo_hijo == insumo_padre:
+                 messages.error(request, "No puedes agregarse a sí mismo.")
+            else:
+                comp.save()
+                insumo_padre.calcular_costo_desde_subreceta()
+                messages.success(request, "Ingrediente agregado.")
+            return redirect('insumo_composition', pk=pk)
+    else:
+        form = ComponenteForm()
+
+    # --- NUEVA LÓGICA DE CÁLCULO ---
+    componentes = insumo_padre.componentes.select_related('insumo_hijo').all()
+    
+    total_cantidad_receta = 0
+    
+    # Recorremos para calcular subtotales precisos en Python
+    for comp in componentes:
+        # Calculamos el costo exacto (Cantidad * Costo Unitario)
+        comp.costo_fila = comp.cantidad * comp.insumo_hijo.costo_unitario
+        # Sumamos al peso total
+        total_cantidad_receta += comp.cantidad
+
+    context = {
+        'insumo': insumo_padre,
+        'componentes': componentes,
+        'form': form,
+        'total_cantidad': total_cantidad_receta, # Enviamos el total a la plantilla
+    }
+    return render(request, 'inventory/insumo_composition.html', context)
+
+@staff_member_required
+def inventory_move(request):
+    if request.method == 'POST':
+        form = MovimientoInventarioForm(request.POST)
+        if form.is_valid():
+            movimiento = form.save(commit=False)
+            insumo = movimiento.insumo
+            
+            # VALIDACIÓN DE STOCK NEGATIVO
+            # Si intenta sacar más de lo que hay, lanzamos error y no guardamos.
+            if movimiento.tipo == 'SALIDA' and movimiento.cantidad > insumo.stock_actual:
+                messages.error(request, f"Error: No tienes suficiente stock de {insumo.nombre}. (Actual: {insumo.stock_actual})")
+            else:
+                movimiento.usuario = request.user
+                movimiento.save() # Al guardar, la SEÑAL del modelo actualiza el stock y el precio automáticamente
+                
+                tipo_accion = "agregada" if movimiento.tipo == 'ENTRADA' else "registrada"
+                messages.success(request, f"{movimiento.get_tipo_display()} {tipo_accion} correctamente.")
+                return redirect('inventory_index')
+    else:
+        form = MovimientoInventarioForm()
+
+    return render(request, 'inventory/inventory_move.html', {'form': form})
+
+# inventory/views.py
+
+@staff_member_required
+def insumo_edit(request, pk):
+    insumo = get_object_or_404(Insumo, pk=pk)
+    
+    if request.method == 'POST':
+        form = InsumoForm(request.POST, instance=insumo)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Insumo '{insumo.nombre}' actualizado correctamente.")
+            
+            # Si es compuesto, preguntamos si quiere ir a editar la receta o volver al inicio
+            if insumo.es_insumo_compuesto:
+                # Opcional: podrías redirigir a la composición directamente si prefieres
+                # return redirect('insumo_composition', pk=insumo.pk)
+                pass 
+
+            return redirect('inventory_index')
+    else:
+        form = InsumoForm(instance=insumo)
+
+    return render(request, 'inventory/insumo_form.html', {
+        'form': form, 
+        'edit_mode': True, # Bandera para saber que estamos editando
+        'insumo': insumo   # Pasamos el objeto para sacar ID y datos extra
+    })
+
+@staff_member_required
+def insumo_delete(request, pk):
+    insumo = get_object_or_404(Insumo, pk=pk)
+    
+    if request.method == 'POST':
+        try:
+            nombre = insumo.nombre
+            insumo.delete()
+            messages.success(request, f"El insumo '{nombre}' y su historial han sido eliminados.")
+        except ProtectedError:
+            messages.error(request, f"No se puede eliminar '{insumo.nombre}' porque se está usando en una Receta (Insumo Compuesto). Elimínalo de la receta primero.")
+        except Exception as e:
+            messages.error(request, f"Ocurrió un error al eliminar: {e}")
+            
+    return redirect('inventory_index')
+==================================================
+ARCHIVO: .\inventory\__init__.py
+==================================================
+
+==================================================
+ARCHIVO: .\inventory\templates\inventory\insumo_composition.html
+==================================================
+{% extends 'base.html' %}
+{% block title %}- Receta {{ insumo.nombre }}{% endblock %}
+
+{% block content %}
+
+<style>
+    .composition-form {
+        background-color: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #e9ecef; margin-bottom: 25px;
+        display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end;
+    }
+    .composition-form input, .composition-form select {
+        width: 100%; padding: 8px 10px; border: 1px solid #ced4da; border-radius: 5px; height: 40px; box-sizing: border-box;
+    }
+    .btn-add-ingredient {
+        height: 40px; width: 50px; background-color: #343a40; color: white; border: none; border-radius: 5px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;
+    }
+    .field-group { display: flex; flex-direction: column; }
+    .field-grow { flex-grow: 1; min-width: 200px; }
+    .field-fixed { width: 150px; }
+</style>
+
+<div style="max-width: 900px; margin: 40px auto; padding: 20px;">
+    
+    <div style="margin-bottom: 30px; text-align: center;">
+        <h2 style="color: #0d6efd; margin: 0;">Composición: {{ insumo.nombre }}</h2>
+        <p style="color: #666; margin-top: 10px;">
+            Define la receta para fabricar <b>{{ total_cantidad }} {{ insumo.unidad.codigo }}</b> de este insumo.
+        </p>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 25px;">
+        
+        <div class="card-style" style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #ddd; height: fit-content; text-align: center;">
+            <h3 style="margin-top: 0; color: #444;">Costo Calculado</h3>
+            <hr style="margin: 10px 0; border: 0; border-top: 1px solid #eee;">
+            
+            <div style="font-size: 2.2em; font-weight: bold; color: #28a745; margin: 15px 0;">
+                ${{ insumo.costo_unitario|floatformat:4 }}
+            </div>
+            
+            <div style="font-size: 0.9em; color: #666; margin-bottom: 20px;">
+                Costo por cada {{ total_cantidad }} {{ insumo.unidad.nombre }}
+            </div>
+
+            <a href="{% url 'inventory_index' %}" class="add-btn" style="display: block; text-decoration: none; background: #343a40; color: white; padding: 10px; border-radius: 5px;">
+                <i class="fas fa-check"></i> Finalizar y Volver
+            </a>
+        </div>
+
+        <div class="card-style" style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #ddd;">
+            <h3 style="margin-top: 0; margin-bottom: 15px; color: #444;">Ingredientes / Sub-insumos</h3>
+            
+            <form method="POST" class="composition-form">
+                {% csrf_token %}
+                <div class="field-group field-grow">
+                    <label style="font-weight: bold; margin-bottom: 5px; font-size: 0.9em;">Ingrediente (Hijo):</label>
+                    {{ form.insumo_hijo }}
+                </div>
+                <div class="field-group field-fixed">
+                    <label style="font-weight: bold; margin-bottom: 5px; font-size: 0.9em;">Cant. ({{ insumo.unidad.codigo }}):</label>
+                    {{ form.cantidad }}
+                </div>
+                <div class="field-group">
+                    <button type="submit" class="btn-add-ingredient" title="Agregar Ingrediente"><i class="fas fa-plus"></i></button>
+                </div>
+            </form>
+
+            <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                <thead>
+                    <tr style="border-bottom: 2px solid #eee; text-align: left; color: #666; font-size: 0.9em;">
+                        <th style="padding: 10px;">Insumo</th>
+                        <th style="padding: 10px;">Cantidad</th>
+                        <th style="padding: 10px;">Costo Aprox.</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for comp in componentes %}
+                    <tr style="border-bottom: 1px solid #f9f9f9;">
+                        <td style="padding: 10px; font-weight: bold;">{{ comp.insumo_hijo.nombre }}</td>
+                        <td style="padding: 10px;">
+                            {{ comp.cantidad }} {{ comp.insumo_hijo.unidad.codigo }}
+                        </td>
+                        <td style="padding: 10px; color: #666;">
+                            ${{ comp.costo_fila|floatformat:4 }}
+                        </td>
+                        <td style="padding: 10px; text-align: right;">
+                            <form method="POST" onsubmit="return confirm('¿Eliminar?');">
+                                {% csrf_token %}
+                                <input type="hidden" name="delete_componente" value="{{ comp.id }}">
+                                <button type="submit" style="background: none; border: none; color: #dc3545; cursor: pointer;">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" style="padding: 30px; text-align: center; color: #999;">Sin ingredientes.</td></tr>
+                    {% endfor %}
+                </tbody>
+                
+                {% if componentes %}
+                <tfoot>
+                    <tr style="background-color: #f1f8ff; border-top: 2px solid #0d6efd;">
+                        <td style="padding: 15px 10px; font-weight: bold; color: #0d6efd;">TOTAL MEZCLA:</td>
+                        <td style="padding: 15px 10px; font-weight: bold; color: #333;">
+                            {{ total_cantidad }} {{ insumo.unidad.codigo }}
+                        </td>
+                        <td colspan="2" style="padding: 15px 10px; color: #666; font-size: 0.9em;">
+                            <i>(Peso total esperado)</i>
+                        </td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+==================================================
+ARCHIVO: .\inventory\templates\inventory\insumo_form.html
+==================================================
+{% extends 'base.html' %}
+
+{% block title %}
+    {# CORRECCIÓN AQUÍ: Agregamos el endif que faltaba #}
+    {% if edit_mode %}- Editar {{ insumo.nombre }}{% else %}- Nuevo Insumo{% endif %}
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 40px auto; padding: 20px;" class="card-style">
+    
+    <div style="text-align: center; margin-bottom: 20px;">
+        <h2 style="color: var(--primary-blue);">
+            {% if edit_mode %}Editar Insumo{% else %}Nuevo Insumo{% endif %}
+        </h2>
+        <p style="color: #666;">
+            {% if edit_mode %}Modifica los datos o la receta.{% else %}Registra materia prima o productos semielaborados.{% endif %}
+        </p>
+    </div>
+    
+    <form method="POST">
+        {% csrf_token %}
+        
+        <div style="margin-bottom: 15px;">
+            <label style="font-weight: bold;">Nombre del Insumo:</label>
+            {{ form.nombre }}
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+            <div style="text-align: center;">
+                <label style="font-weight: bold;">Categoría:</label>
+                {{ form.categoria }}
+            </div>
+            <div style="text-align: center;">
+                <label style="font-weight: bold;">Unidad Base (Almacén):</label>
+                {{ form.unidad }}
+                {% if not edit_mode %}
+                <small style="color: #999; font-size: 0.8em; display: block;">Selecciona la unidad más pequeña (Gramos/ML)</small>
+                {% endif %}
+            </div>
+        </div>
+
+        <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #90caf9;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                {{ form.es_insumo_compuesto }}
+                <div>
+                    <label for="check-compuesto" style="font-weight: bold; color: #0d47a1; cursor: pointer; margin: 0;">
+                        ¿Es un Insumo Compuesto? (Ej: Masa, Salsa)
+                    </label>
+                    <div style="font-size: 0.85em; color: #555; margin-top: 2px;">
+                        Actívalo si este insumo se "fabrica" internamente.
+                    </div>
+                </div>
+            </div>
+
+            {% if edit_mode and insumo.es_insumo_compuesto %}
+            <div style="margin-top: 15px; border-top: 1px solid #bbdefb; padding-top: 10px;">
+                <a href="{% url 'insumo_composition' insumo.id %}" style="display: block; text-align: center; background: white; color: #0d6efd; padding: 8px; border-radius: 5px; text-decoration: none; font-weight: bold; border: 1px solid #0d6efd;">
+                    <i class="fas fa-flask"></i> Modificar Receta / Ingredientes
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        
+        <div style="margin-bottom: 25px;">
+             <label style="font-weight: bold;">Stock Mínimo (Alerta):</label>
+             {{ form.stock_minimo }}
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+            <a href="{% url 'inventory_index' %}" style="padding: 10px 20px; color: #666; text-decoration: none;">Cancelar</a>
+            <button type="submit" class="add-btn" style="flex-grow: 1;">
+                {% if edit_mode %}Guardar Cambios{% else %}Guardar Insumo{% endif %}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+==================================================
+ARCHIVO: .\inventory\templates\inventory\inventory_list.html
+==================================================
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}- Inventario{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<div style="padding: 20px;">
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+        
+        <div>
+            <h2 style="color: var(--primary-blue); margin: 0;">Gestión de Inventario</h2>
+            <p style="color: #666; margin: 5px 0 0 0; font-size: 0.95em;">
+                Valor Total Almacén: <b style="color: #333;">${{ valor_total|floatformat:2 }}</b>
+            </p>
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+            
+            <a href="{% url 'insumo_create' %}" class="add-btn" style="background-color: #28a745; text-decoration: none; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-plus-circle"></i> Nuevo Insumo
+            </a>
+
+            <a href="{% url 'inventory_move' %}" class="add-btn" style="background-color: #343a40; text-decoration: none; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-exchange-alt"></i> Nuevo Movimiento
+            </a>
+            
+        </div>
+    </div>
+
+    <div class="card-style" style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #f8f9fa; text-align: left; border-bottom: 2px solid #ddd;">
+                    <th style="padding: 12px;">Producto</th>
+                    <th style="padding: 12px;">Stock Actual</th>
+                    <th style="padding: 12px;">Precio Bruto</th>
+                    <th style="padding: 12px;">Precio x G</th>
+                    <th style="padding: 12px;">Estado</th>
+                    <th style="padding: 12px;">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for insumo in insumos %}
+                <tr style="border-bottom: 1px solid #f1f1f1;">
+                    
+                    <td style="padding: 12px; font-weight: bold;">{{ insumo.nombre }}</td>
+
+                    <td style="padding: 12px;">
+                        {% if insumo.stock_actual <= insumo.stock_minimo %}
+                            <span style="color: #dc3545; font-weight: bold;">{{ insumo.stock_actual|floatformat:2 }} {{ insumo.unidad.codigo }}</span>
+                        {% else %}
+                            {{ insumo.stock_actual|floatformat:2 }} {{ insumo.unidad.codigo }}
+                        {% endif %}
+                    </td>
+
+                    <td style="padding: 12px; color: #666;">
+                        ${{ insumo.precio_mercado|default:"0.00" }} 
+                        <span style="font-size: 0.8em; color: #999;"></span>
+                    </td>
+
+                    <td style="padding: 12px; font-weight: bold; color: var(--primary-blue); background-color: #f8f9fa;">
+                        ${{ insumo.costo_unitario|floatformat:-5 }}
+                    </td>
+
+                    <td style="padding: 12px;">
+                        {% if insumo.stock_actual <= insumo.stock_minimo %}
+                            <span style="background: #ffebeb; color: #dc3545; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold;">
+                                <i class="fas fa-exclamation-triangle"></i> Bajo
+                            </span>
+                        {% else %}
+                            <span style="background: #d1e7dd; color: #0f5132; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold;">
+                                <i class="fas fa-check"></i> OK
+                            </span>
+                        {% endif %}
+                    </td>
+
+                    <td style="white-space: nowrap; padding: 12px;">
+                        <a href="{% url 'maestro_edit' insumo.id %}" title="Editar Maestro" style="background-color: #ffc107; color: #333; padding: 6px 10px; border-radius: 4px; margin-right: 4px; text-decoration: none; display: inline-block;">
+                            <i class="fas fa-pencil-alt"></i>
+                        </a>
+                        
+                        <form action="{% url 'insumo_delete' insumo.id %}" method="POST" style="display:inline-block;" onsubmit="return confirm('¿Eliminar {{ insumo.nombre }}?');">
+                            {% csrf_token %}
+                            <button type="submit" style="background-color: #dc3545; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer;">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </form>
+
+                        <a href="{% url 'inventory_move' %}" style="background-color: white; border: 1px solid #dee2e6; color: var(--primary-blue); padding: 5px 10px; border-radius: 4px; margin-left: 4px; text-decoration: none; display: inline-block;">
+                            <i class="fas fa-plus"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" style="text-align:center; padding:20px;">Sin inventario</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="modal-movimiento" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1000; justify-content:center; align-items:center; backdrop-filter: blur(2px);">
+    <div style="background:white; padding:30px; border-radius:12px; width:600px; max-width: 95%; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 style="margin:0; color:var(--primary-blue);">Registrar Movimiento</h3>
+            <button onclick="cerrarModal()" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+        </div>
+        
+        <form action="{% url 'add_movement' %}" method="POST">
+            {% csrf_token %}
+            
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">Insumo:</label>
+            <select name="insumo_id" id="modal-insumo-select" required style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:6px; background-color: #f9f9f9;">
+                {% for ins in insumos %}
+                    <option value="{{ ins.id }}">{{ ins.nombre }} ({{ ins.unidad.codigo }})</option>
+                {% endfor %}
+            </select>
+
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">Acción:</label>
+            <select name="tipo" id="modal-tipo-select" onchange="actualizarFormulario(this.value)" required style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:6px;">
+                <option value="ENTRADA">🟢 Entrada / Compra</option>
+                <option value="SALIDA">🔴 Salida / Merma</option>
+                <option value="AJUSTE">🔵 Ajuste Inventario</option>
+            </select>
+
+            <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                <div style="flex: 1;">
+                    <label style="display:block; margin-bottom:5px; font-weight:bold;">Cantidad (Peso/Unid):</label>
+                    <input type="text" inputmode="decimal" name="cantidad" required placeholder="Ej: 50" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px;">
+                </div>
+
+                <div id="contenedor-costo" style="flex: 1;">
+                    <label style="display:block; margin-bottom:5px; font-weight:bold;">Costo Total Factura ($):</label>
+                    <input type="text" inputmode="decimal" name="costo_total" id="input-costo" placeholder="Ej: 25.00" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px;">
+                    <small style="color:#888;">El sistema calculará el precio por Kg.</small>
+                </div>
+            </div>
+
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">Nota:</label>
+            <textarea name="nota" rows="2" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px; resize: none;"></textarea>
+
+            <div style="margin-top:25px; text-align:right;">
+                <button type="button" onclick="cerrarModal()" style="margin-right:10px; padding:10px 20px; cursor:pointer;">Cancelar</button>
+                <button type="submit" class="add-btn" style="padding:10px 25px; cursor:pointer; border:none; border-radius:6px;">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Tu script de SweetAlert y funciones del modal...
+    // (Mantén el mismo script que te di en el paso anterior, funciona igual)
+    document.addEventListener('DOMContentLoaded', function() {
+        {% if messages %}
+            {% for message in messages %}
+                Swal.fire({
+                    title: "{{ message.tags|title }}",
+                    text: "{{ message }}",
+                    icon: "{{ message.tags }}",
+                    confirmButtonColor: '#3085d6',
+                    timer: 3000
+                });
+            {% endfor %}
+        {% endif %}
+    });
+
+    function abrirModalMovimiento(insumoId = null, tipo = 'ENTRADA') {
+        document.getElementById('modal-movimiento').style.display = 'flex';
+        if(insumoId) document.getElementById('modal-insumo-select').value = insumoId;
+        
+        document.getElementById('modal-tipo-select').value = tipo;
+        actualizarFormulario(tipo);
+    }
+
+    function cerrarModal() {
+        document.getElementById('modal-movimiento').style.display = 'none';
+    }
+
+    function actualizarFormulario(tipo) {
+        const divCosto = document.getElementById('contenedor-costo');
+        const inCosto = document.getElementById('input-costo');
+        if (tipo === 'ENTRADA') {
+            divCosto.style.display = 'block';
+            inCosto.required = true;
+        } else {
+            divCosto.style.display = 'none';
+            inCosto.required = false;
+        }
+    }
+    
+    window.onclick = function(e) { if(e.target == document.getElementById('modal-movimiento')) cerrarModal(); }
+</script>
+{% endblock %}
+==================================================
+ARCHIVO: .\inventory\templates\inventory\inventory_move.html
+==================================================
+{% extends 'base.html' %}
+{% block title %}- Registrar Movimiento{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 40px auto; padding: 20px;" class="card-style">
+    
+    <div style="text-align: center; margin-bottom: 25px;">
+        <h2 style="color: var(--primary-blue); margin: 0;">Registrar Movimiento</h2>
+        <p style="color: #666;">Entradas (Compras), Salidas (Mermas) o Ajustes.</p>
+    </div>
+
+    {% if form.errors %}
+    <div style="background-color: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #f5c6cb;">
+        <strong>Error:</strong> Por favor corrige los siguientes campos:
+        {{ form.errors }}
+    </div>
+    {% endif %}
+
+    <form method="POST">
+        {% csrf_token %}
+
+        <div style="margin-bottom: 15px;">
+            <label style="font-weight: bold;">Insumo:</label>
+            {{ form.insumo }}
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+            <div>
+                <label style="font-weight: bold;">Tipo de Movimiento:</label>
+                {{ form.tipo }} 
+                </div>
+            <div>
+                <label style="font-weight: bold;">Cantidad:</label>
+                {{ form.cantidad }}
+            </div>
+        </div>
+
+        <div style="margin-bottom: 15px;">
+            <label style="font-weight: bold;">Unidad de Compra / Movimiento:</label>
+            {{ form.unidad_movimiento }} 
+            <small style="color: #666; display: block; margin-top: 2px;">Ej: Selecciona KG si compraste por Kilos.</small>
+        </div>
+
+        <div style="margin-bottom: 15px;">
+            <label style="font-weight: bold;">Costo Total o Unitario ($):</label>
+            {{ form.costo_unitario_movimiento }}
+            <small style="color: #888; display: block;">
+                Ingresa el costo correspondiente a la unidad seleccionada arriba. Si es salida, pon 0.
+            </small>
+        </div>
+
+        <div style="margin-bottom: 25px;">
+            <label style="font-weight: bold;">Nota / Referencia:</label>
+            {{ form.nota }}
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+            <a href="{% url 'inventory_index' %}" style="padding: 10px 20px; color: #666; text-decoration: none;">Cancelar</a>
+            <button type="submit" class="add-btn" style="flex-grow: 1;">Registrar Movimiento</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+==================================================
+ARCHIVO: .\maestros\admin.py
+==================================================
+from django.contrib import admin
+
+# Register your models here.
+
+==================================================
+ARCHIVO: .\maestros\apps.py
+==================================================
+from django.apps import AppConfig
+
+
+class MaestrosConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'maestros'
+
+==================================================
+ARCHIVO: .\maestros\forms.py
+==================================================
+from django import forms
+from inventory.models import Insumo
+
+# maestros/forms.py
+
+class MaestroInsumoForm(forms.ModelForm):
+    class Meta:
+        model = Insumo
+        fields = ['nombre', 'categoria', 'unidad', 'stock_minimo', 'precio_mercado', 'cantidad_por_precio', 'merma_porcentaje']
+        widgets = {
+            'nombre': forms.TextInput(attrs={'class': 'form-input'}),
+            'categoria': forms.Select(attrs={'class': 'form-input'}),
+            'unidad': forms.Select(attrs={'class': 'form-input'}),
+            'stock_minimo': forms.NumberInput(attrs={'class': 'form-input'}),
+            'precio_mercado': forms.NumberInput(attrs={'class': 'form-input', 'step': '0.01'}),
+            
+            # Nuevo campo visible
+            'cantidad_por_precio': forms.NumberInput(attrs={'class': 'form-input', 'step': '1'}),
+            
+            'merma_porcentaje': forms.NumberInput(attrs={'class': 'form-input', 'step': '0.1'}),
+        }
+==================================================
+ARCHIVO: .\maestros\models.py
+==================================================
+from django.db import models
+
+# Create your models here.
+
+==================================================
+ARCHIVO: .\maestros\tests.py
+==================================================
+from django.test import TestCase
+
+# Create your tests here.
+
+==================================================
+ARCHIVO: .\maestros\urls.py
+==================================================
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('', views.maestro_list, name='maestro_list'),
+    path('nuevo/', views.maestro_create, name='maestro_create'),
+    path('editar/<int:pk>/', views.maestro_edit, name='maestro_edit'),
+]
+==================================================
+ARCHIVO: .\maestros\views.py
+==================================================
+
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
+from inventory.models import Insumo
+from .forms import MaestroInsumoForm
+
+# VISTA PRINCIPAL: TABLA TIPO EXCEL
+def maestro_list(request):
+    insumos = Insumo.objects.all().order_by('nombre')
+    
+    # Simulamos una tasa de cambio (podrías guardarla en BD luego)
+    tasa_dolar = 300.00 
+    
+    return render(request, 'maestros/maestro_list.html', {
+        'insumos': insumos,
+        'tasa': tasa_dolar
+    })
+
+# CREAR NUEVO (Desde el Maestro)
+def maestro_create(request):
+    if request.method == 'POST':
+        form = MaestroInsumoForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Concepto creado en el Maestro.")
+            return redirect('maestro_list')
+    else:
+        form = MaestroInsumoForm()
+    
+    return render(request, 'maestros/maestro_form.html', {'form': form, 'titulo': 'Nuevo Concepto'})
+
+# EDITAR (Desde el Maestro)
+def maestro_edit(request, pk):
+    insumo = get_object_or_404(Insumo, pk=pk)
+    if request.method == 'POST':
+        form = MaestroInsumoForm(request.POST, instance=insumo)
+        if form.is_valid():
+            form.save() # Al guardar, se recalcula el costo con la merma automáticamente
+            messages.success(request, "Concepto actualizado.")
+            return redirect('maestro_list')
+    else:
+        form = MaestroInsumoForm(instance=insumo)
+    
+    return render(request, 'maestros/maestro_form.html', {'form': form, 'titulo': f'Editar {insumo.nombre}'})
+==================================================
+ARCHIVO: .\maestros\__init__.py
+==================================================
+
+==================================================
+ARCHIVO: .\maestros\templates\maestros\maestro_form.html
+==================================================
+{% extends 'base.html' %}
+{% block title %}- {{ titulo }}{% endblock %}
+
+{% block content %}
+<div style="max-width: 500px; margin: 40px auto;" class="card-style">
+    <h3 style="margin-top: 0; color: var(--primary-blue);">{{ titulo }}</h3>
+    
+    <form method="POST">
+        {% csrf_token %}
+        
+        <label>Nombre del Concepto:</label>
+        {{ form.nombre }}
+        <br>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            <div><label>Categoría:</label>{{ form.categoria }}</div>
+            <div><label>Unidad Base:</label>{{ form.unidad }}</div>
+        </div>
+        <br>
+
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #eee;">
+            <h4 style="margin: 0 0 10px 0; color: #555;">Datos Financieros</h4>
+            
+            <label>Precio Mercado ($):</label>
+            {{ form.precio_mercado }}
+            <small style="color: #888;">Precio bruto de compra.</small>
+            <br><br>
+            
+            <label>Porcentaje de Merma (%):</label>
+            {{ form.merma_porcentaje }}
+            <small style="color: #888;">Ej: 15 para 15% de desperdicio.</small>
+        </div>
+        <br>
+        
+        <label>Stock Mínimo:</label>
+        {{ form.stock_minimo }}
+        <br><br>
+
+        <button type="submit" class="add-btn" style="width: 100%;">Guardar Concepto</button>
+    </form>
+</div>
+{% endblock %}
+==================================================
+ARCHIVO: .\maestros\templates\maestros\maestro_list.html
+==================================================
+{% extends 'base.html' %}
+{% block title %}- Maestro de Conceptos{% endblock %}
+
+{% block content %}
+<div style="padding: 20px;">
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div>
+            <h2 style="margin: 0; color: #333;">MAESTRO DE COSTOS</h2>
+            <p style="margin: 5px 0 0 0; color: #666;">Tasa Referencia: <b>Bs. {{ tasa }}</b></p>
+        </div>
+        <a href="{% url 'maestro_create' %}" class="add-btn">
+            <i class="fas fa-plus"></i> Crear Nuevo Concepto
+        </a>
+    </div>
+
+    <div class="card-style" style="padding: 0; overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+            <thead>
+                <tr style="background-color: #f8f9fa; border-bottom: 2px solid #ddd;">
+                    <th style="padding: 12px; text-align: left; border-right: 1px solid #eee;">NOMBRE</th>
+                    <th style="padding: 12px; text-align: center; border-right: 1px solid #eee;">UNIDAD</th>
+                    <th style="padding: 12px; text-align: right; border-right: 1px solid #eee; background: #e3f2fd;">PRECIO MERCADO ($)</th>
+                    <th style="padding: 12px; text-align: center; border-right: 1px solid #eee; background: #fff3cd;">MERMA %</th>
+                    <th style="padding: 12px; text-align: right; border-right: 1px solid #eee;">COSTO REAL ($)</th>
+                    <th style="padding: 12px; text-align: right;">ACCIÓN</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for insumo in insumos %}
+                <tr style="border-bottom: 1px solid #eee; hover: background-color: #f1f1f1;">
+                    <td style="padding: 8px 12px; font-weight: 500;">{{ insumo.nombre }}</td>
+                    <td style="padding: 8px 12px; text-align: center; color: #666;">{{ insumo.unidad.codigo }}</td>
+                    
+                    <td style="padding: 8px 12px; text-align: right;">
+                        ${{ insumo.precio_mercado|floatformat:2 }}
+                    </td>
+
+                    <td style="padding: 8px 12px; text-align: center; color: #d9534f;">
+                        {% if insumo.merma_porcentaje > 0 %}{{ insumo.merma_porcentaje }}%{% else %}-{% endif %}
+                    </td>
+
+                    <td style="padding: 8px 12px; text-align: right; font-weight: bold; color: #28a745;">
+                        ${{ insumo.costo_unitario|floatformat:4 }}
+                    </td>
+
+                    <td style="padding: 8px 12px; text-align: right;">
+                        <a href="{% url 'maestro_edit' insumo.id %}" style="color: #0d6efd; text-decoration: none;">
+                            <i class="fas fa-pencil-alt"></i> Editar
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+==================================================
+ARCHIVO: .\pos_core\asgi.py
+==================================================
+"""
+ASGI config for pos_core project.
+
+It exposes the ASGI callable as a module-level variable named ``application``.
+
+For more information on this file, see
+https://docs.djangoproject.com/en/5.2/howto/deployment/asgi/
+"""
+
+import os
+
+from django.core.asgi import get_asgi_application
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pos_core.settings')
+
+application = get_asgi_application()
+
+==================================================
+ARCHIVO: .\pos_core\settings.py
+==================================================
+"""
+Django settings for pos_core project.
+
+Generated by 'django-admin startproject' using Django 5.2.9.
+
+For more information on this file, see
+https://docs.djangoproject.com/en/5.2/topics/settings/
+
+For the full list of settings and their values, see
+https://docs.djangoproject.com/en/5.2/ref/settings/
+"""
+import os
+from pathlib import Path
+
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+# Quick-start development settings - unsuitable for production
+# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
+
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = 'django-insecure-iimkxxcz5p*io!okont^4z!yybcq7%=nu7+=d#to(4n$uqlylb'
+
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = True
+
+ALLOWED_HOSTS = []
+
+
+# Application definition
+
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    'tables',
+    'dashboard',
+    'inventory',
+    'reports',
+    'maestros',
+]
+
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
+
+ROOT_URLCONF = 'pos_core.urls'
+
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
+
+WSGI_APPLICATION = 'pos_core.wsgi.application'
+
+
+# Database
+# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
+}
+
+
+# Password validation
+# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
+
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
+]
+
+
+# Internationalization
+# https://docs.djangoproject.com/en/5.2/topics/i18n/
+
+LANGUAGE_CODE = 'en-us'
+
+TIME_ZONE = 'UTC'
+
+USE_I18N = True
+
+USE_TZ = True
+
+
+# Static files (CSS, JavaScript, Images)
+# https://docs.djangoproject.com/en/5.2/howto/static-files/
+
+STATIC_URL = 'static/'
+
+# Default primary key field type
+# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+==================================================
+ARCHIVO: .\pos_core\urls.py
+==================================================
+
+from django.contrib import admin
+from django.urls import path, include
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('', include('tables.urls')),
+    path('dashboard/', include('dashboard.urls')),
+    path('inventory/', include('inventory.urls')),
+    path('reportes/', include('reports.urls')),
+    path('maestros/', include('maestros.urls')),
+]
+
+==================================================
+ARCHIVO: .\pos_core\wsgi.py
+==================================================
+"""
+WSGI config for pos_core project.
+
+It exposes the WSGI callable as a module-level variable named ``application``.
+
+For more information on this file, see
+https://docs.djangoproject.com/en/5.2/howto/deployment/wsgi/
+"""
+
+import os
+
+from django.core.wsgi import get_wsgi_application
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pos_core.settings')
+
+application = get_wsgi_application()
+
+==================================================
+ARCHIVO: .\pos_core\__init__.py
+==================================================
+
+==================================================
+ARCHIVO: .\reports\admin.py
+==================================================
+from django.contrib import admin
+
+# Register your models here.
+
+==================================================
+ARCHIVO: .\reports\apps.py
+==================================================
+from django.apps import AppConfig
+
+
+class ReportsConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'reports'
+
+==================================================
+ARCHIVO: .\reports\models.py
+==================================================
+from django.db import models
+
+# Create your models here.
+
+==================================================
+ARCHIVO: .\reports\tests.py
+==================================================
+from django.test import TestCase
+
+# Create your tests here.
+
+==================================================
+ARCHIVO: .\reports\urls.py
+==================================================
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('', views.reportes_index, name='reportes_index'), # Menú principal
+    path('inventario/', views.reporte_inventario, name='reporte_inventario'),
+    path('meseros/', views.ventas_mesero, name='ventas_mesero'),
+    path('productos/', views.ventas_producto, name='ventas_producto'),
+    path('pagos/', views.ventas_pago, name='ventas_pago'),
+]
+==================================================
+ARCHIVO: .\reports\views.py
+==================================================
+from django.shortcuts import render
+from django.db.models import Sum, Count, F
+from django.utils import timezone
+from datetime import timedelta
+from django.contrib.admin.views.decorators import staff_member_required
+
+# Importamos modelos de ambas aplicaciones (Inventario y Ventas)
+from inventory.models import Insumo, MovimientoInventario
+from tables.models import Venta, DetalleVenta 
+
+# 1. MENÚ PRINCIPAL DE REPORTES (Centro de Mando)
+@staff_member_required
+def reportes_index(request):
+    """Muestra el panel con las tarjetas de opciones"""
+    return render(request, 'reports/index.html')
+
+# 2. REPORTE DE INVENTARIO (Completo)
+@staff_member_required
+def reporte_inventario(request):
+    # Filtros de fecha (Por defecto: Últimos 30 días)
+    fecha_inicio = request.GET.get('fecha_inicio')
+    fecha_fin = request.GET.get('fecha_fin')
+
+    if not fecha_inicio:
+        fecha_inicio = (timezone.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+    if not fecha_fin:
+        fecha_fin = timezone.now().strftime('%Y-%m-%d')
+
+    # KPIs Generales
+    insumos = Insumo.objects.all()
+    
+    # Cálculo seguro del valor total
+    valor_total_inventario = sum(i.stock_actual * i.costo_unitario for i in insumos)
+    
+    items_bajo_stock = insumos.filter(stock_actual__lte=F('stock_minimo')).count()
+    
+    # Datos para gráficos (Top 5 Consumo)
+    movimientos_rango = MovimientoInventario.objects.filter(
+        fecha__date__range=[fecha_inicio, fecha_fin]
+    )
+    
+    top_consumo = (movimientos_rango.filter(tipo='SALIDA')
+                   .values('insumo__nombre')
+                   .annotate(total_cantidad=Sum('cantidad'))
+                   .order_by('-total_cantidad')[:5])
+    
+    labels_chart = [item['insumo__nombre'] for item in top_consumo]
+    data_chart = [float(item['total_cantidad']) for item in top_consumo]
+
+    # Tabla detallada
+    movimientos_tabla = movimientos_rango.select_related('insumo', 'usuario').order_by('-fecha')
+
+    context = {
+        'valor_total': valor_total_inventario,
+        'bajo_stock': items_bajo_stock,
+        'total_items': insumos.count(),
+        'fecha_inicio': fecha_inicio,
+        'fecha_fin': fecha_fin,
+        'labels_chart': labels_chart,
+        'data_chart': data_chart,
+        'movimientos': movimientos_tabla,
+    }
+    
+    return render(request, 'reports/inventory_report.html', context)
+
+# 3. REPORTE VENTAS X MESERO
+@staff_member_required
+def ventas_mesero(request):
+    fecha_inicio = request.GET.get('fecha_inicio', (timezone.now() - timedelta(days=30)).strftime('%Y-%m-%d'))
+    fecha_fin = request.GET.get('fecha_fin', timezone.now().strftime('%Y-%m-%d'))
+
+    # Agrupamos ventas por Mesero
+    data = (Venta.objects.filter(fecha__date__range=[fecha_inicio, fecha_fin])
+            .values('mesero__username')
+            .annotate(total_vendido=Sum('total'), total_ordenes=Count('id'))
+            .order_by('-total_vendido'))
+
+    # Preparamos datos para Chart.js
+    labels = [item['mesero__username'] if item['mesero__username'] else 'Sin Asignar' for item in data]
+    values = [float(item['total_vendido']) for item in data]
+
+    context = {
+        'titulo': 'Ventas por Mesero',
+        'data_tabla': data,
+        'labels': labels,
+        'values': values,
+        'tipo_chart': 'bar', # Gráfico de Barras
+        'fecha_inicio': fecha_inicio, 
+        'fecha_fin': fecha_fin
+    }
+    return render(request, 'reports/generic_sales_report.html', context)
+
+# 4. REPORTE VENTAS X PRODUCTO
+@staff_member_required
+def ventas_producto(request):
+    fecha_inicio = request.GET.get('fecha_inicio', (timezone.now() - timedelta(days=30)).strftime('%Y-%m-%d'))
+    fecha_fin = request.GET.get('fecha_fin', timezone.now().strftime('%Y-%m-%d'))
+
+    # Agrupamos detalles por Producto (Top 10)
+    data = (DetalleVenta.objects.filter(venta__fecha__date__range=[fecha_inicio, fecha_fin])
+            .values('nombre_producto')
+            .annotate(cantidad_total=Sum('cantidad'), dinero_generado=Sum('subtotal'))
+            .order_by('-cantidad_total')[:10])
+
+    labels = [item['nombre_producto'] for item in data]
+    values = [float(item['cantidad_total']) for item in data] 
+
+    context = {
+        'titulo': 'Top Productos Vendidos (Unidades)',
+        'data_tabla': data,
+        'labels': labels,
+        'values': values,
+        'tipo_chart': 'doughnut', # Gráfico de Dona
+        'fecha_inicio': fecha_inicio, 
+        'fecha_fin': fecha_fin,
+        'is_product_report': True # Bandera para ajustar la tabla HTML
+    }
+    return render(request, 'reports/generic_sales_report.html', context)
+
+# 5. REPORTE VENTAS X MÉTODO DE PAGO
+@staff_member_required
+def ventas_pago(request):
+    fecha_inicio = request.GET.get('fecha_inicio', (timezone.now() - timedelta(days=30)).strftime('%Y-%m-%d'))
+    fecha_fin = request.GET.get('fecha_fin', timezone.now().strftime('%Y-%m-%d'))
+
+    # Agrupamos por método de pago
+    data = (Venta.objects.filter(fecha__date__range=[fecha_inicio, fecha_fin])
+            .values('metodo_pago')
+            .annotate(total_vendido=Sum('total'), transacciones=Count('id'))
+            .order_by('-total_vendido'))
+
+    labels = [item['metodo_pago'] for item in data]
+    values = [float(item['total_vendido']) for item in data]
+
+    context = {
+        'titulo': 'Ventas por Método de Pago',
+        'data_tabla': data,
+        'labels': labels,
+        'values': values,
+        'tipo_chart': 'pie', # Gráfico de Torta
+        'fecha_inicio': fecha_inicio, 
+        'fecha_fin': fecha_fin
+    }
+    return render(request, 'reports/generic_sales_report.html', context)
+==================================================
+ARCHIVO: .\reports\__init__.py
+==================================================
+
+==================================================
+ARCHIVO: .\reports\templates\reports\generic_sales_report.html
+==================================================
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}- Reporte{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div style="padding: 20px; max-width: 1000px; margin: 0 auto;">
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div>
+            <a href="{% url 'reportes_index' %}" style="color: #666; text-decoration: none; font-size: 0.9em;"><i class="fas fa-arrow-left"></i> Volver</a>
+            <h2 style="color: var(--primary-blue); margin-top: 5px;">{{ titulo }}</h2>
+        </div>
+        
+        <form method="GET" style="background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; gap: 10px; align-items: center;">
+            <label style="font-size: 0.9em;">Desde:</label>
+            <input type="date" name="fecha_inicio" value="{{ fecha_inicio }}" style="border:1px solid #ddd; padding:5px; border-radius:4px;">
+            <label style="font-size: 0.9em;">Hasta:</label>
+            <input type="date" name="fecha_fin" value="{{ fecha_fin }}" style="border:1px solid #ddd; padding:5px; border-radius:4px;">
+            <button type="submit" class="add-btn" style="padding: 6px 15px;">Filtrar</button>
+        </form>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        
+        <div class="card-style" style="height: 400px; display:flex; justify-content:center;">
+            <canvas id="salesChart"></canvas>
+        </div>
+
+        <div class="card-style" style="overflow-y: auto; max-height: 400px;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: #f8f9fa; text-align: left; border-bottom: 2px solid #ddd;">
+                        {% if is_product_report %}
+                            <th style="padding: 10px;">Producto</th>
+                            <th style="padding: 10px;">Cant.</th>
+                            <th style="padding: 10px;">Generado</th>
+                        {% else %}
+                            <th style="padding: 10px;">Concepto</th>
+                            <th style="padding: 10px;">Transacciones</th>
+                            <th style="padding: 10px;">Total</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in data_tabla %}
+                    <tr style="border-bottom: 1px solid #eee;">
+                        {% if is_product_report %}
+                            <td style="padding: 10px; font-weight:bold;">{{ row.nombre_producto }}</td>
+                            <td style="padding: 10px;">{{ row.cantidad_total }}</td>
+                            <td style="padding: 10px; color:green;">${{ row.dinero_generado|floatformat:2 }}</td>
+                        {% else %}
+                            <td style="padding: 10px; font-weight:bold;">
+                                {% if row.mesero__username %}{{ row.mesero__username }}
+                                {% elif row.metodo_pago %}{{ row.metodo_pago }}
+                                {% else %}Desconocido{% endif %}
+                            </td>
+                            <td style="padding: 10px;">
+                                {% if row.total_ordenes %}{{ row.total_ordenes }}
+                                {% elif row.transacciones %}{{ row.transacciones }}
+                                {% endif %}
+                            </td>
+                            <td style="padding: 10px; color:green;">${{ row.total_vendido|floatformat:2 }}</td>
+                        {% endif %}
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3" style="padding:20px; text-align:center;">Sin datos en este rango.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const ctx = document.getElementById('salesChart').getContext('2d');
+    new Chart(ctx, {
+        type: '{{ tipo_chart }}',
+        data: {
+            labels: {{ labels|safe }},
+            datasets: [{
+                label: 'Ventas ($)',
+                data: {{ values|safe }},
+                backgroundColor: [
+                    '#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b',
+                    '#858796', '#5a5c69', '#2e59d9', '#17a673', '#2c9faf'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+        }
+    });
+</script>
+{% endblock %}
+==================================================
+ARCHIVO: .\reports\templates\reports\index.html
+==================================================
+{% extends 'base.html' %}
+{% block title %}- Centro de Reportes{% endblock %}
+
+{% block content %}
+<div style="padding: 20px; max-width: 1000px; margin: 0 auto;">
+    <h2 style="color: var(--primary-blue); border-bottom: 2px solid #eee; padding-bottom: 10px;">
+        <i class="fas fa-chart-line"></i> Centro de Reportes
+    </h2>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-top: 30px;">
+        
+        <a href="{% url 'reporte_inventario' %}" style="text-decoration: none;">
+            <div class="card-style" style="text-align: center; padding: 30px; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform='scale(1)'">
+                <i class="fas fa-boxes" style="font-size: 3em; color: #ffc107; margin-bottom: 15px;"></i>
+                <h3 style="color: #444; margin: 0;">Inventario</h3>
+                <p style="color: #888; font-size: 0.9em;">Stock, costos y mermas</p>
+            </div>
+        </a>
+
+        <a href="{% url 'ventas_mesero' %}" style="text-decoration: none;">
+            <div class="card-style" style="text-align: center; padding: 30px; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform='scale(1)'">
+                <i class="fas fa-user-tie" style="font-size: 3em; color: #28a745; margin-bottom: 15px;"></i>
+                <h3 style="color: #444; margin: 0;">Meseros</h3>
+                <p style="color: #888; font-size: 0.9em;">Rendimiento de personal</p>
+            </div>
+        </a>
+
+        <a href="{% url 'ventas_producto' %}" style="text-decoration: none;">
+            <div class="card-style" style="text-align: center; padding: 30px; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform='scale(1)'">
+                <i class="fas fa-hamburger" style="font-size: 3em; color: #17a2b8; margin-bottom: 15px;"></i>
+                <h3 style="color: #444; margin: 0;">Productos</h3>
+                <p style="color: #888; font-size: 0.9em;">Top ventas y favoritos</p>
+            </div>
+        </a>
+
+        <a href="{% url 'ventas_pago' %}" style="text-decoration: none;">
+            <div class="card-style" style="text-align: center; padding: 30px; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform='scale(1)'">
+                <i class="fas fa-cash-register" style="font-size: 3em; color: #dc3545; margin-bottom: 15px;"></i>
+                <h3 style="color: #444; margin: 0;">Pagos</h3>
+                <p style="color: #888; font-size: 0.9em;">Métodos y flujo de caja</p>
+            </div>
+        </a>
+
+    </div>
+</div>
+{% endblock %}
+==================================================
+ARCHIVO: .\reports\templates\reports\inventory_report.html
+==================================================
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}- Reporte Inventario{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div style="padding: 20px; max-width: 1200px; margin: 0 auto;">
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+        <h2 style="color: var(--primary-blue); margin: 0;">📊 Reporte de Inventario</h2>
+        
+        <form method="GET" style="background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; gap: 10px; align-items: center;">
+            <label style="font-size: 0.9em; font-weight: bold;">Desde:</label>
+            <input type="date" name="fecha_inicio" value="{{ fecha_inicio }}" style="padding: 5px; border: 1px solid #ddd; border-radius: 4px;">
+            
+            <label style="font-size: 0.9em; font-weight: bold;">Hasta:</label>
+            <input type="date" name="fecha_fin" value="{{ fecha_fin }}" style="padding: 5px; border: 1px solid #ddd; border-radius: 4px;">
+            
+            <button type="submit" class="add-btn" style="padding: 6px 15px;">Filtrar</button>
+        </form>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px;">
+        
+        <div class="card-style" style="border-left: 5px solid #28a745;">
+            <div style="color: #666; font-size: 0.9em;">Valor Total Inventario</div>
+            <div style="font-size: 1.8em; font-weight: bold; color: #333;">${{ valor_total|floatformat:2 }}</div>
+        </div>
+
+        <div class="card-style" style="border-left: 5px solid var(--primary-blue);">
+            <div style="color: #666; font-size: 0.9em;">Insumos Registrados</div>
+            <div style="font-size: 1.8em; font-weight: bold; color: #333;">{{ total_items }}</div>
+        </div>
+
+        <div class="card-style" style="border-left: 5px solid #dc3545;">
+            <div style="color: #666; font-size: 0.9em;">⚠️ Bajo Stock</div>
+            <div style="font-size: 1.8em; font-weight: bold; color: #dc3545;">{{ bajo_stock }}</div>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr; gap: 20px; margin-bottom: 30px;">
+        <div class="card-style">
+            <h3 style="margin-top: 0; color: #555;">Top 5 Insumos Más Consumidos (Salidas)</h3>
+            <div style="height: 300px;">
+                <canvas id="topInsumosChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-style">
+        <h3 style="margin-top: 0; color: #555; margin-bottom: 15px;">Historial de Movimientos (Filtrado)</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
+            <thead>
+                <tr style="background: #f8f9fa; text-align: left; border-bottom: 2px solid #ddd;">
+                    <th style="padding: 10px;">Fecha</th>
+                    <th style="padding: 10px;">Insumo</th>
+                    <th style="padding: 10px;">Tipo</th>
+                    <th style="padding: 10px;">Cant.</th>
+                    <th style="padding: 10px;">Costo Mov.</th>
+                    <th style="padding: 10px;">Usuario</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for mov in movimientos %}
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 10px;">{{ mov.fecha|date:"d/m/Y H:i" }}</td>
+                    <td style="padding: 10px;"><b>{{ mov.insumo.nombre }}</b></td>
+                    <td style="padding: 10px;">
+                        {% if mov.tipo == 'ENTRADA' %}
+                            <span style="color: green; font-weight: bold;">Entrada</span>
+                        {% elif mov.tipo == 'SALIDA' %}
+                            <span style="color: red; font-weight: bold;">Salida</span>
+                        {% else %}
+                            <span style="color: blue; font-weight: bold;">Ajuste</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 10px;">{{ mov.cantidad }} {{ mov.insumo.unidad.codigo }}</td>
+                    <td style="padding: 10px;">${{ mov.costo_unitario_movimiento|floatformat:2 }}</td>
+                    <td style="padding: 10px; color: #666;">
+                        {% if mov.usuario %}{{ mov.usuario.username }}{% else %}Sistema{% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 20px;">No hay movimientos en este rango de fechas.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const ctx = document.getElementById('topInsumosChart').getContext('2d');
+    const myChart = new Chart(ctx, {
+        type: 'bar', // Tipo de gráfico: Barra
+        data: {
+            // Traemos los datos desde Django de forma segura
+            labels: {{ labels_chart|safe }},
+            datasets: [{
+                label: 'Cantidad Consumida',
+                data: {{ data_chart|safe }},
+                backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}
+==================================================
+ARCHIVO: .\tables\admin.py
+==================================================
+from django.contrib import admin
+from .models import Table, Categoria, Producto, TasaBCV, IngredienteProducto, CostoAdicional, CostoAsignadoProducto
+
+# --- INLINE DE INGREDIENTES ---
+class IngredienteInline(admin.TabularInline):
+    model = IngredienteProducto
+    extra = 1
+    autocomplete_fields = ['insumo'] 
+    
+    # Mostramos columnas informativas (Solo lectura)
+    readonly_fields = ('costo_unitario_insumo', 'subtotal_costo')
+    
+    # Campos que SÍ se pueden editar
+    fields = ('insumo', 'cantidad', 'costo_unitario_insumo', 'subtotal_costo')
+
+    def costo_unitario_insumo(self, obj):
+        # Muestra cuánto cuesta 1 unidad de ese insumo hoy
+        if obj.insumo:
+            return f"${obj.insumo.costo_unitario:.2f} / {obj.insumo.unidad.codigo}"
+        return "-"
+    costo_unitario_insumo.short_description = "Costo Insumo (Hoy)"
+
+    def subtotal_costo(self, obj):
+        # Muestra cuánto cuesta la cantidad que estás usando (Ej: 0.200kg * Precio)
+        if obj.insumo and obj.cantidad:
+            total = obj.cantidad * obj.insumo.costo_unitario
+            return f"${total:.2f}"
+        return "$0.00"
+    subtotal_costo.short_description = "Costo Ingrediente"
+
+
+# --- ADMIN DEL PRODUCTO PRINCIPAL ---
+@admin.register(Producto)
+class ProductoAdmin(admin.ModelAdmin):
+    # Esto organiza el formulario en secciones bonitas
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('nombre', 'categoria', 'tamano')
+        }),
+        ('Análisis Financiero (Calculado)', {
+            'fields': ('ver_costo_receta', 'precio', 'ver_ganancia'),
+            'description': 'Agregue los ingredientes abajo y presione "Guardar y continuar" para actualizar estos cálculos.'
+        }),
+    )
+
+    inlines = [IngredienteInline]
+    
+    # Campos que el usuario NO puede editar (porque son cálculos)
+    readonly_fields = ('ver_costo_receta', 'ver_ganancia')
+
+    list_display = ('nombre', 'tamano', 'precio', 'ver_costo_receta', 'ver_ganancia_lista')
+    list_filter = ('categoria', 'tamano')
+    search_fields = ('nombre',)
+
+    # --- FUNCIONES PARA MOSTRAR DATOS CALCULADOS ---
+    
+    def ver_costo_receta(self, obj):
+        # Esto muestra el costo en el formulario de edición
+        return f"${obj.costo_receta:.2f}"
+    ver_costo_receta.short_description = "COSTO REAL (Suma de Ingredientes)"
+
+    def ver_ganancia(self, obj):
+        ganancia = obj.ganancia_estimada
+        margen = obj.margen_ganancia
+        style = "color: green; font-weight: bold;" if ganancia > 0 else "color: red; font-weight: bold;"
+        
+        # Inyectamos un poco de HTML para que se vea verde o rojo
+        from django.utils.html import format_html
+        return format_html(
+            '<span style="{}">${:.2f} (Margen: {:.1f}%)</span>',
+            style, ganancia, margen
+        )
+    ver_ganancia.short_description = "Ganancia Estimada"
+
+    # Versión simple para la lista azul de productos
+    def ver_ganancia_lista(self, obj):
+        return f"${obj.ganancia_estimada:.2f}"
+    ver_ganancia_lista.short_description = "Ganancia"
+
+# Registros simples
+admin.site.register(Table)
+admin.site.register(Categoria)
+admin.site.register(TasaBCV)
+
+admin.site.register(CostoAdicional)
+# admin.site.register(CostoAsignadoProducto) # No es necesario registrar este, lo veremos en la vista visual
+==================================================
+ARCHIVO: .\tables\apps.py
+==================================================
+from django.apps import AppConfig
+
+
+class TablesConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'tables'
+
+==================================================
+ARCHIVO: .\tables\forms.py
+==================================================
+from django import forms
+from .models import Producto, IngredienteProducto, CostoAsignadoProducto, CostoAdicional
+from inventory.models import Insumo
+
+# PASO 1: SOLO DATOS BÁSICOS
+class ProductoBasicForm(forms.ModelForm):
+    class Meta:
+        model = Producto
+        fields = ['nombre', 'categoria', 'tamano'] # Quitamos precio
+        widgets = {
+            'nombre': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Ej: Pizza Margarita'}),
+            'categoria': forms.Select(attrs={'class': 'form-input'}),
+            'tamano': forms.Select(attrs={'class': 'form-input'}),
+        }
+
+# PASO 2: (Usamos el IngredienteForm que ya tienes, no cambia)
+# En tu archivo forms.py
+
+class RecetaProductoForm(forms.ModelForm): # O el nombre que tenga tu formulario de receta
+    class Meta:
+        model = IngredienteProducto # O tu modelo intermedio
+        fields = ['insumo', 'cantidad']
+        widgets = {
+            'insumo': forms.Select(attrs={'class': 'form-input'}),
+            
+            # --- CAMBIO AQUÍ ---
+            # 'step': '1' obliga a escribir enteros (1, 20, 100). No deja escribir 0.5 ni 1.5
+            'cantidad': forms.NumberInput(attrs={'class': 'form-input', 'step': '1', 'placeholder': 'Gramos exactos'}), 
+        }
+
+# PASO 3: CONFIGURACIÓN DE PRECIO
+# tables/forms.py
+
+class ProductoPriceForm(forms.ModelForm):
+    class Meta:
+        model = Producto
+        fields = ['precio']
+        widgets = {
+            'precio': forms.NumberInput(attrs={'class': 'form-input', 'step': '0.01', 'id': 'input-precio'}),
+        }
+
+    # --- NUEVA VALIDACIÓN ---
+    def clean_precio(self):
+        precio = self.cleaned_data.get('precio')
+        
+        # Si el precio es None, 0 o negativo, lanzamos error
+        if precio is None or precio <= 0:
+            raise forms.ValidationError("El precio de venta debe ser mayor a 0 para finalizar.")
+        
+        return precio
+
+class CostoAdicionalForm(forms.ModelForm):
+    class Meta:
+        model = CostoAsignadoProducto
+        fields = ['costo_adicional', 'valor_aplicado']
+        widgets = {
+            'costo_adicional': forms.Select(attrs={'class': 'form-input', 'id': 'select-costo-master'}),
+            # CAMBIO AQUÍ: Usamos TextInput y inputmode="decimal"
+            'valor_aplicado': forms.TextInput(attrs={
+                'class': 'form-input', 
+                'placeholder': '0,00',
+                'inputmode': 'decimal' # Activa teclado numérico en móviles
+            }),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['costo_adicional'].queryset = CostoAdicional.objects.all()
+        self.fields['costo_adicional'].empty_label = "Seleccione un costo..."
+==================================================
+ARCHIVO: .\tables\models.py
+==================================================
+from django.db import models
+from django.contrib.auth.models import User
+from inventory.models import Insumo
+from decimal import Decimal
+from inventory.models import Insumo
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
+from django.contrib.auth.models import User
+
+# 1. Modelo para optimizar el BCV (Punto 1)
+class TasaBCV(models.Model):
+    precio = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Precio en Bs")
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Tasa: {self.precio} (Actualizada: {self.fecha_actualizacion.strftime('%d/%m %H:%M')})"
+
+# 2. Modelos para el POS (Punto 2)
+class Categoria(models.Model):
+    nombre = models.CharField(max_length=50) # Ej: IND, MED, FAM, BEBIDAS
+
+    def __str__(self):
+        return self.nombre
+
+class Producto(models.Model):
+    OPCIONES_TAMANO = [
+        ('IND', 'Individual'),
+        ('MED', 'Mediana'),
+        ('FAM', 'Familiar'),
+        ('UNI', 'Único/Bebida'),
+    ]
+
+    nombre = models.CharField(max_length=100)
+    precio = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Precio Venta ($)")
+    tamano = models.CharField(max_length=3, choices=OPCIONES_TAMANO, default='UNI')
+    categoria = models.ForeignKey(Categoria, on_delete=models.CASCADE, related_name='productos')
+    
+    # OPCIONAL: Imagen del producto
+    # imagen = models.ImageField(upload_to='productos/', blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.nombre} ({self.tamano})"
+
+    # --- LÓGICA DE COSTOS AUTOMÁTICA ---
+    @property
+    def costo_receta(self):
+        """Calcula cuánto cuesta hacer este producto sumando sus ingredientes"""
+        total_costo = Decimal('0.00')
+        # Recorremos todos los ingredientes de este producto
+        for ingrediente in self.ingredientes.all():
+            if ingrediente.insumo:
+                # Costo = Cantidad de la receta * Costo Promedio actual del insumo
+                costo_insumo = ingrediente.cantidad * ingrediente.insumo.costo_unitario
+                total_costo += costo_insumo
+        return total_costo
+
+    @property
+    def ganancia_estimada(self):
+        """Muestra cuánto ganas: Precio Venta - Costo Receta"""
+        return self.precio - self.costo_receta
+    
+    @property
+    def margen_ganancia(self):
+        """Margen en porcentaje"""
+        if self.precio > 0:
+            return (self.ganancia_estimada / self.precio) * 100
+        return 0
+
+    # COSTO 1: Solo Ingredientes (Materia Prima)
+    @property
+    def costo_receta(self):
+        total_costo = Decimal('0.00')
+        for ingrediente in self.ingredientes.all():
+            if ingrediente.insumo:
+                total_costo += ingrediente.cantidad * ingrediente.insumo.costo_unitario
+        return total_costo
+
+    costo_materia_prima = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Costo Ingredientes ($)")
+
+    def __str__(self):
+        return f"{self.nombre} ({self.tamano})"
+    # COSTO 2: Suma de Costos Adicionales (Mano de obra, gas, etc)
+    @property
+    def costo_indirectos_total(self):
+        total = Decimal('0.00')
+        for costo in self.costos_adicionales.all():
+            total += costo.monto_calculado
+        return total
+
+    # COSTO 3: Costo TOTAL FINAL (Ingredientes + Indirectos)
+    @property
+    def costo_total_real(self):
+        return self.costo_receta + self.costo_indirectos_total
+
+    # GANANCIA REAL (Precio Venta - Costo Total Real)
+    @property
+    def ganancia_estimada(self):
+        return self.precio - self.costo_total_real
+    
+    # --- FUNCIÓN DE ACTUALIZACIÓN ---
+    def actualizar_costo_receta(self):
+        """Recorre los ingredientes y actualiza el campo costo_materia_prima"""
+        total = Decimal('0.00')
+        for ingrediente in self.ingredientes.all():
+            if ingrediente.insumo:
+                total += ingrediente.cantidad * ingrediente.insumo.costo_unitario
+        
+        self.costo_materia_prima = total
+        self.save() # Guardamos el nuevo costo en la BD
+    
+
+# Tu modelo original de Mesas
+class Table(models.Model):
+    number = models.PositiveIntegerField(unique=True, verbose_name="Número de Mesa")
+    is_occupied = models.BooleanField(default=False, verbose_name="¿Ocupada?")
+
+    class Meta:
+        ordering = ['number']
+
+    def __str__(self):
+        return f"{self.nombre} ({self.tamano})"
+
+    # --- LÓGICA DE COSTOS AUTOMÁTICA ---
+    @property
+    def costo_receta(self):
+        """Calcula cuánto cuesta hacer este producto sumando sus ingredientes"""
+        total_costo = Decimal('0.00')
+        # Recorremos todos los ingredientes de este producto
+        for ingrediente in self.ingredientes.all():
+            if ingrediente.insumo:
+                # Costo = Cantidad de la receta * Costo Promedio actual del insumo
+                costo_insumo = ingrediente.cantidad * ingrediente.insumo.costo_unitario
+                total_costo += costo_insumo
+        return total_costo
+
+    @property
+    def ganancia_estimada(self):
+        """Muestra cuánto ganas: Precio Venta - Costo Receta"""
+        return self.precio - self.costo_receta
+    
+    @property
+    def margen_ganancia(self):
+        """Margen en porcentaje"""
+        if self.precio > 0:
+            return (self.ganancia_estimada / self.precio) * 100
+        return 0
+
+    
+class Table(models.Model):
+    number = models.PositiveIntegerField(unique=True, verbose_name="Número de Mesa")
+    is_occupied = models.BooleanField(default=False, verbose_name="¿Ocupada?")
+    
+    # --- NUEVO CAMPO ---
+    # Relacionamos la mesa con un usuario. 
+    # null=True permite que la mesa no tenga mesero (cuando está libre)
+    mesero = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='mesas_asignadas')
+
+    class Meta:
+        ordering = ['number']
+
+    def __str__(self):
+        mesero_nombre = self.mesero.username if self.mesero else "Sin mesero"
+        return f"Mesa {self.number} - {mesero_nombre}"
+    
+# --- NUEVO MODELO: LA RECETA ---
+class IngredienteProducto(models.Model):
+    producto = models.ForeignKey(Producto, on_delete=models.CASCADE, related_name='ingredientes')
+    insumo = models.ForeignKey(Insumo, on_delete=models.PROTECT, verbose_name="Insumo (Inventario)")
+    cantidad = models.DecimalField(max_digits=10, decimal_places=4, help_text="Cantidad a descontar del inventario (Ej: 0.200 para 200g)")
+
+    def __str__(self):
+        return f"{self.insumo.nombre} ({self.cantidad} {self.insumo.unidad.codigo})"
+
+    # Calculamos el costo parcial solo para mostrarlo en el admin
+    @property
+    def costo_parcial(self):
+        return self.cantidad * self.insumo.costo_unitario
+    
+# 1. MAESTRO DE COSTOS ADICIONALES (Configuración Global)
+class CostoAdicional(models.Model):
+    TIPOS_CALCULO = [
+        ('FIJO', 'Monto Fijo ($)'),
+        ('PORCENTAJE', '% del Costo de Receta'),
+    ]
+    
+    nombre = models.CharField(max_length=100) # Ej: "Mano de Obra", "Gas", "Empaque"
+    tipo = models.CharField(max_length=15, choices=TIPOS_CALCULO, default='FIJO')
+    valor_defecto = models.DecimalField(max_digits=10, decimal_places=2, help_text="Ej: 0.50 para $0.50 o 10 para 10%")
+
+    def __str__(self):
+        signo = "$" if self.tipo == 'FIJO' else "%"
+        return f"{self.nombre} ({self.valor_defecto}{signo})"
+
+# 2. RELACIÓN PRODUCTO <-> COSTO
+class CostoAsignadoProducto(models.Model):
+    producto = models.ForeignKey('Producto', on_delete=models.CASCADE, related_name='costos_adicionales')
+    costo_adicional = models.ForeignKey(CostoAdicional, on_delete=models.PROTECT)
+    valor_aplicado = models.DecimalField(max_digits=10, decimal_places=2, help_text="Valor específico para este producto")
+
+    @property
+    def monto_calculado(self):
+        """Traduce el porcentaje o fijo a dinero real"""
+        if self.costo_adicional.tipo == 'FIJO':
+            return self.valor_aplicado
+        else:
+            # Si es porcentaje, calculamos sobre el costo de los ingredientes
+            # (Valor / 100) * CostoReceta
+            return (self.valor_aplicado / 100) * self.producto.costo_receta
+        
+@receiver([post_save, post_delete], sender=IngredienteProducto)
+def update_costo_por_receta(sender, instance, **kwargs):
+    # 'instance' es el IngredienteProducto
+    if instance.producto:
+        instance.producto.actualizar_costo_receta()
+
+# SEÑAL 2: Si cambia el precio del INSUMO en Inventario -> Actualizar TODOS los productos que lo usen
+@receiver(post_save, sender=Insumo)
+def update_costo_por_insumo(sender, instance, **kwargs):
+    # 'instance' es el Insumo (ej: Harina) que acaba de cambiar de precio
+    
+    # Buscamos todas las recetas que usan este insumo
+    # (Usamos el 'related_name' por defecto o el set inverso)
+    ingredientes_afectados = instance.ingredienteproducto_set.all()
+    
+    # Para cada ingrediente encontrado, le decimos a su producto que se recalcule
+    for ingrediente in ingredientes_afectados:
+        ingrediente.producto.actualizar_costo_receta()
+
+# --- HISTORIAL DE VENTAS (Para Reportes) ---
+class Venta(models.Model):
+    METODOS_PAGO = [
+        ('EFECTIVO', 'Efectivo'),
+        ('TARJETA', 'Tarjeta / Débito'),
+        ('PAGO_MOVIL', 'Pago Móvil'),
+        ('ZELLE', 'Zelle'),
+        ('OTRO', 'Otro'),
+    ]
+
+    fecha = models.DateTimeField(auto_now_add=True)
+    codigo_factura = models.CharField(max_length=20, unique=True) # Ej: FAC-0001
+    total = models.DecimalField(max_digits=10, decimal_places=2)
+    metodo_pago = models.CharField(max_length=20, choices=METODOS_PAGO)
+    mesero = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='ventas_realizadas')
+    mesa_numero = models.IntegerField(help_text="Número de mesa donde se originó")
+
+    def __str__(self):
+        return f"Venta {self.codigo_factura} - ${self.total}"
+
+class DetalleVenta(models.Model):
+    venta = models.ForeignKey(Venta, on_delete=models.CASCADE, related_name='detalles')
+    producto = models.ForeignKey(Producto, on_delete=models.SET_NULL, null=True)
+    nombre_producto = models.CharField(max_length=100) # Guardamos el nombre por si borran el producto luego
+    cantidad = models.IntegerField()
+    precio_unitario = models.DecimalField(max_digits=10, decimal_places=2)
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def __str__(self):
+        return f"{self.cantidad}x {self.nombre_producto}"
+==================================================
+ARCHIVO: .\tables\scrapping.py
+==================================================
+import requests
+from bs4 import BeautifulSoup
+import urllib3
+from django.utils import timezone
+from .models import TasaBCV # Importamos el modelo que acabamos de crear
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+def obtener_tasa_bcv():
+    """
+    Lógica inteligente:
+    1. Revisa si ya tenemos una tasa guardada de HOY.
+    2. Si existe, la devuelve (Rápido).
+    3. Si no existe o es vieja, hace scraping (Lento), la guarda y la devuelve.
+    """
+    
+    # --- 1. INTENTO DE BASE DE DATOS ---
+    # Buscamos la última tasa guardada
+    ultima_tasa = TasaBCV.objects.order_by('-fecha_actualizacion').first()
+    
+    if ultima_tasa:
+        # Verificamos si es de hoy
+        hoy = timezone.now().date()
+        if ultima_tasa.fecha_actualizacion.date() == hoy:
+            # ¡Éxito! Devolvemos la de la BD y nos ahorramos la conexión lenta
+            return f"{ultima_tasa.precio}"
+
+    # --- 2. INTENTO DE SCRAPING (Solo si no hay datos de hoy) ---
+    print("Actualizando tasa desde BCV (Internet)...")
+    url = 'https://www.bcv.org.ve'
+    
+    try:
+        response = requests.get(url, verify=False, timeout=10)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        contenedor = soup.find(id='dolar')
+        
+        if contenedor:
+            dolar_tag = contenedor.find('strong')
+            if dolar_tag:
+                texto_crudo = dolar_tag.get_text().strip()
+                texto_punto = texto_crudo.replace(',', '.')
+                valor_float = float(texto_punto)
+
+                # --- 3. GUARDAMOS EN BASE DE DATOS ---
+                # Creamos el registro nuevo para no volver a consultar hoy
+                TasaBCV.objects.create(precio=valor_float)
+
+                return f"{valor_float:.2f} Bs/S"
+                
+    except Exception as e:
+        print(f"Error scraping: {e}")
+        # Si falla el scraping, intentamos devolver la vieja aunque no sea de hoy
+        if ultima_tasa:
+             return f"{ultima_tasa.precio} Bs/S"
+        return "Sin conexión"
+==================================================
+ARCHIVO: .\tables\tests.py
+==================================================
+from django.test import TestCase
+
+# Create your tests here.
+
+==================================================
+ARCHIVO: .\tables\urls.py
+==================================================
+
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('', views.index, name='index'),
+    path('create/', views.create_table, name='create_table'),
+    # Ruta específica para la petición AJAX de cambiar estado
+    path('toggle/<int:table_id>/', views.toggle_status, name='toggle_status'),
+    # Esta ruta captura el ID de la mesa en la URL, ej: /table/5/order/
+    path('table/<int:table_id>/order/', views.table_order_view, name='table_order'),
+    path('table/<int:table_id>/asignar_mesero/', views.asignar_mesero, name='asignar_mesero'),
+
+    # 1. Catálogo General
+    path('productos/', views.product_list, name='product_list'),
+    
+    # 2. PASO 1: Crear/Editar Datos Básicos
+    path('productos/nuevo/', views.product_create, name='product_create'),
+    path('productos/editar-datos/<int:pk>/', views.product_create, name='product_edit_basic'), # <--- OJO CON ESTE NOMBRE
+    
+    # 3. PASO 2: Receta (Ingredientes)
+    path('productos/receta/<int:pk>/', views.recipe_manager, name='recipe_manager'),
+    
+    # 4. PASO 3: Precio (Nuevo)
+    path('productos/precio/<int:pk>/', views.product_pricing, name='product_pricing'),
+]
+
+==================================================
+ARCHIVO: .\tables\views.py
+==================================================
+# tables/views.py (CÓDIGO COMPLETO Y CORREGIDO)
+
+from django.shortcuts import render, redirect, get_object_or_404
+from django.http import JsonResponse
+from django.db.models import Max
+from django.contrib import messages
+from django.contrib.auth.models import User
+from django.contrib.admin.views.decorators import staff_member_required
+import json
+from .models import CostoAdicional, CostoAsignadoProducto # Importar modelos nuevos
+from .forms import CostoAdicionalForm # Importar form nuevo
+
+
+# Tus modelos y formularios
+from .models import Table, Categoria, Producto, TasaBCV, IngredienteProducto
+from .forms import ProductoBasicForm, RecetaProductoForm, ProductoPriceForm
+from .scrapping import obtener_tasa_bcv
+
+# ==========================================
+#  LÓGICA ORIGINAL (MESAS Y POS)
+# ==========================================
+
+def initialize_tables_if_empty():
+    if Table.objects.count() == 0:
+        tables_to_create = []
+        for i in range(1, 21):
+            tables_to_create.append(Table(number=i))
+        Table.objects.bulk_create(tables_to_create)
+
+def index(request):
+    initialize_tables_if_empty()
+    tables = Table.objects.all()
+    return render(request, 'tables/index.html', {'tables': tables})
+
+def create_table(request):
+    max_number = Table.objects.aggregate(Max('number'))['number__max']
+    new_number = (max_number or 0) + 1
+    Table.objects.create(number=new_number)
+    return redirect('index')
+
+def toggle_status(request, table_id):
+    if request.method == 'POST':
+        table = get_object_or_404(Table, id=table_id)
+        table.is_occupied = not table.is_occupied
+        # Si se libera la mesa, quitamos al mesero
+        if not table.is_occupied:
+            table.mesero = None
+        table.save()
+        return JsonResponse({'is_occupied': table.is_occupied})
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+def asignar_mesero(request, table_id):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            user_id = data.get('user_id')
+            table = Table.objects.get(id=table_id)
+            if user_id:
+                user = User.objects.get(id=user_id)
+                table.mesero = user
+                nombre = user.username
+            else:
+                table.mesero = None
+                nombre = ""
+            table.save()
+            return JsonResponse({'status': 'ok', 'mesero': nombre})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    return JsonResponse({'status': 'error'}, status=400)
+
+def table_order_view(request, table_id):
+    table = get_object_or_404(Table, id=table_id)
+    tasa_actual_texto = obtener_tasa_bcv()
+    
+    tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
+    tasa_numerica = float(tasa_obj.precio) if tasa_obj else 0
+
+    categorias = Categoria.objects.all()
+    productos = Producto.objects.filter(precio__gt=0).select_related('categoria')
+    
+    meseros = User.objects.filter(is_active=True)
+
+    context = {
+        'table': table,
+        'tasa_cambio': tasa_actual_texto,
+        'tasa_valor': tasa_numerica,
+        'categorias': categorias,
+        'productos': productos,
+        'meseros': meseros,
+    }
+    return render(request, 'tables/order_detail.html', context)
+
+
+# ==========================================
+#  NUEVA LÓGICA (PRODUCTOS Y RECETAS)
+# ==========================================
+
+# 1. CATÁLOGO DE PRODUCTOS
+@staff_member_required
+def product_list(request):
+    productos = Producto.objects.all().order_by('nombre')
+    return render(request, 'products/product_list.html', {'productos': productos})
+
+# 2. PASO 1: CREAR DATOS BÁSICOS
+@staff_member_required
+def product_create(request, pk=None):
+    if pk:
+        producto = get_object_or_404(Producto, pk=pk)
+        titulo = "Editar Datos Básicos"
+    else:
+        producto = None
+        titulo = "Paso 1: Crear Producto"
+
+    if request.method == 'POST':
+        form = ProductoBasicForm(request.POST, instance=producto)
+        if form.is_valid():
+            prod = form.save(commit=False)
+            if not pk:
+                prod.precio = 0 # Precio temporal
+            prod.save()
+            messages.success(request, "Datos básicos guardados.")
+            return redirect('recipe_manager', pk=prod.pk)
+    else:
+        form = ProductoBasicForm(instance=producto)
+
+    return render(request, 'products/product_form.html', {'form': form, 'titulo': titulo})
+
+# 3. PASO 2: GESTOR DE RECETAS
+@staff_member_required
+def recipe_manager(request, pk):
+    producto = get_object_or_404(Producto, pk=pk)
+    
+    if request.method == 'POST':
+        if 'delete_ingrediente' in request.POST:
+            ing_id = request.POST.get('delete_ingrediente')
+            IngredienteProducto.objects.filter(id=ing_id).delete()
+            messages.warning(request, "Ingrediente eliminado.")
+            return redirect('recipe_manager', pk=pk)
+            
+        form = RecetaProductoForm(request.POST)
+        if form.is_valid():
+            ingrediente = form.save(commit=False)
+            ingrediente.producto = producto
+            ingrediente.save()
+            messages.success(request, "Ingrediente agregado.")
+            return redirect('recipe_manager', pk=pk)
+    else:
+        form = RecetaProductoForm()
+
+    context = {
+        'producto': producto,
+        'ingredientes': producto.ingredientes.all(),
+        'form': form,
+        'costo_total': producto.costo_receta,
+    }
+    return render(request, 'products/recipe_manager.html', context)
+
+# 4. PASO 3: PRECIO FINAL
+@staff_member_required
+@staff_member_required
+def product_pricing(request, pk):
+    producto = get_object_or_404(Producto, pk=pk)
+    
+    # LÓGICA: AGREGAR O ELIMINAR COSTOS ADICIONALES
+    if request.method == 'POST':
+        
+        # A) Eliminar un costo
+        if 'delete_costo' in request.POST:
+            cid = request.POST.get('delete_costo')
+            CostoAsignadoProducto.objects.filter(id=cid).delete()
+            messages.warning(request, "Costo adicional eliminado.")
+            return redirect('product_pricing', pk=pk)
+        
+        # B) Agregar un costo nuevo (CON CORRECCIÓN DE COMAS)
+        if 'add_costo' in request.POST:
+            # 1. Creamos una copia editable de los datos recibidos
+            datos_formulario = request.POST.copy()
+            
+            # 2. Limpieza manual de la coma en 'valor_aplicado'
+            valor_sucio = datos_formulario.get('valor_aplicado', '')
+            if ',' in valor_sucio:
+                datos_formulario['valor_aplicado'] = valor_sucio.replace('.', '').replace(',', '.') # Quitamos punto de miles y cambiamos coma decimal
+            
+            # 3. Pasamos los datos ya limpios al formulario
+            form_costo = CostoAdicionalForm(datos_formulario)
+            
+            if form_costo.is_valid():
+                nuevo_costo = form_costo.save(commit=False)
+                nuevo_costo.producto = producto
+                nuevo_costo.save()
+                messages.success(request, "Costo adicional agregado correctamente.")
+                return redirect('product_pricing', pk=pk)
+            else:
+                # 4. Si falla, avisamos por qué (Esto es vital para depurar)
+                messages.error(request, f"Error al agregar costo: {form_costo.errors}")
+
+        # C) Guardar Precio Final (Formulario de precio)
+        if 'save_price' in request.POST:
+            datos_precio = request.POST.copy()
+            # Limpieza también para el precio final
+            precio_sucio = datos_precio.get('precio', '')
+            if ',' in precio_sucio:
+                 datos_precio['precio'] = precio_sucio.replace('.', '').replace(',', '.')
+            
+            form_precio = ProductoPriceForm(datos_precio, instance=producto)
+            if form_precio.is_valid():
+                form_precio.save()
+                messages.success(request, f"¡Producto '{producto.nombre}' configurado exitosamente!")
+                return redirect('product_list')
+            else:
+                 messages.error(request, f"Error en el precio: {form_precio.errors}")
+    
+    # Formularios vacíos para renderizar
+    form_precio = ProductoPriceForm(instance=producto)
+    form_costo = CostoAdicionalForm()
+
+    context = {
+        'producto': producto,
+        'form_precio': form_precio,
+        'form_costo': form_costo,
+        'costo_receta': producto.costo_receta,
+        'costos_adicionales': producto.costos_adicionales.all(),
+        'total_indirectos': producto.costo_indirectos_total,
+        'costo_total_final': producto.costo_total_real,
+    }
+    return render(request, 'products/product_pricing.html', context)
+    producto = get_object_or_404(Producto, pk=pk)
+    
+    # LÓGICA: AGREGAR O ELIMINAR COSTOS ADICIONALES
+    if request.method == 'POST':
+        # A) Eliminar un costo
+        if 'delete_costo' in request.POST:
+            cid = request.POST.get('delete_costo')
+            CostoAsignadoProducto.objects.filter(id=cid).delete()
+            messages.warning(request, "Costo adicional eliminado.")
+            return redirect('product_pricing', pk=pk)
+        
+        # B) Agregar un costo nuevo
+        if 'add_costo' in request.POST:
+            form_costo = CostoAdicionalForm(request.POST)
+            if form_costo.is_valid():
+                nuevo_costo = form_costo.save(commit=False)
+                nuevo_costo.producto = producto
+                nuevo_costo.save()
+                messages.success(request, "Costo adicional agregado.")
+                return redirect('product_pricing', pk=pk)
+
+        # C) Guardar Precio Final (Formulario de precio)
+        if 'save_price' in request.POST:
+            form_precio = ProductoPriceForm(request.POST, instance=producto)
+            if form_precio.is_valid():
+                form_precio.save()
+                messages.success(request, f"¡Producto '{producto.nombre}' configurado exitosamente!")
+                return redirect('product_list')
+    
+    # Formularios vacíos para renderizar
+    form_precio = ProductoPriceForm(instance=producto)
+    form_costo = CostoAdicionalForm()
+
+    context = {
+        'producto': producto,
+        'form_precio': form_precio,
+        'form_costo': form_costo,
+        # Datos calculados
+        'costo_receta': producto.costo_receta,
+        'costos_adicionales': producto.costos_adicionales.all(), # Lista de costos agregados
+        'total_indirectos': producto.costo_indirectos_total,
+        'costo_total_final': producto.costo_total_real, # La suma maestra
+    }
+    return render(request, 'products/product_pricing.html', context)
+==================================================
+ARCHIVO: .\tables\__init__.py
+==================================================
+
+==================================================
+ARCHIVO: .\tables\templates\products\product_form.html
+==================================================
+{% extends 'base.html' %}
+{% block content %}
+<div style="max-width: 500px; margin: 40px auto; padding: 20px;" class="card-style">
+    <h2 style="color: var(--primary-blue); text-align: center;">{{ titulo }}</h2>
+    <form method="POST">
+        {% csrf_token %}
+        {% for field in form %}
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 5px;">{{ field.label }}</label>
+                {{ field }}
+            </div>
+        {% endfor %}
+        <button type="submit" class="add-btn" style="width: 100%; margin-top: 10px;">Guardar y Configurar Receta</button>
+    </form>
+</div>
+{% endblock %}
+==================================================
+ARCHIVO: .\tables\templates\products\product_list.html
+==================================================
+{% extends 'base.html' %}
+{% block title %}- Productos{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<div style="padding: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="color: var(--primary-blue); margin: 0;">Catálogo de Productos</h2>
+        <a href="{% url 'product_create' %}" class="add-btn" style="text-decoration: none;">
+            <i class="fas fa-plus"></i> Nuevo Producto
+        </a>
+    </div>
+
+    <div class="card-style">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #f8f9fa; text-align: left; border-bottom: 2px solid #ddd;">
+                    <th style="padding: 12px;">Nombre</th>
+                    <th style="padding: 12px;">Categoría</th>
+                    <th style="padding: 12px;">Precio Venta</th>
+                    <th style="padding: 12px;">Costo Receta</th>
+                    <th style="padding: 12px;">Margen</th>
+                    <th style="padding: 12px;">Fases</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for prod in productos %}
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 12px;">
+                        <b>{{ prod.nombre }}</b> <span style="font-size: 0.8em; color: #666;">({{ prod.get_tamano_display }})</span>
+                    </td>
+                    <td style="padding: 12px; color: #666;">{{ prod.categoria.nombre }}</td>
+                    
+                    <td style="padding: 12px; font-weight: bold; color: green;">${{ prod.precio }}</td>
+                    
+                    <td style="padding: 12px; color: #d32f2f;">${{ prod.costo_receta|floatformat:2 }}</td>
+                    
+                    <td style="padding: 12px;">
+                        {% if prod.precio == 0 %}
+                            <span style="background: #eee; color: #888; padding: 3px 8px; border-radius: 4px; font-size: 0.85em;">
+                                --
+                            </span>
+                        {% elif prod.margen_ganancia >= 30 %}
+                            <span style="background: #e8f5e9; color: #2e7d32; padding: 3px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold;">
+                                {{ prod.margen_ganancia|floatformat:0 }}%
+                            </span>
+                        {% elif prod.margen_ganancia >= 0 %}
+                            <span style="background: #fff3cd; color: #856404; padding: 3px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold;">
+                                {{ prod.margen_ganancia|floatformat:0 }}%
+                            </span>
+                        {% else %}
+                            <span style="background: #f8d7da; color: #721c24; padding: 3px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; border: 1px solid #f5c6cb;">
+                                {{ prod.margen_ganancia|floatformat:0 }}% 📉
+                            </span>
+                        {% endif %}
+                    </td>
+                    
+                    <td style="padding: 12px;">
+                        <a href="{% url 'product_edit_basic' prod.id %}" title="Editar Nombre/Categoría" style="text-decoration: none; color: #666; margin-right: 8px;">
+                            <i class="fas fa-edit"></i>
+                        </a>
+
+                        <a href="{% url 'recipe_manager' prod.id %}" title="Ingeniería de Receta" style="text-decoration: none; color: var(--primary-blue); margin-right: 8px;">
+                            <i class="fas fa-scroll"></i>
+                        </a>
+
+                        <a href="{% url 'product_pricing' prod.id %}" title="Ajustar Precio" style="text-decoration: none; color: #28a745;">
+                            <i class="fas fa-tag"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 20px; color: #888;">No hay productos registrados.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        {% if messages %}
+            {% for message in messages %}
+                Swal.fire({
+                    title: "{{ message.tags|title }}",
+                    text: "{{ message }}",
+                    icon: "{{ message.tags }}",
+                    confirmButtonColor: '#3085d6',
+                    timer: 2000
+                });
+            {% endfor %}
+        {% endif %}
+    });
+</script>
+{% endblock %}
+==================================================
+ARCHIVO: .\tables\templates\products\product_pricing.html
+==================================================
+{% extends 'base.html' %}
+{% block title %}- Configurar Precio{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<div style="max-width: 900px; margin: 40px auto; padding: 20px;">
+    
+    <div style="text-align: center; margin-bottom: 30px;">
+        <h2 style="color: var(--primary-blue);">Paso 3: Estructura de Costos y Precio</h2>
+        <p style="color: #666;">Define los costos indirectos y el precio para <b>{{ producto.nombre }}</b></p>
+    </div>
+
+    <div class="card-style" style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 30px; align-items: start;">
+        
+        <div style="background: #fff;">
+            
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span><i class="fas fa-carrot"></i> Costo Materia Prima (Receta):</span>
+                    <b style="font-size: 1.1em;">${{ costo_receta|floatformat:2 }}</b>
+                </div>
+                <div style="text-align: right; font-size: 0.8em; margin-top: 5px;">
+                    <a href="{% url 'recipe_manager' producto.id %}">Editar ingredientes</a>
+                </div>
+            </div>
+
+            <h4 style="margin-bottom: 10px; color: #444;">Costos Adicionales / Indirectos</h4>
+            
+            <form method="POST" style="background: #e3f2fd; padding: 10px; border-radius: 6px; display: flex; gap: 10px; align-items: end; margin-bottom: 15px;">
+                {% csrf_token %}
+                <input type="hidden" name="add_costo" value="1">
+                <div style="flex-grow: 1;">
+                    <label style="font-size: 0.75em; font-weight: bold;">Concepto:</label>
+                    {{ form_costo.costo_adicional }}
+                </div>
+                <div style="width: 80px;">
+                    <label style="font-size: 0.75em; font-weight: bold;">Valor:</label>
+                    {{ form_costo.valor_aplicado }}
+                </div>
+                <button type="submit" class="add-btn" style="height: 38px; width: 40px; display: flex; justify-content: center; align-items: center;">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </form>
+
+            <table style="width: 100%; font-size: 0.9em; border-collapse: collapse; margin-bottom: 15px;">
+                {% for ca in costos_adicionales %}
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 8px;">
+                        {{ ca.costo_adicional.nombre }}
+                        <span style="color: #888; font-size: 0.85em;">
+                            ({{ ca.valor_aplicado }}{% if ca.costo_adicional.tipo == 'PORCENTAJE' %}%{% endif %})
+                        </span>
+                    </td>
+                    <td style="padding: 8px; font-weight: bold; text-align: right; color: #555;">
+                        + ${{ ca.monto_calculado|floatformat:2 }}
+                    </td>
+                    <td style="padding: 8px; text-align: right; width: 30px;">
+                        <form method="POST">
+                            {% csrf_token %}
+                            <input type="hidden" name="delete_costo" value="{{ ca.id }}">
+                            <button style="border: none; background: none; color: #dc3545; cursor: pointer;">&times;</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                <tr style="background: #f1f1f1;">
+                    <td style="padding: 8px; font-weight: bold;">Subtotal Indirectos:</td>
+                    <td style="padding: 8px; font-weight: bold; text-align: right;">${{ total_indirectos|floatformat:2 }}</td>
+                    <td></td>
+                </tr>
+            </table>
+            
+            <hr style="border: 2px solid #eee;">
+            
+            <div style="display: flex; justify-content: space-between; font-size: 1.3em; margin-top: 15px;">
+                <span>COSTO TOTAL REAL:</span>
+                <b style="color: #d32f2f;">${{ costo_total_final|floatformat:2 }}</b>
+            </div>
+        </div>
+
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #ddd;">
+            <h3 style="margin-top: 0; color: var(--primary-blue);">Precio de Venta</h3>
+            
+            <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="save_price" value="1">
+                
+                <label style="font-weight: bold; display: block; margin-bottom: 5px;">Precio Sugerido ($):</label>
+                {{ form_precio.precio }}
+                
+                <div style="margin-top: 20px; padding: 15px; background: white; border: 1px solid #eee; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 0.9em; color: #666;">Ganancia Real</div>
+                    <div id="live-ganancia" style="font-size: 1.5em; font-weight: bold; color: #ccc;">$0.00</div>
+                    <div id="live-margen" style="font-size: 0.9em; color: #999;">Margen: 0%</div>
+                </div>
+
+                <button type="submit" class="add-btn" style="width: 100%; margin-top: 20px; padding: 12px; font-size: 1.1em;">
+                    Finalizar Producto
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. Script para calcular ganancia en tiempo real
+    const inputPrecio = document.getElementById('input-precio');
+    const displayGanancia = document.getElementById('live-ganancia');
+    const displayMargen = document.getElementById('live-margen');
+    
+    // Traemos el costo TOTAL FINAL desde Django
+    const costoTotal = parseFloat("{{ costo_total_final|stringformat:'f' }}");
+
+    if(inputPrecio){
+        // Ejecutar al cargar por si ya tiene precio
+        calcularGanancia(inputPrecio.value);
+
+        inputPrecio.addEventListener('input', function() {
+            calcularGanancia(this.value);
+        });
+    }
+
+    function calcularGanancia(valor) {
+        const precio = parseFloat(valor) || 0;
+        
+        // Solo calculamos si hay un precio puesto
+        if (precio > 0) {
+            const ganancia = precio - costoTotal;
+            const margen = (ganancia / precio) * 100;
+            
+            // Mostramos los valores (toFixed(2) permite ver negativos como -5.00)
+            displayGanancia.textContent = `$${ganancia.toFixed(2)}`;
+            displayMargen.textContent = `Margen: ${margen.toFixed(1)}%`;
+            
+            // LOGICA DE COLORES
+            if (ganancia > 0) {
+                // Ganancia Positiva (Verde)
+                displayGanancia.style.color = '#28a745'; 
+                displayMargen.style.color = '#28a745';
+            } else if (ganancia === 0) {
+                // Tablas (Gris)
+                displayGanancia.style.color = '#666';
+                displayMargen.style.color = '#666';
+            } else {
+                // PÉRDIDA (Rojo Intenso)
+                displayGanancia.style.color = '#dc3545'; // Rojo peligro
+                displayMargen.style.color = '#dc3545';
+                displayMargen.textContent += " (PÉRDIDA)"; // Agregamos texto de alerta
+            }
+
+        } else {
+            // Si no hay precio
+            displayGanancia.textContent = "$0.00";
+            displayMargen.textContent = "Margen: 0%";
+            displayGanancia.style.color = "#ccc";
+            displayMargen.style.color = "#ccc";
+        }
+    }
+
+    const costosDefault = {
+        {% for ca in form_costo.fields.costo_adicional.queryset %}
+            // Forzamos 2 decimales con punto (ej: "0.50") desde el servidor
+            "{{ ca.id }}": "{{ ca.valor_defecto|stringformat:'.2f' }}",
+        {% endfor %}
+    };
+
+    const selectCosto = document.getElementById('select-costo-master');
+    // Buscamos el input por su nombre, ya que ahora es type="text"
+    const inputValor = document.querySelector('input[name="valor_aplicado"]');
+
+    if(selectCosto){
+        selectCosto.addEventListener('change', function() {
+            const id = this.value;
+            if(costosDefault[id]) {
+                let valor = costosDefault[id];
+                
+                // CAMBIO VISUAL: Cambiamos el punto por coma para que el usuario lo vea familiar
+                valor = valor.replace('.', ',');
+                
+                inputValor.value = valor;
+            } else {
+                inputValor.value = "";
+            }
+        });
+    }
+    
+    // 3. Alertas
+    document.addEventListener('DOMContentLoaded', function() {
+        {% if messages %}
+            {% for message in messages %}
+                Swal.fire({
+                    title: "{{ message.tags|title }}",
+                    text: "{{ message }}",
+                    icon: "{{ message.tags }}",
+                    confirmButtonColor: '#3085d6',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+            {% endfor %}
+        {% endif %}
+    });
+</script>
+
+<style>
+    .form-input {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+</style>
+{% endblock %}
+==================================================
+ARCHIVO: .\tables\templates\products\recipe_manager.html
+==================================================
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}- Receta {{ producto.nombre }}{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<div style="padding: 20px; max-width: 1200px; margin: 0 auto;">
+    
+    <div style="text-align: center; margin-bottom: 30px;">
+        <h2 style="color: var(--primary-blue); margin-bottom: 5px;">Paso 2: Ingeniería de Receta</h2>
+        <p style="color: #666;">Define los ingredientes para <b>{{ producto.nombre }}</b></p>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 20px;">
+        
+        <div class="card-style" style="height: fit-content; position: sticky; top: 20px;">
+            <h3 style="margin-top: 0; color: #444;">Resumen de Costo</h3>
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+            
+            <div style="margin-bottom: 20px;">
+                <div style="font-size: 0.9em; color: #666;">Costo Acumulado</div>
+                <div style="font-size: 2em; font-weight: bold; color: #d32f2f;">
+                    ${{ costo_total|floatformat:2 }}
+                </div>
+                <small style="color: #888;">Suma de todos los ingredientes</small>
+            </div>
+
+            <a href="{% url 'product_pricing' producto.id %}" class="add-btn" style="display: block; text-align: center; text-decoration: none; padding: 15px; margin-top: 20px;">
+                Siguiente: Definir Precio <i class="fas fa-arrow-right"></i>
+            </a>
+            
+            <div style="margin-top: 10px; text-align: center;">
+                <a href="{% url 'product_edit_basic' producto.id %}" style="color: #666; font-size: 0.9em; text-decoration: none;">
+                    <i class="fas fa-arrow-left"></i> Volver a editar nombre
+                </a>
+            </div>
+        </div>
+
+        <div class="card-style">
+            <h3 style="margin-top: 0;">Ingredientes / Composición</h3>
+            
+            <form method="POST" style="background: #f1f8ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 10px; align-items: end;">
+                {% csrf_token %}
+                <div style="flex-grow: 1;">
+                    <label style="font-size: 0.8em; font-weight: bold; display: block; margin-bottom: 5px;">Seleccionar Insumo:</label>
+                    {{ form.insumo }}
+                </div>
+                <div style="width: 140px;">
+                    <label style="font-size: 0.8em; font-weight: bold; display: block; margin-bottom: 5px;">Cantidad:</label>
+                    {{ form.cantidad }}
+                </div>
+                <button type="submit" class="add-btn" style="height: 42px; width: 50px; display: flex; justify-content: center; align-items: center;">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </form>
+
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="text-align: left; border-bottom: 2px solid #eee; color: #666; font-size: 0.9em;">
+                        <th style="padding: 10px;">Insumo</th>
+                        <th style="padding: 10px;">Cantidad</th>
+                        <th style="padding: 10px;">Costo Unit. (Hoy)</th>
+                        <th style="padding: 10px;">Subtotal</th>
+                        <th style="padding: 10px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ing in ingredientes %}
+                    <tr style="border-bottom: 1px solid #f9f9f9;">
+                        <td style="padding: 10px; font-weight: bold;">{{ ing.insumo.nombre }}</td>
+                        <td style="padding: 10px;">
+                            {{ ing.cantidad|floatformat:0 }} <span style="font-size:0.8em; color:#888;">{{ ing.insumo.unidad.codigo }}</span>
+                        </td>
+                        <td style="padding: 10px; font-size: 0.9em; color: #666;">
+                            ${{ ing.insumo.costo_unitario|floatformat:2 }}
+                        </td>
+                        <td style="padding: 10px; font-weight: bold; color: #444;">
+                            ${{ ing.costo_parcial|floatformat:2 }}
+                        </td>
+                        <td style="padding: 10px; text-align: right;">
+                            <form method="POST" onsubmit="return confirm('¿Quitar este ingrediente?');">
+                                {% csrf_token %}
+                                <input type="hidden" name="delete_ingrediente" value="{{ ing.id }}">
+                                <button type="submit" style="background: none; border: none; color: #ff6b6b; cursor: pointer; padding: 5px;">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 40px; color: #999;">
+                            <i class="fas fa-basket-shopping" style="font-size: 2em; margin-bottom: 10px; display: block;"></i>
+                            Aún no has agregado ingredientes.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // Notificaciones
+    document.addEventListener('DOMContentLoaded', function() {
+        {% if messages %}
+            {% for message in messages %}
+                const icon = "{{ message.tags }}" === "success" ? "success" : "warning";
+                Swal.fire({
+                    title: "{{ message.tags|title }}",
+                    text: "{{ message }}",
+                    icon: icon,
+                    confirmButtonColor: '#3085d6',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+            {% endfor %}
+        {% endif %}
+    });
+</script>
+
+<style>
+    /* Estilos para los inputs del formulario Django */
+    .form-input {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+    .form-input:focus {
+        border-color: var(--primary-blue);
+        outline: none;
+    }
+</style>
+{% endblock %}
+==================================================
+ARCHIVO: .\tables\templates\tables\index.html
+==================================================
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema POS - Mesas</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <h1>Sistema POS - Vista de Mesas</h1>
+            
+            <div class="header-actions">
+                <a href="{% url 'panel_control' %}" class="btn-secondary">
+                    <i class="fas fa-th-large"></i> Dashboard
+                </a>
+
+                <a href="{% url 'create_table' %}" class="add-btn">
+                    + Crear Mesa
+                </a>
+            </div>
+        </header>
+
+        <main class="tables-grid">
+            {% for table in tables %}
+                <a href="{% url 'table_order' table.id %}" class="table-link-wrapper">
+                    <div class="table-card {% if table.is_occupied %}occupied{% else %}free{% endif %}">
+                        <div class="table-content">
+                            <h3>Mesa {{ table.number }}</h3>
+                            <div class="status-indicator">
+                                {% if table.is_occupied %}
+                                    <span class="icon">✅</span> Ocupada
+                                {% else %}
+                                    <span class="icon">🍽️</span> Libre
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            {% endfor %}
+        </main>
+    </div>
+
+    {% csrf_token %}
+    
+    <script src="{% static 'js/script.js' %}"></script>
+</body>
+</html>
+==================================================
+ARCHIVO: .\tables\templates\tables\order_detail.html
+==================================================
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pedido - Mesa {{ table.number }}</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="light-theme"> <div style="padding: 20px 0 0 30px; max-width: 1200px; margin: 0 auto;">
+         <a href="{% url 'index' %}" style="text-decoration: none; color: var(--primary-blue); font-weight: bold;">
+            <i class="fas fa-arrow-left"></i> Volver a Mesas
+         </a>
+         <h2 style="margin-top: 10px; color: var(--primary-blue);">Editando Mesa {{ table.number }}</h2>
+    </div>
+
+
+    <div class="pos-container">
+        <div class="top-actions-bar">
+            <button class="action-btn" onclick="abrirModalMeseros()">
+                <i class="fas fa-user"></i> Seleccionar Mesero
+            </button>
+            <button class="action-btn"><i class="fas fa-save"></i> grabar mesa</button>
+            <button class="action-btn"><i class="fas fa-edit"></i> editar mesa</button>
+            <button class="action-btn"><i class="fas fa-trash"></i> eliminar mesa</button>
+            <button class="action-btn"><i class="fas fa-credit-card"></i> cuenta mesa</button>
+            <button class="action-btn"><i class="fas fa-receipt"></i> facturar mesa</button>
+        </div>
+
+        <div class="main-pos-grid">
+            
+            
+            <div class="left-panel product-selection-area card-style">
+                <h3 class="panel-title">Seleccione producto</h3>
+                
+                <div class="search-bar-container">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="buscador-productos" class="search-input" placeholder="Buscar producto..." onkeyup="filtrarPorTexto()">
+                </div>
+                
+                <div class="categories-container card-style-inner" style="overflow-x: auto; white-space: nowrap; padding-bottom: 5px; margin-bottom: 10px;">
+                    
+                    <button class="category-btn active" onclick="resetearFiltros(this)">TODOS</button>
+                    
+                    <button class="category-btn" onclick="filtrarPorTamano('IND', this)">IND</button>
+                    <button class="category-btn" onclick="filtrarPorTamano('MED', this)">MED</button>
+                    <button class="category-btn" onclick="filtrarPorTamano('FAM', this)">FAM</button>
+                    
+                    
+
+                </div>
+
+                <div id="grid-productos" style="
+                    display: grid; 
+                    grid-template-columns: repeat(auto-fill, 110px); 
+                    grid-auto-rows: 110px; 
+                    gap: 10px; 
+                    margin-top: 15px; 
+                    overflow-y: auto; 
+                    height: 350px; 
+                    padding-right: 5px;
+                    align-content: start;
+                ">
+                    {% for prod in productos %}
+                        <div class="producto-card card-style" 
+                            /* DATOS CLAVE PARA EL FILTRADO */
+                            data-cat-id="{{ prod.categoria.id }}" 
+                            data-tamano="{{ prod.tamano }}"  
+                            data-nombre="{{ prod.nombre|lower }}"
+                            
+                            style="cursor: pointer; padding: 5px; text-align: center; border: 1px solid #ddd; 
+                                    transition: transform 0.1s; display: flex; flex-direction: column; 
+                                    justify-content: center; align-items: center; height: 100%;"
+                            onclick="agregarAlCarrito('{{ prod.id }}', '{{ prod.nombre }}', '{{ prod.precio }}', '{{ prod.tamano }}')">
+                            
+                            <div style="font-weight: bold; font-size: 0.85em; margin-bottom: 5px; line-height: 1.2;">
+                                {{ prod.nombre }}
+                            </div>
+                            {% if prod.tamano != 'UNI' %}
+                                <div style="font-size: 0.7em; background: #eee; padding: 2px 6px; border-radius: 4px; margin-bottom: 2px;">
+                                    {{ prod.tamano }}
+                                </div>
+                            {% endif %}
+                            <div style="color: var(--primary-blue); font-weight: bold; font-size: 0.9em;">
+                                ${{ prod.precio }}
+                            </div>
+                        </div>
+                    {% empty %}
+                        <p style="grid-column: 1/-1; text-align: center; color: #888;">No hay productos.</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="right-panel cart-area">
+                <div class="info-inputs">
+                    <div class="input-group">
+                        <input type="text" 
+                            value="TASA: {{ tasa_cambio|default:'Cargando...' }}" 
+                            readonly
+                            class="readonly-field"
+                            style="background-color: #e9ecef; color: #495057; font-weight: bold;">
+                    </div>
+                    <div class="input-group">
+                        <input type="text" id="fecha-hora-live" readonly class="readonly-field">
+                    </div>
+                    <div class="input-group">
+                        <input type="text" id="input-mesero" placeholder="Sin mesero" 
+                            value="{{ table.mesero.username|default:'' }}" readonly 
+                            class="readonly-field"
+                            style="background-color: #e9ecef; color: #495057; font-weight: bold;">
+                    </div>
+                </div>
+
+                <div class="cart-summary card-style">
+                    <div class="cart-header">
+                        <span>ITEM</span>
+                        <span>CANT</span>
+                        <span>PRECIO</span>
+                    </div>
+                    <div class="cart-items-list">
+                        <p style="text-align: center; color: #aaa; padding-top: 50px;">Carrito vacío</p>
+                    </div>
+                    <div class="cart-footer" style="display: flex; justify-content: space-between; padding: 15px; background: #f8f9fa; border-top: 2px solid #ddd;">
+    
+                        <div style="text-align: center;">
+                            <div style="font-size: 0.8em; color: #666; font-weight: bold;">TOTAL $</div>
+                            <div class="total-amount" id="total-usd" style="font-size: 1.5em; color: var(--primary-blue);">0.00</div>
+                        </div>
+
+                        <div style="border-left: 1px solid #ccc; margin: 0 10px;"></div>
+
+                        <div style="text-align: center;">
+                            <div style="font-size: 0.8em; color: #666; font-weight: bold;">TOTAL Bs</div>
+                            <div class="total-amount" id="total-bs" style="font-size: 1.5em; color: #28a745;">0,00</div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+    <div id="modal-meseros" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">
+        <div style="background:white; padding:20px; border-radius:10px; width:300px; text-align:center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h3 style="color:var(--primary-blue); margin-bottom:15px;">Seleccionar Mesero</h3>
+            
+            <div style="display:grid; gap:10px; max-height:300px; overflow-y:auto;">
+                {% for mesero in meseros %}
+                <button onclick="seleccionarMesero('{{ mesero.id }}', '{{ mesero.username }}')" 
+                        style="padding:10px; background:#f8f9fa; border:1px solid #ddd; border-radius:5px; cursor:pointer; font-size:16px;">
+                    <i class="fas fa-user-tie"></i> {{ mesero.username|title }}
+                </button>
+                {% endfor %}
+            </div>
+            
+            <button onclick="cerrarModalMeseros()" style="margin-top:15px; background:#dc3545; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">Cancelar</button>
+        </div>
+    </div>
+
+    </div> 
+    <script>
+        // --- LÓGICA DE MESEROS ---
+        function abrirModalMeseros() {
+            document.getElementById('modal-meseros').style.display = 'flex';
+        }
+
+        function cerrarModalMeseros() {
+            document.getElementById('modal-meseros').style.display = 'none';
+        }
+
+        function seleccionarMesero(userId, userName) {
+            // 1. Enviar datos al servidor
+            fetch("{% url 'asignar_mesero' table.id %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ user_id: userId })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.status === 'ok') {
+                    // 2. Actualizar el input visualmente
+                    document.getElementById('input-mesero').value = userName;
+                    
+                    // 3. Cerrar el modal inmediatamente (SIN ALERT)
+                    cerrarModalMeseros();
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        function actualizarReloj() {
+            // 1. Obtener la fecha actual del computador
+            const ahora = new Date();
+
+            // 2. Funciones auxiliares para asegurar 2 dígitos (ej. "05" en vez de "5")
+            const formatoDosDigitos = (num) => num.toString().padStart(2, '0');
+
+            // 3. Extraer los componentes
+            const dia = formatoDosDigitos(ahora.getDate());
+            const mes = formatoDosDigitos(ahora.getMonth() + 1); // Los meses en JS van de 0 a 11
+            const anio = ahora.getFullYear();
+            const horas = formatoDosDigitos(ahora.getHours());
+            const minutos = formatoDosDigitos(ahora.getMinutes());
+            const segundos = formatoDosDigitos(ahora.getSeconds());
+
+            // 4. Crear el string final (formato: DD/MM/AAAA HH:MM:SS)
+            const fechaHoraString = `${dia}/${mes}/${anio} ${horas}:${minutos}`;
+
+            // 5. Insertar el texto en el input
+            const inputFecha = document.getElementById('fecha-hora-live');
+            if (inputFecha) {
+                inputFecha.value = fechaHoraString;
+            }
+        }
+
+        // Ejecutar la función inmediatamente al cargar la página
+        actualizarReloj();
+
+        // Función para filtrar las categorías de los productos
+        // Variables para guardar el estado actual de los filtros
+        let filtroCategoriaActivo = 'todas';
+        let filtroTamanoActivo = 'todos';
+
+        function actualizarVisibilidad() {
+            const productos = document.querySelectorAll('.producto-card');
+            
+            productos.forEach(prod => {
+                const prodCat = prod.getAttribute('data-cat-id');
+                const prodTamano = prod.getAttribute('data-tamano');
+                
+                // Lógica: Debe cumplir AMBAS condiciones (si hay filtro activo)
+                const cumpleCategoria = (filtroCategoriaActivo === 'todas') || (prodCat === filtroCategoriaActivo);
+                
+                // Nota: Si el filtro es 'todos', pasa. 
+                // Si el producto es 'UNI' (ej. refresco) usualmente queremos que se vea siempre 
+                // a menos que estemos siendo muy estrictos. Por ahora filtramos estricto:
+                const cumpleTamano = (filtroTamanoActivo === 'todos') || (prodTamano === filtroTamanoActivo);
+
+                if (cumpleCategoria && cumpleTamano) {
+                    prod.style.display = 'flex';
+                } else {
+                    prod.style.display = 'none';
+                }
+            });
+        }
+
+        function cambiarBotonActivo(botonClickeado) {
+            // Quita la clase active de TODOS los botones
+            document.querySelectorAll('.category-btn').forEach(btn => btn.classList.remove('active'));
+            // Se la pone solo al que tocamos
+            botonClickeado.classList.add('active');
+        }
+
+        // --- FUNCIONES QUE LLAMAN LOS BOTONES ---
+
+        function resetearFiltros(boton) {
+            filtroCategoriaActivo = 'todas';
+            filtroTamanoActivo = 'todos';
+            cambiarBotonActivo(boton);
+            actualizarVisibilidad();
+        }
+
+        function filtrarPorCategoria(idCategoria, boton) {
+            filtroCategoriaActivo = idCategoria;
+            // Opcional: ¿Si elijo categoría "Bebidas", reseteo el tamaño? 
+            // Por ahora dejemos el tamaño como estaba (ej: 'todos')
+            filtroTamanoActivo = 'todos'; 
+            cambiarBotonActivo(boton);
+            actualizarVisibilidad();
+        }
+
+        function filtrarPorTamano(tamano, boton) {
+            filtroTamanoActivo = tamano;
+            // Al filtrar por tamaño, asumimos que queremos buscar en TODAS las categorías
+            // o mantenemos la categoría actual. Vamos a resetear categoría para buscar "Todas las IND"
+            filtroCategoriaActivo = 'todas'; 
+            cambiarBotonActivo(boton);
+            actualizarVisibilidad();
+        }
+
+        function filtrarPorTexto() {
+            const texto = document.getElementById('buscador-productos').value.toLowerCase();
+            document.querySelectorAll('.producto-card').forEach(prod => {
+                const nombre = prod.getAttribute('data-nombre');
+                if (nombre.includes(texto)) {
+                    prod.style.display = 'flex';
+                } else {
+                    prod.style.display = 'none';
+                }
+            });
+        }
+
+        function agregarAlCarrito(id, nombre, precio, tamano) {
+            let nombreDisplay = nombre;
+            if(tamano !== 'UNI') nombreDisplay += ` (${tamano})`;
+            
+            console.log(`Agregado: ${nombreDisplay} - $${precio}`);
+            alert(`Agregaste: ${nombreDisplay}`);
+        }
+        // 1. Recibimos la tasa desde Django
+        // Usamos 'replace' para asegurar que el decimal sea punto (por si acaso viene con coma)
+        const TASA_CAMBIO = parseFloat("{{ tasa_valor|stringformat:'f' }}");
+        
+        // Array para guardar los productos del carrito en memoria
+        let carrito = [];
+
+        // Función modificada para AGREGAR de verdad
+        function agregarAlCarrito(id, nombre, precio, tamano) {
+            // Convertimos precio a float por seguridad
+            let precioFloat = parseFloat(precio);
+            let nombreDisplay = nombre;
+            if(tamano !== 'UNI') nombreDisplay += ` (${tamano})`;
+
+            // Buscamos si ya existe para sumar cantidad (Opcional, por ahora agregamos fila nueva)
+            carrito.push({
+                id: id,
+                nombre: nombreDisplay,
+                precio: precioFloat,
+                cantidad: 1
+            });
+
+            renderizarCarrito();
+        }
+
+        // Función para DIBUJAR el carrito y CALCULAR totales
+        function renderizarCarrito() {
+            const contenedor = document.querySelector('.cart-items-list');
+            const totalUsdEl = document.getElementById('total-usd');
+            const totalBsEl = document.getElementById('total-bs');
+            
+            // Limpiar HTML actual
+            contenedor.innerHTML = '';
+
+            let sumaUsd = 0;
+
+            // Recorrer carrito y crear filas
+            carrito.forEach((item, index) => {
+                sumaUsd += item.precio;
+                
+                // Creamos el HTML de la fila
+                const fila = document.createElement('div');
+                fila.style.cssText = "display: grid; grid-template-columns: 2fr 1fr 1fr; padding: 8px 0; border-bottom: 1px solid #eee; font-size: 0.9em;";
+                fila.innerHTML = `
+                    <span>${item.nombre}</span>
+                    <span style="text-align: center;">1</span>
+                    <span style="text-align: right;">$${item.precio.toFixed(2)}</span>
+                `;
+                contenedor.appendChild(fila);
+            });
+
+            // --- CÁLCULOS MATEMÁTICOS ---
+            let sumaBs = sumaUsd * TASA_CAMBIO;
+
+            // Mostrar totales formateados
+            totalUsdEl.innerText = sumaUsd.toFixed(2);
+            
+            // Formateo de Bolívares (usamos coma como decimal para Venezuela)
+            totalBsEl.innerText = sumaBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            
+
+            // Mensaje si está vacío
+            if(carrito.length === 0) {
+                contenedor.innerHTML = '<p style="text-align: center; color: #aaa; padding-top: 50px;">Carrito vacío</p>';
+            }
+        }
+        
+    </script>
+
+</body>
+</html>
+
+</body>
+</html>
+==================================================
+ARCHIVO: .\templates\base.html
+==================================================
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema POS {% block title %}{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="light-theme">
+
+    <div class="dashboard-layout">
+        <div class="main-app-container card-style">
+
+            <aside class="sidebar">
+                <nav class="sidebar-nav">
+                    <a href="{% url 'panel_control' %}" class="sidebar-link">
+                       <i class="fas fa-tachometer-alt"></i> Dashboard
+                    </a>
+                    <a href="{% url 'product_list' %}" class="sidebar-link">
+                       <i class="fas fa-box"></i> Productos
+                    </a>
+                    <a href="{% url 'inventory_index' %}" class="sidebar-link">
+                       <i class="fas fa-clipboard-list"></i> Inventario
+                    </a>
+                    <a href="{% url 'maestro_list' %}" class="sidebar-link">
+                        <i class="fas fa-cog"></i> Maestro de inventario
+                    </a>
+                    <a href="{% url 'reportes_index' %}" class="sidebar-link">
+                        <i class="fas fa-chart-line"></i> Reportes
+                    </a>
+                    <a href="#" class="sidebar-link">
+                       <i class="fas fa-user-tie"></i> Personal
+                    </a>
+                    <a href="{% url 'index' %}" class="sidebar-link">
+                       <i class="fas fa-cash-register"></i> Punto de Venta
+                    </a>
+                    <a href="#" class="sidebar-link">
+                        <i class="fas fa-cog"></i> Configuración
+                    </a>
+                </nav>
+            </aside>
+
+            <main class="main-content-area">
+                {% block content %}
+                {% endblock %}
+            </main>
+
+        </div> 
+    </div>
+
+</body>
+</html>

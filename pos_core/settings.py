@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'dashboard',
     'inventory',
     'reports',
+    'maestros',
 ]
 
 MIDDLEWARE = [

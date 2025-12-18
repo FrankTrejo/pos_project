@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block title %}- Maestro de Conceptos{% endblock %}
+
+{% block content %}
+<div style="padding: 20px;">
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div>
+            <h2 style="margin: 0; color: #333;">MAESTRO DE COSTOS</h2>
+            <p style="margin: 5px 0 0 0; color: #666;">Tasa Referencia: <b>Bs. {{ tasa }}</b></p>
+        </div>
+        <a href="{% url 'maestro_create' %}" class="add-btn">
+            <i class="fas fa-plus"></i> Crear Nuevo Concepto
+        </a>
+    </div>
+
+    <div class="card-style" style="padding: 0; overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+            <thead>
+                <tr style="background-color: #f8f9fa; border-bottom: 2px solid #ddd;">
+                    <th style="padding: 12px; text-align: left; border-right: 1px solid #eee;">NOMBRE</th>
+                    <th style="padding: 12px; text-align: center; border-right: 1px solid #eee;">UNIDAD</th>
+                    <th style="padding: 12px; text-align: right; border-right: 1px solid #eee; background: #e3f2fd;">PRECIO MERCADO ($)</th>
+                    <th style="padding: 12px; text-align: center; border-right: 1px solid #eee; background: #fff3cd;">MERMA %</th>
+                    <th style="padding: 12px; text-align: right; border-right: 1px solid #eee;">COSTO REAL ($)</th>
+                    <th style="padding: 12px; text-align: right;">ACCIÓN</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for insumo in insumos %}
+                <tr style="border-bottom: 1px solid #eee; hover: background-color: #f1f1f1;">
+                    <td style="padding: 8px 12px; font-weight: 500;">{{ insumo.nombre }}</td>
+                    <td style="padding: 8px 12px; text-align: center; color: #666;">{{ insumo.unidad.codigo }}</td>
+                    
+                    <td style="padding: 8px 12px; text-align: right;">
+                        ${{ insumo.precio_mercado|floatformat:2 }}
+                    </td>
+
+                    <td style="padding: 8px 12px; text-align: center; color: #d9534f;">
+                        {% if insumo.merma_porcentaje > 0 %}{{ insumo.merma_porcentaje }}%{% else %}-{% endif %}
+                    </td>
+
+                    <td style="padding: 8px 12px; text-align: right; font-weight: bold; color: #28a745;">
+                        ${{ insumo.costo_unitario|floatformat:4 }}
+                    </td>
+
+                    <td style="padding: 8px 12px; text-align: right;">
+                        <a href="{% url 'maestro_edit' insumo.id %}" style="color: #0d6efd; text-decoration: none;">
+                            <i class="fas fa-pencil-alt"></i> Editar
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

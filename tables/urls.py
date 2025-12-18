@@ -23,4 +23,5 @@ urlpatterns = [
     
     # 4. PASO 3: Precio (Nuevo)
     path('productos/precio/<int:pk>/', views.product_pricing, name='product_pricing'),
+    path('productos/eliminar/<int:pk>/', views.product_delete, name='product_delete'),
 ]

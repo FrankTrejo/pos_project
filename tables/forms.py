@@ -14,18 +14,19 @@ class ProductoBasicForm(forms.ModelForm):
         }
 
 # PASO 2: (Usamos el IngredienteForm que ya tienes, no cambia)
-class IngredienteForm(forms.ModelForm):
+# En tu archivo forms.py
+
+class RecetaProductoForm(forms.ModelForm): # O el nombre que tenga tu formulario de receta
     class Meta:
-        model = IngredienteProducto
+        model = IngredienteProducto # O tu modelo intermedio
         fields = ['insumo', 'cantidad']
         widgets = {
             'insumo': forms.Select(attrs={'class': 'form-input'}),
-            'cantidad': forms.NumberInput(attrs={'class': 'form-input', 'step': '0.001', 'placeholder': 'Cantidad'}),
+            
+            # --- CAMBIO AQUÍ ---
+            # 'step': '1' obliga a escribir enteros (1, 20, 100). No deja escribir 0.5 ni 1.5
+            'cantidad': forms.NumberInput(attrs={'class': 'form-input', 'step': '1', 'placeholder': 'Gramos exactos'}), 
         }
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['insumo'].queryset = Insumo.objects.all().order_by('nombre')
-        self.fields['insumo'].label_from_instance = lambda obj: f"{obj.nombre} ({obj.unidad.codigo}) - ${obj.costo_unitario:.2f}"
 
 # PASO 3: CONFIGURACIÓN DE PRECIO
 # tables/forms.py

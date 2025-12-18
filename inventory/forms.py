@@ -56,4 +56,18 @@ class MovimientoInventarioForm(forms.ModelForm):
         except:
             pass
 
-        
+class ProduccionForm(forms.Form):
+    cantidad_lotes = forms.IntegerField(
+        label="¿Cuántas tandas/lotes preparaste?",
+        min_value=1,
+        initial=1,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-input', 
+            'placeholder': 'Ej: 1 para un lote normal',
+            'style': 'font-size: 1.2em; font-weight: bold; text-align: center;'
+        })
+    )
+    nota = forms.CharField(
+        required=False, 
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Opcional: Nota de referencia'})
+    )
