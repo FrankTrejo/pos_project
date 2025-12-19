@@ -9,7 +9,15 @@ from django.contrib.admin.views.decorators import staff_member_required
 import json
 from .models import CostoAdicional, CostoAsignadoProducto # Importar modelos nuevos
 from .forms import CostoAdicionalForm # Importar form nuevo
-
+# --- IMPORTS NUEVOS ---
+import json
+from django.http import HttpResponse
+from django.template.loader import get_template
+from xhtml2pdf import pisa
+from django.utils import timezone
+from .models import Orden, DetalleOrden # Importa tus nuevos modelos
+import json
+from reports.models import AuditoriaEliminacion
 
 # Tus modelos y formularios
 from .models import Table, Categoria, Producto, TasaBCV, IngredienteProducto
@@ -70,15 +78,35 @@ def asignar_mesero(request, table_id):
 
 def table_order_view(request, table_id):
     table = get_object_or_404(Table, id=table_id)
-    tasa_actual_texto = obtener_tasa_bcv()
     
+    # 1. Recuperamos la Tasa y Productos (Código que ya tenías)
+    tasa_actual_texto = obtener_tasa_bcv()
     tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
     tasa_numerica = float(tasa_obj.precio) if tasa_obj else 0
-
     categorias = Categoria.objects.all()
     productos = Producto.objects.filter(precio__gt=0).select_related('categoria')
-    
     meseros = User.objects.filter(is_active=True)
+
+    # 2. LOGICA NUEVA: RECUPERAR EL CARRITO GUARDADO
+    orden_activa = Orden.objects.filter(mesa=table).first()
+    carrito_recuperado = []
+    
+    if orden_activa:
+        # Convertimos los detalles de la BD a una lista de diccionarios para JS
+        for detalle in orden_activa.detalles.all():
+            nombre_display = detalle.producto.nombre
+            if detalle.producto.tamano != 'UNI':
+                nombre_display += f" ({detalle.producto.tamano})"
+                
+            carrito_recuperado.append({
+                'id': detalle.producto.id,
+                'nombre': nombre_display,
+                'precio': float(detalle.precio_unitario),
+                'cantidad': detalle.cantidad
+            })
+
+    # Convertimos la lista a JSON string para que JS la pueda leer
+    carrito_json = json.dumps(carrito_recuperado)
 
     context = {
         'table': table,
@@ -87,6 +115,9 @@ def table_order_view(request, table_id):
         'categorias': categorias,
         'productos': productos,
         'meseros': meseros,
+        # DATOS NUEVOS
+        'orden_activa': orden_activa,
+        'carrito_json': carrito_json, 
     }
     return render(request, 'tables/order_detail.html', context)
 
@@ -279,3 +310,184 @@ def product_delete(request, pk):
         messages.success(request, f"Producto '{nombre}' eliminado correctamente.")
         
     return redirect('product_list')
+
+# 1. FUNCIÓN PARA GUARDAR (AJAX)
+def grabar_mesa_ajax(request, table_id):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            items = data.get('carrito', [])
+            mesero_nombre = data.get('mesero', '')
+            
+            table = Table.objects.get(id=table_id)
+            
+            # Buscamos al mesero por nombre (o podrías pasar el ID mejor)
+            mesero_obj = None
+            if mesero_nombre:
+                mesero_obj = User.objects.filter(username=mesero_nombre).first()
+
+            # A) CREAR O ACTUALIZAR LA ORDEN
+            # Usamos update_or_create o get_or_create. 
+            # Si ya hay orden, la borramos y creamos nueva (o actualizamos, simplifiquemos borrando detalles previos)
+            
+            orden, created = Orden.objects.get_or_create(mesa=table)
+            orden.mesero = mesero_obj
+            orden.save()
+            
+            # Limpiamos detalles viejos para sobreescribir con el carrito actual
+            # (En un sistema más complejo, solo agregarías lo nuevo)
+            orden.detalles.all().delete()
+            
+            for item in items:
+                prod_id = item.get('id')
+                cant = item.get('cantidad')
+                precio = item.get('precio')
+                
+                prod_obj = Producto.objects.get(id=prod_id)
+                
+                DetalleOrden.objects.create(
+                    orden=orden,
+                    producto=prod_obj,
+                    cantidad=cant,
+                    precio_unitario=precio
+                )
+            
+            # B) MARCAR MESA COMO OCUPADA
+            table.is_occupied = True
+            table.mesero = mesero_obj
+            table.save()
+            
+            return JsonResponse({'status': 'ok', 'orden_id': orden.id})
+            
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+    return JsonResponse({'status': 'error'}, status=400)
+
+
+# 2. FUNCIÓN GENERAR PDF
+def generar_ticket_pdf(request, orden_id):
+    orden = get_object_or_404(Orden, id=orden_id)
+    
+    # Contexto para el HTML del ticket
+    context = {
+        'orden': orden,
+        'detalles': orden.detalles.all(),
+        'fecha': timezone.now(),
+        'total': orden.total_calculado
+    }
+    
+    # Renderizamos el HTML
+    template_path = 'tables/ticket_pdf.html' # Crearemos este archivo ahora
+    template = get_template(template_path)
+    html = template.render(context)
+
+    # Creamos el PDF
+    response = HttpResponse(content_type='application/pdf')
+    # Esto hace que se descargue. Si quieres verlo en el navegador quita 'attachment;'
+    response['Content-Disposition'] = f'filename="comanda_cocina_mesa_{orden.mesa.number}.pdf"'
+
+    pisa_status = pisa.CreatePDF(html, dest=response)
+
+    if pisa_status.err:
+        return HttpResponse('Error al generar PDF', status=500)
+    return response
+
+def eliminar_mesa_ajax(request, table_id):
+    if request.method == 'POST':
+        try:
+            # 1. Obtener datos (incluyendo el motivo que viene del JS)
+            data = json.loads(request.body)
+            motivo = data.get('motivo', 'Sin motivo especificado')
+            
+            table = get_object_or_404(Table, id=table_id)
+            orden = Orden.objects.filter(mesa=table).first()
+
+            # 2. Si hay orden, guardamos la evidencia antes de borrar
+            if orden:
+                detalles_texto = ""
+                total_calc = 0
+                
+                for det in orden.detalles.all():
+                    subt = det.cantidad * det.precio_unitario
+                    total_calc += float(subt)
+                    detalles_texto += f"{det.cantidad}x {det.producto.nombre} (${subt:.2f})\n"
+
+                # CREAR REGISTRO DE AUDITORÍA
+                AuditoriaEliminacion.objects.create(
+                    usuario_responsable=request.user if request.user.is_authenticated else None,
+                    mesa_numero=table.number,
+                    mesero_asignado=orden.mesero.username if orden.mesero else "Sin Asignar",
+                    resumen_pedido=detalles_texto,
+                    total_eliminado=total_calc,
+                    motivo=motivo
+                )
+                
+                # Borrar la orden física
+                orden.delete()
+            
+            # 3. Liberar la mesa
+            table.is_occupied = False
+            table.mesero = None
+            table.save()
+            
+            return JsonResponse({'status': 'ok'})
+
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+    
+    return JsonResponse({'status': 'error'}, status=400)
+
+def generar_cuenta_pdf(request, table_id):
+    # 1. Obtener datos
+    table = get_object_or_404(Table, id=table_id)
+    orden = Orden.objects.filter(mesa=table).first()
+    
+    if not orden:
+        return HttpResponse("No hay orden activa para esta mesa", status=404)
+
+    # 2. Obtener Tasa BCV para los cálculos
+    tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
+    tasa_valor = float(tasa_obj.precio) if tasa_obj else 0
+
+    # 3. CAMBIO DE ESTADO (Mesa Amarilla)
+    table.solicitud_pago = True
+    table.save()
+
+    # 4. Preparar datos para el PDF
+    detalles_con_conversion = []
+    total_usd = orden.total_calculado
+    total_bs = float(total_usd) * tasa_valor
+
+    for item in orden.detalles.all():
+        subtotal_bs = float(item.subtotal) * tasa_valor
+        detalles_con_conversion.append({
+            'cantidad': item.cantidad,
+            'producto': item.producto.nombre,
+            'tamano': item.producto.get_tamano_display(),
+            'precio_usd': item.precio_unitario,
+            'subtotal_usd': item.subtotal,
+            'subtotal_bs': subtotal_bs, # Dato extra para el ticket
+        })
+
+    context = {
+        'orden': orden,
+        'detalles': detalles_con_conversion,
+        'fecha': timezone.now(),
+        'tasa': tasa_valor,
+        'total_usd': total_usd,
+        'total_bs': total_bs
+    }
+
+    # 5. Generar PDF
+    template_path = 'tables/cuenta_pdf.html'
+    template = get_template(template_path)
+    html = template.render(context)
+
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'filename="cuenta_mesa_{table.number}.pdf"'
+
+    pisa_status = pisa.CreatePDF(html, dest=response)
+    if pisa_status.err:
+        return HttpResponse('Error al generar PDF', status=500)
+    
+    return response

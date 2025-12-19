@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        @page { size: 80mm 250mm; margin: 5mm; }
+        body { font-family: sans-serif; font-size: 12px; color: #000; }
+        .header { text-align: center; border-bottom: 1px dashed #000; padding-bottom: 10px; margin-bottom: 10px; }
+        .titulo-local { font-size: 16px; font-weight: bold; }
+        .mesa-info { font-size: 14px; font-weight: bold; margin-top: 5px; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { text-align: left; border-bottom: 1px solid #000; font-size: 10px; }
+        td { padding: 5px 0; vertical-align: top; }
+        
+        .col-cant { width: 10%; text-align: center; }
+        .col-desc { width: 50%; }
+        .col-tot { width: 40%; text-align: right; }
+        
+        .totales { margin-top: 15px; border-top: 1px dashed #000; padding-top: 10px; }
+        .row-total { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px; }
+        .gran-total { font-size: 18px; font-weight: bold; margin-top: 5px; }
+        
+        .footer { text-align: center; margin-top: 20px; font-size: 10px; }
+        .tasa-info { font-size: 10px; text-align: center; margin-top: 5px; font-style: italic;}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="titulo-local">ALMUS RESTAURANT</div>
+        <div>Rif: J-12345678-9</div>
+        <div class="mesa-info">CUENTA MESA #{{ orden.mesa.number }}</div>
+        <div>Mesero: {{ orden.mesero.username|upper }}</div>
+        <div>Fecha: {{ fecha|date:"d/m/Y h:i A" }}</div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th class="col-cant">CNT</th>
+                <th class="col-desc">DESCRIPCIÓN</th>
+                <th class="col-tot">TOTAL</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in detalles %}
+            <tr>
+                <td class="col-cant">{{ item.cantidad }}</td>
+                <td class="col-desc">
+                    {{ item.producto }} <small>({{ item.tamano }})</small><br>
+                    <small>REF: ${{ item.precio_usd }}</small>
+                </td>
+                <td class="col-tot">
+                    ${{ item.subtotal_usd }}<br>
+                    <b>Bs. {{ item.subtotal_bs|floatformat:2 }}</b>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="totales">
+        <div class="row-total">
+            <span>SUBTOTAL USD:</span>
+            <span>${{ total_usd }}</span>
+        </div>
+        
+        <div class="tasa-info">Tasa de cambio: Bs. {{ tasa|floatformat:2 }}</div>
+
+        <div style="text-align: right; margin-top: 15px;">
+            <div style="font-size: 14px;">TOTAL A PAGAR:</div>
+            <div class="gran-total" style="color: #000;">${{ total_usd }}</div>
+            <div class="gran-total" style="color: #000;">Bs. {{ total_bs|floatformat:2 }}</div>
+        </div>
+    </div>
+
+    <div class="footer">
+        PROPINA NO INCLUIDA<br>
+        ¡Gracias por su visita!
+    </div>
+</body>
+</html>

@@ -7,29 +7,40 @@
     <title>Pedido - Mesa {{ table.number }}</title>
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
-<body class="light-theme"> <div style="padding: 20px 0 0 30px; max-width: 1200px; margin: 0 auto;">
+<body class="light-theme"> 
+    
+    <div style="padding: 20px 0 0 30px; max-width: 1200px; margin: 0 auto;">
          <a href="{% url 'index' %}" style="text-decoration: none; color: var(--primary-blue); font-weight: bold;">
             <i class="fas fa-arrow-left"></i> Volver a Mesas
          </a>
          <h2 style="margin-top: 10px; color: var(--primary-blue);">Editando Mesa {{ table.number }}</h2>
     </div>
 
-
     <div class="pos-container">
         <div class="top-actions-bar">
             <button class="action-btn" onclick="abrirModalMeseros()">
                 <i class="fas fa-user"></i> Seleccionar Mesero
             </button>
-            <button class="action-btn"><i class="fas fa-save"></i> grabar mesa</button>
-            <button class="action-btn"><i class="fas fa-edit"></i> editar mesa</button>
-            <button class="action-btn"><i class="fas fa-trash"></i> eliminar mesa</button>
-            <button class="action-btn"><i class="fas fa-credit-card"></i> cuenta mesa</button>
-            <button class="action-btn"><i class="fas fa-receipt"></i> facturar mesa</button>
+            
+            <button class="action-btn" onclick="grabarMesa()">
+                <i class="fas fa-save"></i> Grabar Mesa
+            </button>
+            
+            <button class="action-btn"><i class="fas fa-edit"></i> Editar Mesa</button>
+
+            <button class="action-btn" onclick="eliminarMesa()">
+                <i class="fas fa-trash"></i> Eliminar Mesa
+            </button>
+
+            <button class="action-btn" onclick="pedirCuenta()">
+                <i class="fas fa-credit-card"></i> Cuenta Mesa
+            </button>
+            <button class="action-btn"><i class="fas fa-receipt"></i> Facturar Mesa</button>
         </div>
 
         <div class="main-pos-grid">
-            
             
             <div class="left-panel product-selection-area card-style">
                 <h3 class="panel-title">Seleccione producto</h3>
@@ -40,38 +51,19 @@
                 </div>
                 
                 <div class="categories-container card-style-inner" style="overflow-x: auto; white-space: nowrap; padding-bottom: 5px; margin-bottom: 10px;">
-                    
                     <button class="category-btn active" onclick="resetearFiltros(this)">TODOS</button>
-                    
                     <button class="category-btn" onclick="filtrarPorTamano('IND', this)">IND</button>
                     <button class="category-btn" onclick="filtrarPorTamano('MED', this)">MED</button>
                     <button class="category-btn" onclick="filtrarPorTamano('FAM', this)">FAM</button>
-                    
-                    
-
                 </div>
 
-                <div id="grid-productos" style="
-                    display: grid; 
-                    grid-template-columns: repeat(auto-fill, 110px); 
-                    grid-auto-rows: 110px; 
-                    gap: 10px; 
-                    margin-top: 15px; 
-                    overflow-y: auto; 
-                    height: 350px; 
-                    padding-right: 5px;
-                    align-content: start;
-                ">
+                <div id="grid-productos" style="display: grid; grid-template-columns: repeat(auto-fill, 110px); grid-auto-rows: 110px; gap: 10px; margin-top: 15px; overflow-y: auto; height: 350px; padding-right: 5px; align-content: start;">
                     {% for prod in productos %}
                         <div class="producto-card card-style" 
-                            /* DATOS CLAVE PARA EL FILTRADO */
                             data-cat-id="{{ prod.categoria.id }}" 
                             data-tamano="{{ prod.tamano }}"  
                             data-nombre="{{ prod.nombre|lower }}"
-                            
-                            style="cursor: pointer; padding: 5px; text-align: center; border: 1px solid #ddd; 
-                                    transition: transform 0.1s; display: flex; flex-direction: column; 
-                                    justify-content: center; align-items: center; height: 100%;"
+                            style="cursor: pointer; padding: 5px; text-align: center; border: 1px solid #ddd; transition: transform 0.1s; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%;"
                             onclick="agregarAlCarrito('{{ prod.id }}', '{{ prod.nombre }}', '{{ prod.precio }}', '{{ prod.tamano }}')">
                             
                             <div style="font-weight: bold; font-size: 0.85em; margin-bottom: 5px; line-height: 1.2;">
@@ -95,20 +87,13 @@
             <div class="right-panel cart-area">
                 <div class="info-inputs">
                     <div class="input-group">
-                        <input type="text" 
-                            value="TASA: {{ tasa_cambio|default:'Cargando...' }}" 
-                            readonly
-                            class="readonly-field"
-                            style="background-color: #e9ecef; color: #495057; font-weight: bold;">
+                        <input type="text" value="TASA: {{ tasa_cambio|default:'Cargando...' }}" readonly class="readonly-field" style="background-color: #e9ecef; color: #495057; font-weight: bold;">
                     </div>
                     <div class="input-group">
                         <input type="text" id="fecha-hora-live" readonly class="readonly-field">
                     </div>
                     <div class="input-group">
-                        <input type="text" id="input-mesero" placeholder="Sin mesero" 
-                            value="{{ table.mesero.username|default:'' }}" readonly 
-                            class="readonly-field"
-                            style="background-color: #e9ecef; color: #495057; font-weight: bold;">
+                        <input type="text" id="input-mesero" placeholder="Sin mesero" value="{{ table.mesero.username|default:'' }}" readonly class="readonly-field" style="background-color: #e9ecef; color: #495057; font-weight: bold;">
                     </div>
                 </div>
 
@@ -122,256 +107,300 @@
                         <p style="text-align: center; color: #aaa; padding-top: 50px;">Carrito vacío</p>
                     </div>
                     <div class="cart-footer" style="display: flex; justify-content: space-between; padding: 15px; background: #f8f9fa; border-top: 2px solid #ddd;">
-    
                         <div style="text-align: center;">
                             <div style="font-size: 0.8em; color: #666; font-weight: bold;">TOTAL $</div>
                             <div class="total-amount" id="total-usd" style="font-size: 1.5em; color: var(--primary-blue);">0.00</div>
                         </div>
-
                         <div style="border-left: 1px solid #ccc; margin: 0 10px;"></div>
-
                         <div style="text-align: center;">
                             <div style="font-size: 0.8em; color: #666; font-weight: bold;">TOTAL Bs</div>
                             <div class="total-amount" id="total-bs" style="font-size: 1.5em; color: #28a745;">0,00</div>
                         </div>
-
                     </div>
                 </div>
             </div>
-
         </div>
     </div>
+
     <div id="modal-meseros" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">
         <div style="background:white; padding:20px; border-radius:10px; width:300px; text-align:center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
             <h3 style="color:var(--primary-blue); margin-bottom:15px;">Seleccionar Mesero</h3>
-            
             <div style="display:grid; gap:10px; max-height:300px; overflow-y:auto;">
                 {% for mesero in meseros %}
-                <button onclick="seleccionarMesero('{{ mesero.id }}', '{{ mesero.username }}')" 
-                        style="padding:10px; background:#f8f9fa; border:1px solid #ddd; border-radius:5px; cursor:pointer; font-size:16px;">
+                <button onclick="seleccionarMesero('{{ mesero.id }}', '{{ mesero.username }}')" style="padding:10px; background:#f8f9fa; border:1px solid #ddd; border-radius:5px; cursor:pointer; font-size:16px;">
                     <i class="fas fa-user-tie"></i> {{ mesero.username|title }}
                 </button>
                 {% endfor %}
             </div>
-            
             <button onclick="cerrarModalMeseros()" style="margin-top:15px; background:#dc3545; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">Cancelar</button>
         </div>
     </div>
 
-    </div> 
     <script>
-        // --- LÓGICA DE MESEROS ---
-        function abrirModalMeseros() {
-            document.getElementById('modal-meseros').style.display = 'flex';
-        }
+        // --- CONFIGURACIÓN INICIAL ---
+        const TASA_CAMBIO = parseFloat("{{ tasa_valor|stringformat:'f' }}");
+        // Recuperamos el carrito guardado (si existe)
+        let carrito = {{ carrito_json|safe|default:"[]" }};
 
-        function cerrarModalMeseros() {
-            document.getElementById('modal-meseros').style.display = 'none';
-        }
+        // Al cargar la página, dibujamos lo que había
+        document.addEventListener("DOMContentLoaded", function() {
+            renderizarCarrito();
+            actualizarReloj();
+        });
 
-        function seleccionarMesero(userId, userName) {
-            // 1. Enviar datos al servidor
-            fetch("{% url 'asignar_mesero' table.id %}", {
+        // --- FUNCIÓN IMPORTANTE: GRABAR MESA ---
+        function grabarMesa() {
+            // 1. VALIDACIÓN: Carrito Vacío
+            if (carrito.length === 0) {
+                Swal.fire('Mesa Vacía', 'Agrega productos antes de grabar.', 'warning');
+                return;
+            }
+
+            // 2. NUEVA VALIDACIÓN: Mesero Obligatorio
+            const meseroNombre = document.getElementById('input-mesero').value;
+
+            if (!meseroNombre || meseroNombre.trim() === "") {
+                Swal.fire({
+                    title: 'Falta Mesero',
+                    text: '⚠️ No puedes grabar la mesa sin asignar un mesero responsable.',
+                    icon: 'warning',
+                    confirmButtonText: 'Seleccionar Mesero Ahora',
+                    confirmButtonColor: '#3085d6'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        abrirModalMeseros(); // Le abrimos el modal automáticamente para ayudarle
+                    }
+                });
+                return; // DETIENE LA EJECUCIÓN AQUÍ
+            }
+
+            // 3. Si pasó las validaciones, preparamos los datos
+            const data = {
+                carrito: carrito,
+                mesero: meseroNombre
+            };
+
+            // 4. Petición al servidor
+            fetch("{% url 'grabar_mesa' table.id %}", {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': '{{ csrf_token }}'
                 },
-                body: JSON.stringify({ user_id: userId })
+                body: JSON.stringify(data)
             })
             .then(response => response.json())
-            .then(data => {
-                if(data.status === 'ok') {
-                    // 2. Actualizar el input visualmente
-                    document.getElementById('input-mesero').value = userName;
-                    
-                    // 3. Cerrar el modal inmediatamente (SIN ALERT)
-                    cerrarModalMeseros();
+            .then(result => {
+                if(result.status === 'ok') {
+                    Swal.fire({
+                        title: '¡Mesa Guardada!',
+                        text: 'La orden se ha registrado correctamente.',
+                        icon: 'success',
+                        showCancelButton: true,
+                        confirmButtonColor: '#3085d6',
+                        cancelButtonColor: '#d33',
+                        confirmButtonText: '🖨️ Imprimir Ticket',
+                        cancelButtonText: 'Seguir Editando'
+                    }).then((alertResult) => {
+                        if (alertResult.isConfirmed) {
+                            const urlPDF = `/orden/${result.orden_id}/pdf/`; 
+                            window.open(urlPDF, '_blank');
+                        }
+                    });
+                } else {
+                    Swal.fire('Error', 'El servidor respondió: ' + result.message, 'error');
                 }
             })
-            .catch(error => console.error('Error:', error));
-        }
-
-        function actualizarReloj() {
-            // 1. Obtener la fecha actual del computador
-            const ahora = new Date();
-
-            // 2. Funciones auxiliares para asegurar 2 dígitos (ej. "05" en vez de "5")
-            const formatoDosDigitos = (num) => num.toString().padStart(2, '0');
-
-            // 3. Extraer los componentes
-            const dia = formatoDosDigitos(ahora.getDate());
-            const mes = formatoDosDigitos(ahora.getMonth() + 1); // Los meses en JS van de 0 a 11
-            const anio = ahora.getFullYear();
-            const horas = formatoDosDigitos(ahora.getHours());
-            const minutos = formatoDosDigitos(ahora.getMinutes());
-            const segundos = formatoDosDigitos(ahora.getSeconds());
-
-            // 4. Crear el string final (formato: DD/MM/AAAA HH:MM:SS)
-            const fechaHoraString = `${dia}/${mes}/${anio} ${horas}:${minutos}`;
-
-            // 5. Insertar el texto en el input
-            const inputFecha = document.getElementById('fecha-hora-live');
-            if (inputFecha) {
-                inputFecha.value = fechaHoraString;
-            }
-        }
-
-        // Ejecutar la función inmediatamente al cargar la página
-        actualizarReloj();
-
-        // Función para filtrar las categorías de los productos
-        // Variables para guardar el estado actual de los filtros
-        let filtroCategoriaActivo = 'todas';
-        let filtroTamanoActivo = 'todos';
-
-        function actualizarVisibilidad() {
-            const productos = document.querySelectorAll('.producto-card');
-            
-            productos.forEach(prod => {
-                const prodCat = prod.getAttribute('data-cat-id');
-                const prodTamano = prod.getAttribute('data-tamano');
-                
-                // Lógica: Debe cumplir AMBAS condiciones (si hay filtro activo)
-                const cumpleCategoria = (filtroCategoriaActivo === 'todas') || (prodCat === filtroCategoriaActivo);
-                
-                // Nota: Si el filtro es 'todos', pasa. 
-                // Si el producto es 'UNI' (ej. refresco) usualmente queremos que se vea siempre 
-                // a menos que estemos siendo muy estrictos. Por ahora filtramos estricto:
-                const cumpleTamano = (filtroTamanoActivo === 'todos') || (prodTamano === filtroTamanoActivo);
-
-                if (cumpleCategoria && cumpleTamano) {
-                    prod.style.display = 'flex';
-                } else {
-                    prod.style.display = 'none';
-                }
+            .catch(error => {
+                console.error('Error:', error);
+                Swal.fire('Error Técnico', 'No se pudo conectar con el servidor.', 'error');
             });
         }
 
-        function cambiarBotonActivo(botonClickeado) {
-            // Quita la clase active de TODOS los botones
-            document.querySelectorAll('.category-btn').forEach(btn => btn.classList.remove('active'));
-            // Se la pone solo al que tocamos
-            botonClickeado.classList.add('active');
-        }
-
-        // --- FUNCIONES QUE LLAMAN LOS BOTONES ---
-
-        function resetearFiltros(boton) {
-            filtroCategoriaActivo = 'todas';
-            filtroTamanoActivo = 'todos';
-            cambiarBotonActivo(boton);
-            actualizarVisibilidad();
-        }
-
-        function filtrarPorCategoria(idCategoria, boton) {
-            filtroCategoriaActivo = idCategoria;
-            // Opcional: ¿Si elijo categoría "Bebidas", reseteo el tamaño? 
-            // Por ahora dejemos el tamaño como estaba (ej: 'todos')
-            filtroTamanoActivo = 'todos'; 
-            cambiarBotonActivo(boton);
-            actualizarVisibilidad();
-        }
-
-        function filtrarPorTamano(tamano, boton) {
-            filtroTamanoActivo = tamano;
-            // Al filtrar por tamaño, asumimos que queremos buscar en TODAS las categorías
-            // o mantenemos la categoría actual. Vamos a resetear categoría para buscar "Todas las IND"
-            filtroCategoriaActivo = 'todas'; 
-            cambiarBotonActivo(boton);
-            actualizarVisibilidad();
-        }
-
-        function filtrarPorTexto() {
-            const texto = document.getElementById('buscador-productos').value.toLowerCase();
-            document.querySelectorAll('.producto-card').forEach(prod => {
-                const nombre = prod.getAttribute('data-nombre');
-                if (nombre.includes(texto)) {
-                    prod.style.display = 'flex';
-                } else {
-                    prod.style.display = 'none';
-                }
-            });
-        }
-
+        // --- FUNCIONES DEL CARRITO ---
         function agregarAlCarrito(id, nombre, precio, tamano) {
-            let nombreDisplay = nombre;
-            if(tamano !== 'UNI') nombreDisplay += ` (${tamano})`;
-            
-            console.log(`Agregado: ${nombreDisplay} - $${precio}`);
-            alert(`Agregaste: ${nombreDisplay}`);
-        }
-        // 1. Recibimos la tasa desde Django
-        // Usamos 'replace' para asegurar que el decimal sea punto (por si acaso viene con coma)
-        const TASA_CAMBIO = parseFloat("{{ tasa_valor|stringformat:'f' }}");
-        
-        // Array para guardar los productos del carrito en memoria
-        let carrito = [];
-
-        // Función modificada para AGREGAR de verdad
-        function agregarAlCarrito(id, nombre, precio, tamano) {
-            // Convertimos precio a float por seguridad
             let precioFloat = parseFloat(precio);
             let nombreDisplay = nombre;
             if(tamano !== 'UNI') nombreDisplay += ` (${tamano})`;
-
-            // Buscamos si ya existe para sumar cantidad (Opcional, por ahora agregamos fila nueva)
-            carrito.push({
-                id: id,
-                nombre: nombreDisplay,
-                precio: precioFloat,
-                cantidad: 1
-            });
-
+            
+            // Buscar si ya existe para sumar cantidad
+            let existente = carrito.find(item => item.id == id && item.nombre == nombreDisplay);
+            
+            if (existente) {
+                existente.cantidad++;
+            } else {
+                carrito.push({
+                    id: id,
+                    nombre: nombreDisplay,
+                    precio: precioFloat,
+                    cantidad: 1
+                });
+            }
             renderizarCarrito();
         }
 
-        // Función para DIBUJAR el carrito y CALCULAR totales
         function renderizarCarrito() {
             const contenedor = document.querySelector('.cart-items-list');
             const totalUsdEl = document.getElementById('total-usd');
             const totalBsEl = document.getElementById('total-bs');
             
-            // Limpiar HTML actual
             contenedor.innerHTML = '';
-
             let sumaUsd = 0;
 
-            // Recorrer carrito y crear filas
             carrito.forEach((item, index) => {
-                sumaUsd += item.precio;
+                sumaUsd += item.precio * item.cantidad;
                 
-                // Creamos el HTML de la fila
                 const fila = document.createElement('div');
-                fila.style.cssText = "display: grid; grid-template-columns: 2fr 1fr 1fr; padding: 8px 0; border-bottom: 1px solid #eee; font-size: 0.9em;";
+                fila.style.cssText = "display: grid; grid-template-columns: 2fr 1fr 1fr 30px; padding: 8px 0; border-bottom: 1px solid #eee; font-size: 0.9em; align-items: center;";
+                
                 fila.innerHTML = `
                     <span>${item.nombre}</span>
-                    <span style="text-align: center;">1</span>
-                    <span style="text-align: right;">$${item.precio.toFixed(2)}</span>
+                    <span style="text-align: center;">x${item.cantidad}</span>
+                    <span style="text-align: right;">$${(item.precio * item.cantidad).toFixed(2)}</span>
+                    <button onclick="eliminarDelCarrito(${index})" style="background:none; border:none; color:red; cursor:pointer; margin-left:5px;">&times;</button>
                 `;
                 contenedor.appendChild(fila);
             });
 
-            // --- CÁLCULOS MATEMÁTICOS ---
             let sumaBs = sumaUsd * TASA_CAMBIO;
-
-            // Mostrar totales formateados
             totalUsdEl.innerText = sumaUsd.toFixed(2);
-            
-            // Formateo de Bolívares (usamos coma como decimal para Venezuela)
             totalBsEl.innerText = sumaBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            
 
-            // Mensaje si está vacío
             if(carrito.length === 0) {
                 contenedor.innerHTML = '<p style="text-align: center; color: #aaa; padding-top: 50px;">Carrito vacío</p>';
             }
         }
+
+        function eliminarDelCarrito(index) {
+            carrito.splice(index, 1);
+            renderizarCarrito();
+        }
+
+        // --- RELOJ Y MESEROS (Código existente) ---
+        function abrirModalMeseros() { document.getElementById('modal-meseros').style.display = 'flex'; }
+        function cerrarModalMeseros() { document.getElementById('modal-meseros').style.display = 'none'; }
         
+        function seleccionarMesero(userId, userName) {
+            fetch("{% url 'asignar_mesero' table.id %}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                body: JSON.stringify({ user_id: userId })
+            })
+            .then(r => r.json())
+            .then(d => {
+                if(d.status === 'ok') {
+                    document.getElementById('input-mesero').value = userName;
+                    cerrarModalMeseros();
+                }
+            });
+        }
+
+        function actualizarReloj() {
+            const ahora = new Date();
+            const dosDigitos = (n) => n.toString().padStart(2, '0');
+            const str = `${dosDigitos(ahora.getDate())}/${dosDigitos(ahora.getMonth()+1)}/${ahora.getFullYear()} ${dosDigitos(ahora.getHours())}:${dosDigitos(ahora.getMinutes())}`;
+            const el = document.getElementById('fecha-hora-live');
+            if(el) el.value = str;
+        }
+
+        // --- FILTROS (Código existente) ---
+        let filtroCategoriaActivo = 'todas';
+        let filtroTamanoActivo = 'todos';
+
+        function actualizarVisibilidad() {
+            document.querySelectorAll('.producto-card').forEach(prod => {
+                const pCat = prod.getAttribute('data-cat-id');
+                const pTam = prod.getAttribute('data-tamano');
+                const okCat = (filtroCategoriaActivo === 'todas') || (pCat === filtroCategoriaActivo);
+                const okTam = (filtroTamanoActivo === 'todos') || (pTam === filtroTamanoActivo);
+                prod.style.display = (okCat && okTam) ? 'flex' : 'none';
+            });
+        }
+        function resetearFiltros(btn) {
+            filtroCategoriaActivo = 'todas'; filtroTamanoActivo = 'todos';
+            document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            actualizarVisibilidad();
+        }
+        function filtrarPorTamano(tam, btn) {
+            filtroTamanoActivo = tam; filtroCategoriaActivo = 'todas';
+            document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            actualizarVisibilidad();
+        }
+        function filtrarPorTexto() {
+            const txt = document.getElementById('buscador-productos').value.toLowerCase();
+            document.querySelectorAll('.producto-card').forEach(p => {
+                p.style.display = p.getAttribute('data-nombre').includes(txt) ? 'flex' : 'none';
+            });
+        }
+        function eliminarMesa() {
+            // Pedimos confirmación y MOTIVO
+            Swal.fire({
+                title: '¿Eliminar Mesa?',
+                text: "Esta acción quedará registrada en auditoría. Escribe el motivo:",
+                icon: 'warning',
+                input: 'text',
+                inputPlaceholder: 'Ej: Cliente se retiró / Error de mesero',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'Sí, Eliminar',
+                cancelButtonText: 'Cancelar',
+                preConfirm: (motivo) => {
+                    if (!motivo) {
+                        Swal.showValidationMessage('Debes escribir un motivo obligatoriamente')
+                    }
+                    return motivo
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const motivoIngresado = result.value;
+
+                    // Enviamos al servidor
+                    fetch("{% url 'eliminar_mesa' table.id %}", {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        },
+                        body: JSON.stringify({ motivo: motivoIngresado })
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        if(data.status === 'ok') {
+                            Swal.fire('Eliminado', 'La mesa ha sido liberada.', 'success')
+                            .then(() => {
+                                window.location.href = "{% url 'index' %}"; // Volver al mapa de mesas
+                            });
+                        } else {
+                            Swal.fire('Error', data.message, 'error');
+                        }
+                    });
+                }
+            });
+        }
+        function pedirCuenta() {
+            Swal.fire({
+                title: '¿Emitir Cuenta?',
+                text: "La mesa cambiará a estado 'En proceso de pago' (Amarillo).",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#ffc107', // Color amarillo
+                confirmButtonText: 'Sí, Imprimir Cuenta',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Abrimos el PDF en una pestaña nueva
+                    const url = "{% url 'generar_cuenta_pdf' table.id %}";
+                    window.open(url, '_blank');
+                    
+                    // Opcional: Recargar página o volver al mapa para ver el cambio de color
+                    setTimeout(() => {
+                        window.location.href = "{% url 'index' %}"; 
+                    }, 1000);
+                }
+            });
+        }
     </script>
-
-</body>
-</html>
-
 </body>
 </html>

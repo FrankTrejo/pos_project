@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block content %}
+<div style="padding: 20px; max-width: 1000px; margin: 0 auto;">
+    <h2 style="color: #d32f2f;"><i class="fas fa-user-secret"></i> Auditoría de Eliminaciones</h2>
+
+    <div class="card-style">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead style="background: #333; color: white;">
+                <tr>
+                    <th style="padding: 10px;">Fecha</th>
+                    <th style="padding: 10px;">Responsable</th>
+                    <th style="padding: 10px;">Mesa</th>
+                    <th style="padding: 10px;">Total ($)</th>
+                    <th style="padding: 10px;">Motivo</th>
+                    <th style="padding: 10px;">Detalle</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 10px;">{{ log.fecha|date:"d/m H:i" }}</td>
+                    <td style="padding: 10px;">{{ log.usuario_responsable.username|default:"Sistema" }}</td>
+                    <td style="padding: 10px; text-align: center; font-weight: bold;">#{{ log.mesa_numero }}</td>
+                    <td style="padding: 10px; color: #d32f2f; font-weight: bold;">${{ log.total_eliminado }}</td>
+                    <td style="padding: 10px; font-style: italic;">"{{ log.motivo }}"</td>
+                    <td style="padding: 10px; font-size: 0.85em;"><pre>{{ log.resumen_pedido }}</pre></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" style="padding: 20px; text-align: center;">Sin registros sospechosos.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

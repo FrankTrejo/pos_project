@@ -154,7 +154,8 @@ class Table(models.Model):
     # Relacionamos la mesa con un usuario. 
     # null=True permite que la mesa no tenga mesero (cuando está libre)
     mesero = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='mesas_asignadas')
-
+    solicitud_pago = models.BooleanField(default=False, verbose_name="¿Pidió Cuenta?")
+    
     class Meta:
         ordering = ['number']
 
@@ -256,3 +257,30 @@ class DetalleVenta(models.Model):
 
     def __str__(self):
         return f"{self.cantidad}x {self.nombre_producto}"
+    
+# 1. ORDEN TEMPORAL (La cuenta abierta)
+class Orden(models.Model):
+    mesa = models.OneToOneField(Table, on_delete=models.CASCADE, related_name='orden_activa')
+    mesero = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    fecha_inicio = models.DateTimeField(auto_now_add=True)
+    # Guardamos si ya se imprimió para saber si es "Comanda nueva" o "Reimpresión"
+    impreso = models.BooleanField(default=False) 
+
+    def __str__(self):
+        return f"Orden Mesa {self.mesa.number}"
+    
+    @property
+    def total_calculado(self):
+        return sum(d.subtotal for d in self.detalles.all())
+
+# 2. DETALLE DE LA ORDEN (Qué pidieron)
+class DetalleOrden(models.Model):
+    orden = models.ForeignKey(Orden, on_delete=models.CASCADE, related_name='detalles')
+    producto = models.ForeignKey(Producto, on_delete=models.PROTECT)
+    cantidad = models.PositiveIntegerField(default=1)
+    precio_unitario = models.DecimalField(max_digits=10, decimal_places=2) # Precio al momento de pedir
+    nota = models.CharField(max_length=200, blank=True, null=True) # Ej: "Sin cebolla"
+
+    @property
+    def subtotal(self):
+        return self.cantidad * self.precio_unitario

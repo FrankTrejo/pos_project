@@ -26,18 +26,38 @@
         <main class="tables-grid">
             {% for table in tables %}
                 <a href="{% url 'table_order' table.id %}" class="table-link-wrapper">
-                    <div class="table-card {% if table.is_occupied %}occupied{% else %}free{% endif %}">
-                        <div class="table-content">
-                            <h3>Mesa {{ table.number }}</h3>
-                            <div class="status-indicator">
-                                {% if table.is_occupied %}
-                                    <span class="icon">✅</span> Ocupada
-                                {% else %}
-                                    <span class="icon">🍽️</span> Libre
-                                {% endif %}
+                    
+                    {% if table.solicitud_pago %}
+                        <div class="table-card" style="background-color: #fff3cd; border-color: #ffc107;">
+                            <div class="table-content">
+                                <h3 style="color: #856404;">Mesa {{ table.number }}</h3>
+                                <div class="status-indicator">
+                                    <span class="icon">💰</span> <b style="color: #856404;">Pagando...</b>
+                                </div>
                             </div>
                         </div>
-                    </div>
+
+                    {% elif table.is_occupied %}
+                        <div class="table-card occupied">
+                            <div class="table-content">
+                                <h3>Mesa {{ table.number }}</h3>
+                                <div class="status-indicator">
+                                    <span class="icon">✅</span> Ocupada
+                                </div>
+                            </div>
+                        </div>
+
+                    {% else %}
+                        <div class="table-card free">
+                            <div class="table-content">
+                                <h3>Mesa {{ table.number }}</h3>
+                                <div class="status-indicator">
+                                    <span class="icon">🍽️</span> Libre
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+                    
                 </a>
             {% endfor %}
         </main>

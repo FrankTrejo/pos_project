@@ -24,4 +24,8 @@ urlpatterns = [
     # 4. PASO 3: Precio (Nuevo)
     path('productos/precio/<int:pk>/', views.product_pricing, name='product_pricing'),
     path('productos/eliminar/<int:pk>/', views.product_delete, name='product_delete'),
+    path('mesa/<int:table_id>/grabar/', views.grabar_mesa_ajax, name='grabar_mesa'),
+    path('orden/<int:orden_id>/pdf/', views.generar_ticket_pdf, name='generar_ticket_pdf'),
+    path('mesa/<int:table_id>/eliminar/', views.eliminar_mesa_ajax, name='eliminar_mesa'),
+    path('mesa/<int:table_id>/cuenta/', views.generar_cuenta_pdf, name='generar_cuenta_pdf'),
 ]

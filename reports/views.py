@@ -3,6 +3,7 @@ from django.db.models import Sum, Count, F
 from django.utils import timezone
 from datetime import timedelta
 from django.contrib.admin.views.decorators import staff_member_required
+from .models import AuditoriaEliminacion
 
 # Importamos modelos de ambas aplicaciones (Inventario y Ventas)
 from inventory.models import Insumo, MovimientoInventario
@@ -142,3 +143,8 @@ def ventas_pago(request):
         'fecha_fin': fecha_fin
     }
     return render(request, 'reports/generic_sales_report.html', context)
+
+@staff_member_required
+def auditoria_eliminaciones(request):
+    logs = AuditoriaEliminacion.objects.all().order_by('-fecha')
+    return render(request, 'reports/auditoria_list.html', {'logs': logs})
