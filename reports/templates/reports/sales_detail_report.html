@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}- Detalle de Ventas{% endblock %}
+
+{% block content %}
+<div style="padding: 20px; max-width: 1400px; margin: 0 auto;">
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
+        <div>
+            <a href="{% url 'reportes_index' %}" style="color: #666; text-decoration: none; font-size: 0.9em;">
+                <i class="fas fa-arrow-left"></i> Volver a Reportes
+            </a>
+            <h2 style="color: var(--primary-blue); margin: 5px 0 0 0;">
+                <i class="fas fa-file-invoice-dollar"></i> Reporte Detallado de Ventas
+            </h2>
+        </div>
+
+        <form method="GET" style="background: white; padding: 10px; border-radius: 8px; border: 1px solid #ddd; display: flex; gap: 10px; align-items: center;">
+            <label style="font-weight: bold; font-size: 0.9em;">Desde:</label>
+            <input type="date" name="fecha_inicio" value="{{ fecha_inicio }}" class="form-input" style="padding: 5px;">
+            
+            <label style="font-weight: bold; font-size: 0.9em;">Hasta:</label>
+            <input type="date" name="fecha_fin" value="{{ fecha_fin }}" class="form-input" style="padding: 5px;">
+            
+            <button type="submit" class="add-btn" style="padding: 6px 15px;">
+                <i class="fas fa-search"></i>
+            </button>
+        </form>
+    </div>
+
+    <div style="background: #e3f2fd; color: #0d47a1; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #bbdefb; display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 1.1em;">Mostrando <b>{{ ventas.count }}</b> transacciones</span>
+        <span style="font-size: 1.4em; font-weight: bold;">Total Facturado: ${{ total_periodo|floatformat:2 }}</span>
+    </div>
+
+    <div class="card-style" style="padding: 0; overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
+            <thead>
+                <tr style="background: #343a40; color: white; text-align: left;">
+                    <th style="padding: 12px;">Fecha / Hora</th>
+                    <th style="padding: 12px;">N° Factura</th>
+                    <th style="padding: 12px;">Mesero</th>
+                    <th style="padding: 12px; width: 30%;">Productos</th>
+                    <th style="padding: 12px; width: 20%;">Métodos de Pago</th>
+                    <th style="padding: 12px; text-align: right;">Total ($)</th>
+                    <th style="padding: 12px; text-align: center;">PDF</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for venta in ventas %}
+                <tr style="border-bottom: 1px solid #eee; hover: background-color: #f9f9f9;">
+                    
+                    <td style="padding: 12px; white-space: nowrap; vertical-align: top;">
+                        <div style="font-weight: bold;">{{ venta.fecha|date:"d/m/Y" }}</div>
+                        <small style="color: #666;">{{ venta.fecha|date:"H:i A" }}</small>
+                    </td>
+
+                    <td style="padding: 12px; vertical-align: top;">
+                        <span style="background: #eee; padding: 3px 8px; border-radius: 4px; font-family: monospace; font-weight: bold;">
+                            {{ venta.codigo_factura }}
+                        </span>
+                    </td>
+
+                    <td style="padding: 12px; vertical-align: top;">
+                        {% if venta.mesero %}
+                            <i class="fas fa-user-tie" style="color: #888;"></i> {{ venta.mesero.username|title }}
+                        {% else %}
+                            <span style="color: #999;">--</span>
+                        {% endif %}
+                    </td>
+
+                    <td style="padding: 12px; vertical-align: top;">
+                        <ul style="margin: 0; padding-left: 15px; list-style-type: square;">
+                            {% for det in venta.detalles.all %}
+                                <li style="margin-bottom: 2px;">
+                                    <b>{{ det.cantidad }}</b> {{ det.nombre_producto }}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </td>
+
+                    <td style="padding: 12px; vertical-align: top;">
+                        {% if venta.pagos.exists %}
+                            {% for pago in venta.pagos.all %}
+                                <div style="margin-bottom: 3px;">
+                                    <span style="font-weight: 600; font-size: 0.85em; color: #555;">{{ pago.get_metodo_display }}:</span>
+                                    ${{ pago.monto }}
+                                </div>
+                            {% endfor %}
+                            
+                            <div style="margin-top: 5px; font-size: 0.8em; color: #888; border-top: 1px dashed #ddd; padding-top: 2px;">
+                                Recibido: ${{ venta.monto_recibido }}
+                                {% if venta.propina > 0 %}| Propina: ${{ venta.propina }}{% endif %}
+                            </div>
+                        {% else %}
+                            {{ venta.get_metodo_pago_display }}
+                        {% endif %}
+                    </td>
+
+                    <td style="padding: 12px; text-align: right; vertical-align: top;">
+                        <b style="color: #28a745; font-size: 1.1em;">${{ venta.total|floatformat:2 }}</b>
+                    </td>
+
+                    <td style="padding: 12px; text-align: center; vertical-align: top;">
+                        <a href="{% url 'generar_factura_pdf' venta.id %}" target="_blank" title="Ver Factura PDF" 
+                           style="color: #dc3545; font-size: 1.2em;">
+                            <i class="fas fa-file-pdf"></i>
+                        </a>
+                    </td>
+
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" style="padding: 30px; text-align: center; color: #999;">
+                        No se encontraron ventas en este rango de fechas.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

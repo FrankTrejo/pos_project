@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        @page { size: 80mm 250mm; margin: 5mm; }
+        body { font-family: sans-serif; font-size: 11px; }
+        .center { text-align: center; }
+        .bold { font-weight: bold; }
+        .line { border-bottom: 1px dashed #000; margin: 5px 0; }
+        table { width: 100%; margin-top: 10px; }
+        td { vertical-align: top; }
+        .right { text-align: right; }
+    </style>
+</head>
+<body>
+    <div class="center">
+        <div style="font-size: 16px; font-weight: bold;">DI CATIA PIZZA</div>
+        <div>Rif: J-12345678-9</div>
+        <div>Caracas, Venezuela</div>
+        <div class="line"></div>
+        <div class="bold">FACTURA: {{ venta.codigo_factura }}</div>
+        <div>Fecha: {{ venta.fecha|date:"d/m/Y H:i" }}</div>
+        <div>Mesero: {{ venta.mesero.username|default:"Caja" }}</div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th align="left">Cant</th>
+                <th align="left">Desc</th>
+                <th align="right">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in detalles %}
+            <tr>
+                <td>{{ item.cantidad }}</td>
+                <td>{{ item.nombre_producto }}</td>
+                <td class="right">${{ item.subtotal }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="line"></div>
+
+    <div style="text-align: right; font-size: 14px;">
+        <div>TOTAL USD: <b>${{ venta.total }}</b></div>
+        <div style="font-size: 12px;">Total Bs: {{ total_bs|floatformat:2 }}</div>
+    </div>
+
+    <div class="line"></div>
+
+    <div class="line"></div>
+
+    <div>
+        <b>Detalles del Pago:</b><br>
+        
+        {% if venta.pagos.exists %}
+            {% for pago in venta.pagos.all %}
+                - {{ pago.get_metodo_display }}: ${{ pago.monto }}<br>
+            {% endfor %}
+            <div style="margin-top: 5px; border-top: 1px dashed #ccc;">
+                Total Recibido: ${{ venta.monto_recibido }}
+            </div>
+        
+        {% else %}
+            Método: {{ venta.get_metodo_pago_display }}<br>
+            Recibido: ${{ venta.monto_recibido }}<br>
+        {% endif %}
+
+        {% if venta.propina > 0 %}
+            <br><b>Propina: ${{ venta.propina }}</b>
+        {% endif %}
+        
+        {% if vuelto > 0 %}
+            <br>Vuelto: ${{ vuelto|floatformat:2 }}
+        {% endif %}
+    </div>
+
+    <div class="center" style="margin-top: 20px;">
+        ¡GRACIAS POR SU COMPRA!
+    </div>
+</body>
+</html>

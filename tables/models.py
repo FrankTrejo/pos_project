@@ -230,22 +230,28 @@ def update_costo_por_insumo(sender, instance, **kwargs):
 # --- HISTORIAL DE VENTAS (Para Reportes) ---
 class Venta(models.Model):
     METODOS_PAGO = [
-        ('EFECTIVO', 'Efectivo'),
-        ('TARJETA', 'Tarjeta / Débito'),
+        ('EFECTIVO_USD', 'Efectivo ($)'),
+        ('EFECTIVO_BS', 'Efectivo (Bs)'),
         ('PAGO_MOVIL', 'Pago Móvil'),
+        ('PUNTO', 'Punto de Venta'),
         ('ZELLE', 'Zelle'),
-        ('OTRO', 'Otro'),
+        ('MIXTO', 'Mixto'),
     ]
-
+    
     fecha = models.DateTimeField(auto_now_add=True)
-    codigo_factura = models.CharField(max_length=20, unique=True) # Ej: FAC-0001
-    total = models.DecimalField(max_digits=10, decimal_places=2)
+    codigo_factura = models.CharField(max_length=20, unique=True)
+    total = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Total Facturado")
     metodo_pago = models.CharField(max_length=20, choices=METODOS_PAGO)
     mesero = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='ventas_realizadas')
-    mesa_numero = models.IntegerField(help_text="Número de mesa donde se originó")
+    mesa_numero = models.IntegerField()
+
+    # --- CAMPOS NUEVOS PARA EL FLUJO DE CAJA ---
+    monto_recibido = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="Cuánto dinero entregó el cliente")
+    propina = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="Monto excedente asignado a propina")
+    # El vuelto se calcula: (monto_recibido - total - propina)
 
     def __str__(self):
-        return f"Venta {self.codigo_factura} - ${self.total}"
+        return f"Factura #{self.codigo_factura}"
 
 class DetalleVenta(models.Model):
     venta = models.ForeignKey(Venta, on_delete=models.CASCADE, related_name='detalles')
@@ -284,3 +290,20 @@ class DetalleOrden(models.Model):
     @property
     def subtotal(self):
         return self.cantidad * self.precio_unitario
+    
+class Pago(models.Model):
+    METODOS = [
+        ('EFECTIVO_USD', 'Efectivo ($)'),
+        ('EFECTIVO_BS', 'Efectivo (Bs)'), # Opcional, si quieres registrarlo separado
+        ('PAGO_MOVIL', 'Pago Móvil'),
+        ('PUNTO', 'Punto de Venta'),
+        ('ZELLE', 'Zelle'),
+    ]
+    
+    venta = models.ForeignKey(Venta, on_delete=models.CASCADE, related_name='pagos')
+    metodo = models.CharField(max_length=20, choices=METODOS)
+    monto = models.DecimalField(max_digits=10, decimal_places=2, help_text="Monto abonado en USD")
+    referencia = models.CharField(max_length=50, blank=True, null=True, help_text="Ref bancaria si aplica")
+
+    def __str__(self):
+        return f"{self.get_metodo_display()}: ${self.monto}"

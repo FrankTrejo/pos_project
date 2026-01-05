@@ -20,9 +20,17 @@ import json
 from reports.models import AuditoriaEliminacion
 
 # Tus modelos y formularios
-from .models import Table, Categoria, Producto, TasaBCV, IngredienteProducto
+from .models import Table, Categoria, Producto, TasaBCV, IngredienteProducto, Venta, DetalleVenta, Pago
 from .forms import ProductoBasicForm, RecetaProductoForm, ProductoPriceForm
 from .scrapping import obtener_tasa_bcv
+
+# tables/views.py
+from django.db import transaction
+from django.utils import timezone
+import uuid
+
+# Asegúrate de tener estos imports arriba:
+from inventory.models import MovimientoInventario, Insumo
 
 # ==========================================
 #  LÓGICA ORIGINAL (MESAS Y POS)
@@ -490,4 +498,130 @@ def generar_cuenta_pdf(request, table_id):
     if pisa_status.err:
         return HttpResponse('Error al generar PDF', status=500)
     
+    return response
+
+# --- FUNCIÓN DE FACTURACIÓN CORREGIDA (Secuencial) ---
+# tables/views.py
+
+@staff_member_required
+def facturar_mesa_ajax(request, table_id):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            # AHORA RECIBIMOS UNA LISTA DE PAGOS
+            # Ejemplo: [{'metodo': 'ZELLE', 'monto': 10}, {'metodo': 'EFECTIVO_USD', 'monto': 5}]
+            lista_pagos = data.get('lista_pagos', []) 
+            
+            # Datos para cálculos finales
+            monto_total_recibido = float(data.get('monto_recibido_total', 0))
+            es_propina = data.get('es_propina', False)
+            
+            table = get_object_or_404(Table, id=table_id)
+            orden = Orden.objects.filter(mesa=table).first()
+            
+            if not orden:
+                return JsonResponse({'status': 'error', 'message': 'No hay orden.'})
+
+            # --- VALIDACIÓN DE INVENTARIO (IGUAL QUE ANTES) ---
+            insumos_requeridos = {} 
+            for detalle in orden.detalles.all():
+                ingredientes = detalle.producto.ingredientes.all()
+                for ing in ingredientes:
+                    total_item = ing.cantidad * detalle.cantidad
+                    if ing.insumo.id in insumos_requeridos: insumos_requeridos[ing.insumo.id] += total_item
+                    else: insumos_requeridos[ing.insumo.id] = total_item
+
+            faltantes = []
+            for i_id, cant in insumos_requeridos.items():
+                ins_obj = Insumo.objects.get(id=i_id)
+                if ins_obj.stock_actual < cant:
+                    faltantes.append(f"❌ {ins_obj.nombre}: Tienes {ins_obj.stock_actual:.2f}, necesitas {cant:.2f}")
+
+            if faltantes:
+                return JsonResponse({'status': 'error', 'message': "STOCK INSUFICIENTE:\n" + "\n".join(faltantes)})
+            # ---------------------------------------------------
+
+            total_venta = float(orden.total_calculado)
+            diferencia = monto_total_recibido - total_venta
+            propina_calc = diferencia if (diferencia > 0 and es_propina) else 0
+
+            with transaction.atomic():
+                # 1. NUMERACIÓN
+                ultima = Venta.objects.last()
+                nuevo_num = (int(ultima.codigo_factura) + 1) if (ultima and ultima.codigo_factura.isdigit()) else 1
+                codigo = f"{nuevo_num:06d}"
+
+                # 2. CREAR VENTA (Metodo general MIXTO si hay varios, o el único si es uno)
+                metodo_general = 'MIXTO' if len(lista_pagos) > 1 else lista_pagos[0]['metodo']
+                
+                venta = Venta.objects.create(
+                    codigo_factura=codigo,
+                    total=total_venta,
+                    metodo_pago=metodo_general, # 'MIXTO' o el específico
+                    mesero=orden.mesero,
+                    mesa_numero=table.number,
+                    monto_recibido=monto_total_recibido,
+                    propina=propina_calc
+                )
+
+                # 3. REGISTRAR LOS PAGOS INDIVIDUALES
+                for p in lista_pagos:
+                    Pago.objects.create(
+                        venta=venta,
+                        metodo=p['metodo'],
+                        monto=p['monto']
+                    )
+
+                # 4. DETALLES Y DESCUENTO INVENTARIO (Igual que antes)
+                for det in orden.detalles.all():
+                    DetalleVenta.objects.create(
+                        venta=venta, producto=det.producto, nombre_producto=det.producto.nombre,
+                        cantidad=det.cantidad, precio_unitario=det.precio_unitario, subtotal=det.subtotal
+                    )
+                    for ing in det.producto.ingredientes.all():
+                        MovimientoInventario.objects.create(
+                            insumo=ing.insumo, tipo='SALIDA', cantidad=ing.cantidad * det.cantidad,
+                            unidad_movimiento=ing.insumo.unidad, usuario=request.user,
+                            nota=f"Fac: {codigo}"
+                        )
+
+                orden.delete()
+                table.is_occupied = False
+                table.solicitud_pago = False
+                table.mesero = None
+                table.save()
+
+            return JsonResponse({'status': 'ok', 'venta_id': venta.id})
+
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+    return JsonResponse({'status': 'error'}, status=400)
+
+# 2. GENERAR FACTURA PDF FINAL
+@staff_member_required
+def generar_factura_pdf(request, venta_id):
+    venta = get_object_or_404(Venta, id=venta_id)
+    tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
+    tasa_valor = float(tasa_obj.precio) if tasa_obj else 0
+    
+    total_bs = float(venta.total) * tasa_valor
+
+    context = {
+        'venta': venta,
+        'detalles': venta.detalles.all(),
+        'tasa': tasa_valor,
+        'total_bs': total_bs,
+        'vuelto': float(venta.monto_recibido) - float(venta.total) - float(venta.propina)
+    }
+    
+    template_path = 'tables/factura_final_pdf.html'
+    template = get_template(template_path)
+    html = template.render(context)
+
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'filename="Factura_{venta.codigo_factura}.pdf"'
+
+    pisa_status = pisa.CreatePDF(html, dest=response)
+    if pisa_status.err:
+        return HttpResponse('Error al generar PDF', status=500)
     return response

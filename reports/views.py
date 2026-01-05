@@ -7,7 +7,7 @@ from .models import AuditoriaEliminacion
 
 # Importamos modelos de ambas aplicaciones (Inventario y Ventas)
 from inventory.models import Insumo, MovimientoInventario
-from tables.models import Venta, DetalleVenta 
+from tables.models import Venta, DetalleVenta, DetalleVenta
 
 # 1. MENÚ PRINCIPAL DE REPORTES (Centro de Mando)
 @staff_member_required
@@ -148,3 +148,28 @@ def ventas_pago(request):
 def auditoria_eliminaciones(request):
     logs = AuditoriaEliminacion.objects.all().order_by('-fecha')
     return render(request, 'reports/auditoria_list.html', {'logs': logs})
+
+@staff_member_required
+def reporte_ventas_detalle(request):
+    # 1. Filtros de Fecha
+    fecha_inicio = request.GET.get('fecha_inicio', timezone.now().strftime('%Y-%m-%d'))
+    fecha_fin = request.GET.get('fecha_fin', timezone.now().strftime('%Y-%m-%d'))
+
+    # 2. Consulta Optimizada (Trae ventas + sus productos + sus pagos en un solo viaje)
+    ventas = Venta.objects.filter(
+        fecha__date__range=[fecha_inicio, fecha_fin]
+    ).select_related('mesero').prefetch_related(
+        'detalles', # Trae los productos
+        'pagos'     # Trae el desglose de pagos
+    ).order_by('-fecha')
+
+    # 3. Totales del período
+    total_periodo = ventas.aggregate(Sum('total'))['total__sum'] or 0
+
+    context = {
+        'ventas': ventas,
+        'fecha_inicio': fecha_inicio,
+        'fecha_fin': fecha_fin,
+        'total_periodo': total_periodo
+    }
+    return render(request, 'reports/sales_detail_report.html', context)

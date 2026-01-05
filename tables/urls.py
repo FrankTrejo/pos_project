@@ -28,4 +28,6 @@ urlpatterns = [
     path('orden/<int:orden_id>/pdf/', views.generar_ticket_pdf, name='generar_ticket_pdf'),
     path('mesa/<int:table_id>/eliminar/', views.eliminar_mesa_ajax, name='eliminar_mesa'),
     path('mesa/<int:table_id>/cuenta/', views.generar_cuenta_pdf, name='generar_cuenta_pdf'),
+    path('mesa/<int:table_id>/facturar/', views.facturar_mesa_ajax, name='facturar_mesa'),
+    path('factura/<int:venta_id>/pdf/', views.generar_factura_pdf, name='generar_factura_pdf'),
 ]

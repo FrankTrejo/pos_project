@@ -37,7 +37,9 @@
             <button class="action-btn" onclick="pedirCuenta()">
                 <i class="fas fa-credit-card"></i> Cuenta Mesa
             </button>
-            <button class="action-btn"><i class="fas fa-receipt"></i> Facturar Mesa</button>
+            <button class="action-btn" onclick="iniciarFacturacion()">
+                <i class="fas fa-receipt"></i> Facturar Mesa
+            </button>
         </div>
 
         <div class="main-pos-grid">
@@ -401,6 +403,222 @@
                 }
             });
         }
+
+        async function iniciarFacturacion() {
+        const totalTexto = document.getElementById('total-usd').innerText;
+        const totalMesa = parseFloat(totalTexto);
+
+        // Validamos que tengamos Tasa
+        if (!TASA_CAMBIO || TASA_CAMBIO <= 0) {
+            Swal.fire('Error', 'No hay Tasa de Cambio cargada.', 'error');
+            return;
+        }
+
+        if (totalMesa <= 0) { Swal.fire('Error', 'Monto 0', 'error'); return; }
+
+        // HTML DEL FORMULARIO MIXTO
+        const htmlForm = `
+            <div style="text-align: left; font-size: 0.9em;">
+                <div style="margin-bottom: 15px; font-weight: bold; color: #444; text-align: center; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                    Total a Pagar: <span style="font-size: 1.5em; color: var(--primary-blue);">$${totalMesa.toFixed(2)}</span>
+                    <br>
+                    <small style="color: #666; font-weight: normal;">(Bs. ${(totalMesa * TASA_CAMBIO).toLocaleString('es-VE', {minimumFractionDigits: 2})})</small>
+                </div>
+                
+                <div style="background: #e3f2fd; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+                    <div class="pago-row" style="margin-bottom: 5px;">
+                        <label>💵 Efectivo (USD):</label>
+                        <input type="number" id="pago-efectivo-usd" class="swal2-input" placeholder="0.00" style="margin: 0; width: 100%; height: 35px;" oninput="calcularRestante()">
+                    </div>
+                    <div class="pago-row">
+                        <label>🏦 Zelle (USD):</label>
+                        <input type="number" id="pago-zelle" class="swal2-input" placeholder="0.00" style="margin: 0; width: 100%; height: 35px;" oninput="calcularRestante()">
+                    </div>
+                </div>
+
+                <div style="background: #fff3cd; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+                    <div style="font-size: 0.8em; color: #856404; margin-bottom: 5px; text-align: right;">Tasa: Bs. ${TASA_CAMBIO.toFixed(2)}</div>
+                    
+                    <div class="pago-row" style="margin-bottom: 8px;">
+                        <label>📱 Pago Móvil (Bs):</label>
+                        <div style="display: flex; gap: 5px;">
+                            <input type="number" id="pago-pm" class="swal2-input" placeholder="Bolívares" style="margin: 0; flex-grow: 1; height: 35px;" oninput="calcularRestante()">
+                            <input type="text" id="ref-pm-usd" readonly style="width: 80px; border: none; background: transparent; color: #666; font-size: 0.9em; text-align: right;" value="$0.00">
+                        </div>
+                    </div>
+
+                    <div class="pago-row" style="margin-bottom: 8px;">
+                        <label>💳 Punto Venta (Bs):</label>
+                        <div style="display: flex; gap: 5px;">
+                            <input type="number" id="pago-punto" class="swal2-input" placeholder="Bolívares" style="margin: 0; flex-grow: 1; height: 35px;" oninput="calcularRestante()">
+                            <input type="text" id="ref-punto-usd" readonly style="width: 80px; border: none; background: transparent; color: #666; font-size: 0.9em; text-align: right;" value="$0.00">
+                        </div>
+                    </div>
+
+                    <div class="pago-row">
+                        <label>🇻🇪 Efectivo (Bs):</label>
+                        <div style="display: flex; gap: 5px;">
+                            <input type="number" id="pago-efectivo-bs" class="swal2-input" placeholder="Bolívares" style="margin: 0; flex-grow: 1; height: 35px;" oninput="calcularRestante()">
+                            <input type="text" id="ref-efec-bs-usd" readonly style="width: 80px; border: none; background: transparent; color: #666; font-size: 0.9em; text-align: right;" value="$0.00">
+                        </div>
+                    </div>
+                </div>
+
+                <hr style="margin: 15px 0;">
+                
+                <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 1.1em;">
+                    <span>Pagado (Equivalente):</span>
+                    <span id="label-pagado" style="color: green;">$0.00</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 1.1em;">
+                    <span>Restante:</span>
+                    <span id="label-restante" style="color: red;">$${totalMesa.toFixed(2)}</span>
+                </div>
+            </div>
+        `;
+
+        // ABRIR EL MODAL (CONFIGURACIÓN DE SEGURIDAD AGREGADA)
+        const { value: formValues } = await Swal.fire({
+            title: 'Facturación / Pago Mixto',
+            html: htmlForm,
+            focusConfirm: false,
+            width: '550px',
+            
+            // --- AQUÍ ESTÁ LA MAGIA DE SEGURIDAD ---
+            allowOutsideClick: false, // Bloquea clic afuera
+            allowEscapeKey: false,    // Bloquea tecla ESC
+            showCloseButton: true,    // Muestra X para salir explícitamente
+            // ---------------------------------------
+
+            showCancelButton: true,
+            confirmButtonText: 'Procesar Pago',
+            cancelButtonText: 'Cancelar',
+            preConfirm: () => {
+                // 1. OBTENER VALORES
+                const efecUsd = parseFloat(document.getElementById('pago-efectivo-usd').value) || 0;
+                const zelle = parseFloat(document.getElementById('pago-zelle').value) || 0;
+                
+                const pmBs = parseFloat(document.getElementById('pago-pm').value) || 0;
+                const puntoBs = parseFloat(document.getElementById('pago-punto').value) || 0;
+                const efecBs = parseFloat(document.getElementById('pago-efectivo-bs').value) || 0;
+
+                // 2. CONVERTIR
+                const pmUsd = pmBs / TASA_CAMBIO;
+                const puntoUsd = puntoBs / TASA_CAMBIO;
+                const efecBsUsd = efecBs / TASA_CAMBIO;
+
+                const totalIngresadoUsd = efecUsd + zelle + pmUsd + puntoUsd + efecBsUsd;
+
+                // Validamos
+                if (totalIngresadoUsd < (totalMesa - 0.01)) {
+                    Swal.showValidationMessage(`Faltan $${(totalMesa - totalIngresadoUsd).toFixed(2)} por cobrar`);
+                    return false;
+                }
+
+                // 3. CONSTRUIR LISTA
+                let lista = [];
+                if(efecUsd > 0) lista.push({ metodo: 'EFECTIVO_USD', monto: efecUsd });
+                if(zelle > 0) lista.push({ metodo: 'ZELLE', monto: zelle });
+                if(pmUsd > 0) lista.push({ metodo: 'PAGO_MOVIL', monto: pmUsd });
+                if(puntoUsd > 0) lista.push({ metodo: 'PUNTO', monto: puntoUsd });
+                if(efecBsUsd > 0) lista.push({ metodo: 'EFECTIVO_BS', monto: efecBsUsd });
+
+                return {
+                    lista_pagos: lista,
+                    total_ingresado: totalIngresadoUsd
+                };
+            }
+        });
+
+        // Si el usuario le da a Cancelar o a la X, formValues es undefined y se detiene aquí.
+        if (!formValues) return; 
+
+        // LOGICA DE PROPINA / VUELTO
+        const diferencia = formValues.total_ingresado - totalMesa;
+        let esPropina = false;
+
+        if (diferencia > 0.01) { 
+            const { isConfirmed } = await Swal.fire({
+                title: `Sobra: $${diferencia.toFixed(2)}`,
+                text: "¿Cómo registrar el excedente?",
+                icon: 'question',
+                allowOutsideClick: false, // También bloqueamos este para seguridad
+                showCancelButton: true,
+                confirmButtonText: 'Es Propina 🎁',
+                cancelButtonText: 'Es Vuelto 💵',
+                confirmButtonColor: '#28a745',
+                cancelButtonColor: '#3085d6'
+            });
+            esPropina = isConfirmed;
+        }
+
+        // ENVIAR AL BACKEND
+        Swal.fire({ title: 'Procesando...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+        fetch("{% url 'facturar_mesa' table.id %}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({
+                lista_pagos: formValues.lista_pagos,
+                monto_recibido_total: formValues.total_ingresado,
+                es_propina: esPropina
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'ok') {
+                Swal.fire('¡Éxito!', 'Factura generada', 'success').then(() => {
+                    window.open(`/factura/${data.venta_id}/pdf/`, '_blank');
+                    window.location.href = "{% url 'index' %}";
+                });
+            } else {
+                Swal.fire('Error', data.message, 'error');
+            }
+        });
+    }
+
+    // FUNCIÓN AUXILIAR DE CÁLCULO EN TIEMPO REAL
+    window.calcularRestante = function() {
+        const total = parseFloat(document.getElementById('total-usd').innerText);
+        
+        // Entradas en USD
+        const efecUsd = parseFloat(document.getElementById('pago-efectivo-usd').value) || 0;
+        const zelle = parseFloat(document.getElementById('pago-zelle').value) || 0;
+        
+        // Entradas en Bs
+        const pmBs = parseFloat(document.getElementById('pago-pm').value) || 0;
+        const puntoBs = parseFloat(document.getElementById('pago-punto').value) || 0;
+        const efecBs = parseFloat(document.getElementById('pago-efectivo-bs').value) || 0;
+
+        // Conversión Visual
+        const pmUsd = pmBs / TASA_CAMBIO;
+        const puntoUsd = puntoBs / TASA_CAMBIO;
+        const efecBsUsd = efecBs / TASA_CAMBIO;
+
+        // Actualizamos los textos pequeños de referencia
+        document.getElementById('ref-pm-usd').value = `$${pmUsd.toFixed(2)}`;
+        document.getElementById('ref-punto-usd').value = `$${puntoUsd.toFixed(2)}`;
+        document.getElementById('ref-efec-bs-usd').value = `$${efecBsUsd.toFixed(2)}`;
+
+        // Suma Total en USD
+        const totalPagado = efecUsd + zelle + pmUsd + puntoUsd + efecBsUsd;
+        const restante = total - totalPagado;
+
+        document.getElementById('label-pagado').innerText = `$${totalPagado.toFixed(2)}`;
+        
+        const elRestante = document.getElementById('label-restante');
+        
+        // Tolerancia pequeña para errores de punto flotante
+        if (restante > 0.009) {
+            elRestante.innerText = `$${restante.toFixed(2)}`;
+            elRestante.style.color = 'red';
+            elRestante.innerText += " (Falta)";
+        } else {
+            elRestante.innerText = `$${Math.abs(restante).toFixed(2)}`;
+            elRestante.style.color = 'green';
+            elRestante.innerText += " (Sobra)";
+        }
+    }
     </script>
 </body>
 </html>
