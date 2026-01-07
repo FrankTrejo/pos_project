@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        @page { 
+            size: 80mm 200mm; 
+            margin: 5mm; 
+        }
+        body { 
+            font-family: 'Helvetica', sans-serif; 
+            font-size: 12px; 
+            color: #000; 
+            line-height: 1.2;
+        }
+        
+        /* Header simple */
+        .header { 
+            text-align: center; 
+            border-bottom: 1px solid #ccc; 
+            padding-bottom: 5px; 
+            margin-bottom: 10px; 
+        }
+        .titulo-tipo { font-size: 16px; font-weight: bold; text-transform: uppercase; }
+        .info-ticket { font-size: 10px; color: #555; }
+        
+        /* CAJA PRINCIPAL UNIFICADA */
+        .caja-producto { 
+            border: 2px solid #000; /* Borde sólido negro */
+            padding: 10px; 
+            border-radius: 5px;
+        }
+        
+        /* El nombre del empleado (Ej: PERSONAL: MANUEL) */
+        .nombre-empleado { 
+            font-size: 14px; 
+            font-weight: bold; 
+            border-bottom: 1px dashed #000;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        /* LOS INGREDIENTES (Ahora son gigantes) */
+        .item-ingrediente { 
+            font-size: 18px; /* Tamaño grande como pediste */
+            font-weight: 900; 
+            margin-bottom: 5px;
+            display: block;
+        }
+        
+        .footer { 
+            text-align: center; margin-top: 10px; 
+            font-size: 9px; color: #777;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="titulo-tipo">
+            {% if consumo.tipo == 'PERSONAL' %}
+                👨‍🍳 COMIDA PERSONAL
+            {% elif consumo.tipo == 'CORTESIA' %}
+                🎁 CORTESÍA
+            {% else %}
+                MERMA
+            {% endif %}
+        </div>
+        <div class="info-ticket">
+            Ticket #{{ consumo.id }} | {{ fecha|date:"d/m/Y H:i" }}
+        </div>
+    </div>
+
+    <div class="caja-producto">
+        <span class="nombre-empleado">
+            {{ titulo_principal|upper }}
+        </span>
+
+        {% if extras %}
+            {% for mov in extras %}
+            <div class="item-ingrediente">
+                {{ mov.insumo.nombre|upper }}
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="item-ingrediente" style="color: #555;">
+                BASE STANDARD
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="footer">
+        Autorizado por: {{ consumo.usuario.username|upper }}
+    </div>
+</body>
+</html>

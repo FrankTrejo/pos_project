@@ -10,4 +10,6 @@ urlpatterns = [
     path('editar/<int:pk>/', views.insumo_edit, name='insumo_edit'),
     path('eliminar/<int:pk>/', views.insumo_delete, name='insumo_delete'),
     path('produccion/<int:pk>/', views.insumo_produccion, name='insumo_produccion'),
+    path('salidas-especiales/', views.salidas_especiales_view, name='salidas_especiales'),
+    path('comanda-interna/<int:consumo_id>/pdf/', views.generar_comanda_interno_pdf, name='generar_comanda_interno_pdf'),
 ]

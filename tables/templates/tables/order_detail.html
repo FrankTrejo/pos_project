@@ -205,8 +205,15 @@
                         cancelButtonText: 'Seguir Editando'
                     }).then((alertResult) => {
                         if (alertResult.isConfirmed) {
+                            // 1. Abrir el PDF en una pestaña nueva
                             const urlPDF = `/orden/${result.orden_id}/pdf/`; 
                             window.open(urlPDF, '_blank');
+
+                            // 2. Redirigir al Dashboard de Mesas en la pestaña actual
+                            // Usamos un pequeño retraso (500ms) para que la transición sea suave
+                            setTimeout(() => {
+                                window.location.href = "{% url 'index' %}";
+                            }, 500);
                         }
                     });
                 } else {

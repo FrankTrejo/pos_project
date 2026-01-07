@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container" style="padding: 20px; max-width: 1200px; margin: 0 auto;">
+    
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+        <h2 style="color: #333; margin: 0;"><i class="fas fa-cogs"></i> Configuración del Sistema</h2>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 30px;">
+            
+            <div class="card-style" style="height: fit-content;">
+                <h3 style="color: var(--primary-blue); border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px;">
+                    🏢 Identidad del Negocio
+                </h3>
+                
+                <div class="form-group mb-3">
+                    <label style="font-weight: bold;">Nombre Empresa:</label>
+                    {{ form.nombre_empresa }}
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                    <div>
+                        <label style="font-weight: bold;">RIF / ID:</label>
+                        {{ form.rif }}
+                    </div>
+                    <div>
+                        <label style="font-weight: bold;">Teléfono:</label>
+                        {{ form.telefono }}
+                    </div>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label style="font-weight: bold;">Dirección:</label>
+                    {{ form.direccion }}
+                </div>
+                
+                <div class="form-group mb-3">
+                    <label style="font-weight: bold;">Logo:</label>
+                    {{ form.logo }}
+                </div>
+
+                <div class="form-group">
+                    <label style="font-weight: bold;">Mensaje del Ticket:</label>
+                    {{ form.mensaje_ticket }}
+                </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 25px;">
+                
+                <div class="card-style" style="border-left: 5px solid #27ae60;">
+                    <h3 style="color: #27ae60; font-size: 1.2em; margin-bottom: 15px;">
+                        💰 Moneda e Impuestos
+                    </h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div>
+                            <label style="font-weight: bold;">Tasa BCV ($):</label>
+                            {{ form.tasa_dolar }}
+                        </div>
+                        <div>
+                            <label style="font-weight: bold;">% IVA:</label>
+                            {{ form.iva_porcentaje }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-style" style="border-left: 5px solid #e67e22;">
+                    <h3 style="color: #e67e22; font-size: 1.2em; margin-bottom: 15px;">
+                        ➕ Costos y Cargos Extra
+                    </h3>
+                    
+                    <h5 style="margin-top: 10px; font-size: 0.9em; text-transform: uppercase; color: #777; border-bottom: 1px solid #eee; padding-bottom: 5px;">
+                        Cargos al Cliente
+                    </h5>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                        <div>
+                            <label style="font-size: 0.85em; font-weight: bold;">% IGTF (Divisa)</label>
+                            {{ form.igtf_porcentaje }}
+                        </div>
+                        <div>
+                            <label style="font-size: 0.85em; font-weight: bold;">% Servicio</label>
+                            {{ form.servicio_porcentaje }}
+                        </div>
+                        <div>
+                            <label style="font-size: 0.85em; font-weight: bold;">Delivery Fijo ($)</label>
+                            {{ form.monto_delivery_fijo }}
+                        </div>
+                    </div>
+
+                    <h5 style="margin-top: 15px; font-size: 0.9em; text-transform: uppercase; color: #777; border-bottom: 1px solid #eee; padding-bottom: 5px;">
+                        Costos Operativos Internos
+                    </h5>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px;">
+                        <div>
+                            <label style="font-size: 0.85em; font-weight: bold;">Caja Peque ($)</label>
+                            {{ form.costo_caja_pequena }}
+                        </div>
+                        <div>
+                            <label style="font-size: 0.85em; font-weight: bold;">Caja Grande ($)</label>
+                            {{ form.costo_caja_grande }}
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 15px;">
+                        <label style="font-size: 0.85em; font-weight: bold;">% Gastos Operativos (Luz/Gas)</label>
+                        {{ form.gastos_operativos_porcentaje }}
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div style="margin-top: 30px; text-align: right;">
+            <button type="submit" class="action-btn" style="padding: 15px 40px; font-size: 1.1em; background: var(--primary-color); color: white; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                💾 Guardar Cambios
+            </button>
+        </div>
+    </form>
+</div>
+
+<style>
+    /* Pequeño ajuste para que los inputs se vean siempre bien */
+    .form-control {
+        width: 100%;
+        box-sizing: border-box; /* Importante para que el padding no rompa el ancho */
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+    label {
+        display: block; /* Para que el label siempre esté arriba del input */
+        margin-bottom: 5px;
+    }
+</style>
+{% endblock %}

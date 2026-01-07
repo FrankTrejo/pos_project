@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib import messages
-from .models import Insumo, MovimientoInventario, CategoriaInsumo, IngredienteCompuesto
+from .models import Insumo, MovimientoInventario, CategoriaInsumo, IngredienteCompuesto, ConsumoInterno
 from .forms import InsumoForm, ComponenteForm, MovimientoInventarioForm
 from django.db import models
 import re
@@ -11,6 +11,7 @@ from django.db import transaction # Importante para que no descuente uno si fall
 from .forms import ProduccionForm
 from django.db import transaction
 from django.db.models import Sum
+from django.http import HttpResponseRedirect, HttpResponse
 
 def inventory_index(request):
     """Muestra el listado de insumos con alertas de stock bajo"""
@@ -460,3 +461,411 @@ def insumo_produccion(request, pk):
         'insumo': insumo_padre,
         'componentes': componentes
     })
+
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from .models import Insumo, MovimientoInventario, ConsumoInterno
+from tables.models import Producto
+from django.db import transaction
+
+# CONFIGURACIÓN: Define qué insumos conforman la "BASE" de la comida de personal
+# Pon aquí los IDs o Nombres de: Masa, Salsa, Queso.
+# Ejemplo: Supongamos que Masa es ID 1, Salsa ID 2, Queso ID 3.
+# Ajusta las cantidades según tu receta de personal (ej: 250g masa, 100g queso...)
+BASE_PERSONAL = [
+    {'insumo_id': 1, 'cantidad': 250}, # Masa
+    {'insumo_id': 2, 'cantidad': 100}, # Salsa
+    {'insumo_id': 3, 'cantidad': 150}, # Queso
+]
+
+# inventory/views.py
+
+def salidas_especiales_view(request):
+    # 1. Traer datos para el formulario
+    productos = Producto.objects.all().order_by('nombre')
+    # Traemos todos los insumos simples para los extras
+    ingredientes_extra = Insumo.objects.filter(es_insumo_compuesto=False).order_by('nombre')
+    
+    # Historial reciente
+    historial = ConsumoInterno.objects.all().order_by('-fecha')[:20]
+
+    if request.method == 'POST':
+        tipo_accion = request.POST.get('tipo_accion')
+        nota = request.POST.get('nota', '')
+
+        try:
+            with transaction.atomic():
+                costo_total = 0
+
+                # ==========================================
+                # CASO 1: COMIDA DE PERSONAL (LÓGICA AVANZADA)
+                # ==========================================
+                if tipo_accion == 'PERSONAL':
+                    tamano = request.POST.get('tamano_pizza') # 'IND', 'MED', 'FAM'
+                    empleado = request.POST.get('empleado_nombre')
+
+                    # A) BUSCAR LA RECETA BASE (La Margarita del tamaño elegido)
+                    producto_base = Producto.objects.filter(nombre__icontains='MARGARITA', tamano=tamano).first()
+
+                    if not producto_base:
+                        messages.error(request, f"Error: No existe una 'Pizza Margarita' tamaño {tamano} para usar de base.")
+                        return redirect('salidas_especiales')
+
+                    registro = ConsumoInterno.objects.create(
+                        tipo='PERSONAL',
+                        usuario=request.user,
+                        descripcion=f"Personal: {empleado} ({producto_base.nombre} {producto_base.get_tamano_display()})"
+                    )
+
+                    # B) DESCONTAR LA BASE (Según receta de Margarita)
+                    for componente in producto_base.ingredientes.all():
+                        MovimientoInventario.objects.create(
+                            insumo=componente.insumo,
+                            tipo='SALIDA',
+                            cantidad=componente.cantidad,
+                            unidad_movimiento=componente.insumo.unidad,
+                            usuario=request.user,
+                            nota=f"Base Personal #{registro.id}"
+                        )
+                        costo_total += (componente.insumo.costo_unitario * componente.cantidad)
+
+                    # C) DESCONTAR LOS EXTRAS (Cantidades exactas)
+                    ids_extras = request.POST.getlist('extra_id')
+                    cantidades_extras = request.POST.getlist('extra_cantidad')
+
+                    for i, insumo_id in enumerate(ids_extras):
+                        cantidad_texto = cantidades_extras[i]
+                        
+                        # Validamos que no venga vacío y sea mayor a 0
+                        if cantidad_texto and float(cantidad_texto) > 0:
+                            cantidad = Decimal(cantidad_texto) # <--- AQUÍ CORREGIMOS EL ERROR DE DECIMAL
+                            
+                            insumo = Insumo.objects.get(id=insumo_id)
+                            
+                            MovimientoInventario.objects.create(
+                                insumo=insumo,
+                                tipo='SALIDA',
+                                cantidad=cantidad,
+                                unidad_movimiento=insumo.unidad,
+                                usuario=request.user,
+                                nota=f"Extra Personal #{registro.id}"
+                            )
+                            # Calculamos costo (Decimal * Decimal)
+                            costo_total += (insumo.costo_unitario * cantidad)
+
+                # ==========================================
+                # CASO 2: REGALO / CORTESÍA
+                # ==========================================
+                elif tipo_accion == 'REGALO':
+                    prod_id = request.POST.get('producto_regalo')
+                    prod_obj = Producto.objects.get(id=prod_id)
+                    
+                    registro = ConsumoInterno.objects.create(
+                        tipo='CORTESIA',
+                        usuario=request.user,
+                        descripcion=f"Regalo: {prod_obj.nombre} - {nota}"
+                    )
+
+                    for ing in prod_obj.ingredientes.all():
+                        MovimientoInventario.objects.create(
+                            insumo=ing.insumo, tipo='SALIDA', cantidad=ing.cantidad,
+                            unidad_movimiento=ing.insumo.unidad, usuario=request.user,
+                            nota=f"Regalo #{registro.id}"
+                        )
+                        costo_total += (ing.insumo.costo_unitario * ing.cantidad)
+
+                # Guardamos costo final
+                registro.costo_estimado = costo_total
+                registro.save()
+                
+                # --- CORRECCIÓN DEFINITIVA ---
+                messages.success(request, f"Salida registrada exitosamente.")
+                
+                # Importamos aquí mismo para evitar el error de variable local
+                from django.urls import reverse 
+                
+                base_url = reverse('salidas_especiales')
+                final_url = f"{base_url}?print_id={registro.id}"
+                
+                return HttpResponseRedirect(final_url)
+
+        except Exception as e:
+            messages.error(request, f"Error técnico: {str(e)}")
+            return redirect('salidas_especiales')
+
+    return render(request, 'inventory/salidas_especiales.html', {
+        'productos': productos,
+        'ingredientes': ingredientes_extra,
+        'historial': historial
+    })
+    # 1. Traer datos para el formulario
+    productos = Producto.objects.all().order_by('nombre')
+    # Traemos todos los insumos simples para los extras
+    ingredientes_extra = Insumo.objects.filter(es_insumo_compuesto=False).order_by('nombre')
+    
+    # Historial reciente
+    historial = ConsumoInterno.objects.all().order_by('-fecha')[:20]
+
+    if request.method == 'POST':
+        tipo_accion = request.POST.get('tipo_accion')
+        nota = request.POST.get('nota', '')
+
+        try:
+            with transaction.atomic():
+                costo_total = 0
+
+                # ==========================================
+                # CASO 1: COMIDA DE PERSONAL (AVANZADO)
+                # ==========================================
+                if tipo_accion == 'PERSONAL':
+                    tamano = request.POST.get('tamano_pizza') # 'IND', 'MED', 'FAM'
+                    empleado = request.POST.get('empleado_nombre')
+
+                    # A) BUSCAR LA RECETA BASE (La Margarita del tamaño elegido)
+                    # Buscamos un producto que se llame "Margarita" y tenga el tamaño correcto
+                    producto_base = Producto.objects.filter(nombre__icontains='MARGARITA', tamano=tamano).first()
+
+                    if not producto_base:
+                        messages.error(request, f"Error: No existe una 'Pizza Margarita' tamaño {tamano} para usar de base.")
+                        return redirect('salidas_especiales')
+
+                    registro = ConsumoInterno.objects.create(
+                        tipo='PERSONAL',
+                        usuario=request.user,
+                        descripcion=f"Personal: {empleado} ({producto_base.nombre} {producto_base.get_tamano_display()})"
+                    )
+
+                    # B) DESCONTAR LA BASE (Según receta de Margarita)
+                    for componente in producto_base.ingredientes.all():
+                        MovimientoInventario.objects.create(
+                            insumo=componente.insumo,
+                            tipo='SALIDA',
+                            cantidad=componente.cantidad, # Cantidad exacta de la receta
+                            unidad_movimiento=componente.insumo.unidad,
+                            usuario=request.user,
+                            nota=f"Base Personal #{registro.id}"
+                        )
+                        costo_total += (componente.insumo.costo_unitario * componente.cantidad)
+
+                    # C) DESCONTAR LOS EXTRAS (Cantidades exactas)
+                    # Recibimos listas paralelas de IDs y Cantidades
+                    ids_extras = request.POST.getlist('extra_id')
+                    cantidades_extras = request.POST.getlist('extra_cantidad')
+
+                    for i, insumo_id in enumerate(ids_extras):
+                        # ERROR ANTERIOR: cantidad = float(cantidades_extras[i])
+                        # CORRECCIÓN: Usamos Decimal para que sea compatible con el dinero
+                        cantidad_texto = cantidades_extras[i]
+                        
+                        # Validamos que no venga vacío para que no de error
+                        if cantidad_texto and float(cantidad_texto) > 0:
+                            cantidad = Decimal(cantidad_texto) # <--- AQUÍ ESTÁ LA MAGIA
+                            
+                            insumo = Insumo.objects.get(id=insumo_id)
+                            
+                            MovimientoInventario.objects.create(
+                                insumo=insumo,
+                                tipo='SALIDA',
+                                cantidad=cantidad,
+                                unidad_movimiento=insumo.unidad,
+                                usuario=request.user,
+                                nota=f"Extra Personal #{registro.id}"
+                            )
+                            # Ahora sí: Decimal * Decimal = Éxito
+                            costo_total += (insumo.costo_unitario * cantidad)
+
+
+                # ==========================================
+                # CASO 2: REGALO / CORTESÍA (IGUAL QUE ANTES)
+                # ==========================================
+                elif tipo_accion == 'REGALO':
+                    prod_id = request.POST.get('producto_regalo')
+                    prod_obj = Producto.objects.get(id=prod_id)
+                    
+                    registro = ConsumoInterno.objects.create(
+                        tipo='CORTESIA',
+                        usuario=request.user,
+                        descripcion=f"Regalo: {prod_obj.nombre} - {nota}"
+                    )
+
+                    for ing in prod_obj.ingredientes.all():
+                        MovimientoInventario.objects.create(
+                            insumo=ing.insumo, tipo='SALIDA', cantidad=ing.cantidad,
+                            unidad_movimiento=ing.insumo.unidad, usuario=request.user,
+                            nota=f"Regalo #{registro.id}"
+                        )
+                        costo_total += (ing.insumo.costo_unitario * ing.cantidad)
+
+                # Guardamos costo final
+                registro.costo_estimado = costo_total
+                registro.save()
+                
+                messages.success(request, f"Salida registrada exitosamente.")
+                
+                # CAMBIO CLAVE: Redirigimos pasando el ID para imprimir
+                from django.urls import reverse
+
+                # Construimos la URL con el parámetro ?print_id=123
+                url_base = reverse('salidas_especiales')
+                url_destino = f"{url_base}?print_id={registro.id}"
+                
+                return redirect(url_destino)
+
+        except Exception as e:
+            messages.error(request, f"Error técnico: {str(e)}")
+
+    return render(request, 'inventory/salidas_especiales.html', {
+        'productos': productos,
+        'ingredientes': ingredientes_extra,
+        'historial': historial
+    })
+    # Obtenemos productos para el select de "Regalos"
+    productos = Producto.objects.all()
+    # Obtenemos insumos (ingredientes) para que el personal elija sus extras
+    # Filtramos solo insumos que sean ingredientes (no cajas, servilletas, etc)
+    # Ajusta el filtro según tu categoría de ingredientes
+    ingredientes_extra = Insumo.objects.filter(es_insumo_compuesto=False).order_by('nombre')
+
+    if request.method == 'POST':
+        tipo_accion = request.POST.get('tipo_accion') # 'PERSONAL' o 'REGALO'
+        nota = request.POST.get('nota', '')
+
+        try:
+            with transaction.atomic():
+                costo_total_operacion = 0
+                
+                # --- CASO 1: COMIDA DE PERSONAL ---
+                if tipo_accion == 'PERSONAL':
+                    # 1. Recuperar los 2 ingredientes extra seleccionados
+                    extras_ids = request.POST.getlist('extras') # Lista de IDs
+                    
+                    if len(extras_ids) > 2:
+                        messages.error(request, "Solo se permiten 2 ingredientes extra.")
+                        return redirect('salidas_especiales')
+
+                    registro = ConsumoInterno.objects.create(
+                        tipo='PERSONAL',
+                        usuario=request.user,
+                        descripcion=f"Comida Personal: {nota}"
+                    )
+
+                    # A) Descontar la BASE (Masa, Salsa, Queso)
+                    for item in BASE_PERSONAL:
+                        try:
+                            insumo = Insumo.objects.get(id=item['insumo_id'])
+                            MovimientoInventario.objects.create(
+                                insumo=insumo,
+                                tipo='SALIDA',
+                                cantidad=item['cantidad'],
+                                unidad_movimiento=insumo.unidad,
+                                usuario=request.user,
+                                nota=f"Personal #{registro.id}"
+                            )
+                            costo_total_operacion += (insumo.costo_unitario * item['cantidad'])
+                        except Insumo.DoesNotExist:
+                            pass # Manejar si no existe el ID configurado
+
+                    # B) Descontar los EXTRAS seleccionados
+                    # Asumiremos una cantidad estándar para el extra (ej: 50g de jamón)
+                    CANTIDAD_EXTRA_ESTANDAR = 50 
+                    
+                    for extra_id in extras_ids:
+                        insumo_extra = Insumo.objects.get(id=extra_id)
+                        MovimientoInventario.objects.create(
+                            insumo=insumo_extra,
+                            tipo='SALIDA',
+                            cantidad=CANTIDAD_EXTRA_ESTANDAR,
+                            unidad_movimiento=insumo_extra.unidad,
+                            usuario=request.user,
+                            nota=f"Extra Personal #{registro.id}"
+                        )
+                        costo_total_operacion += (insumo_extra.costo_unitario * CANTIDAD_EXTRA_ESTANDAR)
+
+
+                # --- CASO 2: REGALO / CORTESÍA ---
+                elif tipo_accion == 'REGALO':
+                    producto_id = request.POST.get('producto_regalo')
+                    producto = Producto.objects.get(id=producto_id)
+                    
+                    registro = ConsumoInterno.objects.create(
+                        tipo='CORTESIA',
+                        usuario=request.user,
+                        descripcion=f"Regalo: {producto.nombre} - {nota}"
+                    )
+
+                    # Descontar receta del producto
+                    ingredientes = producto.ingredientes.all()
+                    for ing in ingredientes:
+                        MovimientoInventario.objects.create(
+                            insumo=ing.insumo,
+                            tipo='SALIDA',
+                            cantidad=ing.cantidad,
+                            unidad_movimiento=ing.insumo.unidad,
+                            usuario=request.user,
+                            nota=f"Regalo #{registro.id}"
+                        )
+                        # Calculamos costo
+                        costo_total_operacion += (ing.insumo.costo_unitario * ing.cantidad)
+
+                # Guardamos el costo final
+                registro.costo_estimado = costo_total_operacion
+                registro.save()
+                
+                messages.success(request, "Salida registrada e inventario actualizado.")
+                return redirect('salidas_especiales')
+
+        except Exception as e:
+            messages.error(request, f"Error: {str(e)}")
+
+    return render(request, 'inventory/salidas_especiales.html', {
+        'productos': productos,
+        'ingredientes': ingredientes_extra
+    })
+
+    # --- AGREGAR ESTO AL FINAL ---
+    # Recuperamos los últimos 20 registros para mostrarlos en la tabla
+    historial = ConsumoInterno.objects.all().order_by('-fecha')[:20]
+
+    return render(request, 'inventory/salidas_especiales.html', {
+        'productos': productos,
+        'ingredientes': ingredientes_extra,
+        'historial': historial # <--- Enviamos esto al HTML
+    })
+
+from django.template.loader import get_template
+from xhtml2pdf import pisa
+from django.http import HttpResponse
+
+def generar_comanda_interno_pdf(request, consumo_id):
+    consumo = get_object_or_404(ConsumoInterno, id=consumo_id)
+    
+    # Lógica para limpiar el texto
+    # Si dice: "Personal: Manuel (MARGARITA INDIVIDUAL)" -> Nos quedamos con "Personal: Manuel"
+    descripcion_limpia = consumo.descripcion.split('(')[0].strip()
+    
+    context = {
+        'consumo': consumo,
+        'fecha': consumo.fecha,
+        'extras': [],
+        'titulo_principal': descripcion_limpia  # <--- Enviamos el nombre limpio
+    }
+
+    if consumo.tipo == 'PERSONAL':
+        movimientos_extra = MovimientoInventario.objects.filter(
+            nota=f"Extra Personal #{consumo.id}"
+        )
+        context['extras'] = movimientos_extra
+    
+    # (El resto de la función sigue igual...)
+    template_path = 'inventory/comanda_interno_pdf.html'
+    template = get_template(template_path)
+    html = template.render(context)
+
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'filename="comanda_interna_{consumo.id}.pdf"'
+
+    pisa_status = pisa.CreatePDF(html, dest=response)
+    if pisa_status.err:
+        return HttpResponse('Error al generar PDF', status=500)
+    
+    return response

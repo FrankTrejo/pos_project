@@ -625,3 +625,4 @@ def generar_factura_pdf(request, venta_id):
     if pisa_status.err:
         return HttpResponse('Error al generar PDF', status=500)
     return response
+

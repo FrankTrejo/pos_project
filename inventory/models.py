@@ -125,3 +125,23 @@ def actualizar_stock_conversion(sender, instance, created, **kwargs):
             if insumo.stock_actual < 0: insumo.stock_actual = 0
             
         insumo.save()
+
+class ConsumoInterno(models.Model):
+    TIPOS = [
+        ('PERSONAL', 'Comida de Personal'),
+        ('CORTESIA', 'Cortesía / Regalo'),
+        ('MERMA', 'Merma / Dañado'), # De paso aprovechamos para esto
+    ]
+    
+    tipo = models.CharField(max_length=20, choices=TIPOS)
+    fecha = models.DateTimeField(auto_now_add=True)
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    
+    # Para saber qué fue (Ej: "Pizza Personal de Juan" o "Regalo Mesa 4")
+    descripcion = models.CharField(max_length=255) 
+    
+    # Opcional: Para calcular cuánto le costó a la empresa ese regalo
+    costo_estimado = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    def __str__(self):
+        return f"{self.get_tipo_display()} - {self.fecha.strftime('%d/%m')}"

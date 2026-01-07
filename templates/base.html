@@ -24,6 +24,9 @@
                     <a href="{% url 'inventory_index' %}" class="sidebar-link">
                        <i class="fas fa-clipboard-list"></i> Inventario
                     </a>
+                    <a href="{% url 'salidas_especiales' %}" class="sidebar-link">
+                        <i class="fas fa-hand-holding-heart"></i> Consumo Interno
+                    </a>
                     <a href="{% url 'maestro_list' %}" class="sidebar-link">
                         <i class="fas fa-book"></i> Maestro de inventario
                     </a>
@@ -36,7 +39,7 @@
                     <a href="{% url 'index' %}" class="sidebar-link">
                        <i class="fas fa-cash-register"></i> Punto de Venta
                     </a>
-                    <a href="#" class="sidebar-link">
+                    <a href="{% url 'configuracion' %}" class="sidebar-link">
                         <i class="fas fa-cog"></i> Configuración
                     </a>
                 </nav>
