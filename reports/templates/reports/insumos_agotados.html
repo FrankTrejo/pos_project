@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div style="padding: 20px; max-width: 1000px; margin: 0 auto;">
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; border-bottom: 2px solid #eee; padding-bottom: 15px;">
+        <div>
+            <h2 style="color: #dc3545; margin: 0; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-boxes"></i> Alerta de Insumos
+            </h2>
+            <p style="color: #666; margin: 5px 0 0 0;">
+                Materia prima que requiere reposición inmediata.
+            </p>
+        </div>
+        
+        <div style="display: flex; gap: 10px;">
+            <a href="{% url 'reporte_inventario' %}" class="btn-print" style="text-decoration: none; padding: 10px 20px; background: #f8f9fa; color: #333; border: 1px solid #ddd; border-radius: 5px; font-weight: bold;">
+                <i class="fas fa-arrow-left"></i> Volver
+            </a>
+            <button onclick="window.print()" class="btn-print" style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer;">
+                <i class="fas fa-print"></i> Imprimir
+            </button>
+        </div>
+    </div>
+
+    <div class="card-style" style="background: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid #ffcccc;">
+        
+        {% if insumos %}
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead style="background: #fff5f5; color: #c62828;">
+                <tr>
+                    <th style="padding: 15px; text-align: left;">Insumo</th>
+                    <th style="padding: 15px; text-align: center;">Unidad</th>
+                    <th style="padding: 15px; text-align: center;">Stock Actual</th>
+                    <th style="padding: 15px; text-align: center;">Mínimo</th>
+                    <th style="padding: 15px; text-align: center;">Faltante</th>
+                    <th style="padding: 15px; text-align: center;">Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in insumos %}
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 15px; font-weight: bold; color: #444;">
+                        {{ item.nombre }}
+                    </td>
+                    
+                    <td style="padding: 15px; text-align: center; color: #666; font-size: 0.9em;">
+                        {{ item.unidad }} 
+                    </td>
+                    
+                    <td style="padding: 15px; text-align: center; font-size: 1.1em;">
+                        {% if item.stock_actual <= 0 %}
+                            <span style="color: red; font-weight: bold;">0</span>
+                        {% else %}
+                            {{ item.stock_actual|floatformat:2 }}
+                        {% endif %}
+                    </td>
+                    
+                    <td style="padding: 15px; text-align: center; color: #555;">
+                        {{ item.stock_minimo|floatformat:2 }}
+                    </td>
+
+                    <td style="padding: 15px; text-align: center; font-weight: bold; color: #dc3545; background-color: #fff0f0;">
+                        -{{ item.deficit|floatformat:2 }}
+                    </td>
+
+                    <td style="padding: 15px; text-align: center;">
+                        {% if item.stock_actual <= 0 %}
+                            <span style="background: #dc3545; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75em; font-weight: bold;">AGOTADO</span>
+                        {% else %}
+                            <span style="background: #ffc107; color: #333; padding: 4px 10px; border-radius: 4px; font-size: 0.75em; font-weight: bold;">BAJO</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+            <div style="padding: 50px; text-align: center; color: #28a745;">
+                <i class="fas fa-check-circle" style="font-size: 4em; margin-bottom: 15px; opacity: 0.5;"></i>
+                <h3>Almacén Abastecido</h3>
+                <p>Todos los insumos están por encima del stock mínimo.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    @media print {
+        .btn-print, header, .sidebar { display: none !important; }
+        body { background: white; }
+        table { -webkit-print-color-adjust: exact; }
+    }
+</style>
+{% endblock %}

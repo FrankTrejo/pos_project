@@ -75,25 +75,97 @@ class CoreConfig(AppConfig):
     name = 'core'
 
 ==================================================
+ARCHIVO: .\core\context_processors.py
+==================================================
+# core/context_processors.py
+from .models import Configuracion
+
+def configuracion_global(request):
+    # Esto hace que la variable {{ config }} esté disponible en TODOS los HTML
+    return {
+        'config': Configuracion.get_solo()
+    }
+==================================================
 ARCHIVO: .\core\forms.py
 ==================================================
 from django import forms
 from .models import Configuracion
 
-class ConfiguracionForm(forms.ModelForm):
+# 1. FORMULARIO DE IDENTIDAD
+class ConfigIdentidadForm(forms.ModelForm):
     class Meta:
         model = Configuracion
-        fields = '__all__'
+        fields = ['nombre_empresa', 'rif', 'direccion', 'telefono']
         widgets = {
-            'direccion': forms.Textarea(attrs={'rows': 2}),
-            'mensaje_ticket': forms.Textarea(attrs={'rows': 2}),
+            'direccion': forms.Textarea(attrs={'rows': 3}),
         }
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Dar estilo a todos los campos
-        for field in self.fields:
-            self.fields[field].widget.attrs.update({'class': 'form-control'})
+# 2. FORMULARIO DE ECONOMÍA (CORREGIDO)
+class ConfigEconomiaForm(forms.ModelForm):
+    class Meta:
+        model = Configuracion
+        # AQUI ESTABA EL ERROR: Ahora usamos los nombres reales de tu models.py
+        fields = [
+            'tasa_dolar',           # Antes decía tasa_cambio
+            'iva_porcentaje',       # Antes decía iva
+            'igtf_porcentaje',      # Antes decía igtf
+            'servicio_porcentaje',
+            'monto_delivery_fijo',
+            'costo_caja_pequena',
+            'costo_caja_grande',
+            'gastos_operativos_porcentaje'
+        ]
+        # Etiquetas para que se vea bonito en la pantalla
+        labels = {
+            'tasa_dolar': 'Tasa del Dólar (BCV)',
+            'iva_porcentaje': 'IVA (%)',
+            'igtf_porcentaje': 'IGTF (%)',
+            'servicio_porcentaje': 'Propina / Servicio (%)',
+            'monto_delivery_fijo': 'Costo Delivery ($)',
+            'costo_caja_pequena': 'Costo Caja Pequeña ($)',
+            'costo_caja_grande': 'Costo Caja Grande ($)',
+        }
+
+# 3. FORMULARIO VISUAL
+class ConfigVisualForm(forms.ModelForm):
+    class Meta:
+        model = Configuracion
+        fields = ['logo', 'mensaje_ticket']
+==================================================
+ARCHIVO: .\core\middleware.py
+==================================================
+# core/middleware.py
+from django.shortcuts import redirect
+from django.urls import reverse
+
+class LoginRequiredMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        # 1. Rutas que SÍ puede ver el público (Excepciones)
+        # Es vital poner aquí el login, logout y el admin para no crear un bucle infinito.
+        rutas_publicas = [
+            '/login/',
+            '/logout/',
+            '/admin/',  # El admin tiene su propio login, mejor dejarlo tranquilo
+            '/media/',   # <--- AGREGA ESTA LÍNEA (Para que se vea el logo)
+            '/static/',
+        ]
+
+        # 2. Lógica del Portero:
+        # Si el usuario NO está autenticado...
+        if not request.user.is_authenticated:
+            # ... y la ruta actual NO empieza con ninguna de las permitidas...
+            path = request.path
+            es_publica = any(path.startswith(ruta) for ruta in rutas_publicas)
+            
+            if not es_publica:
+                # ... ¡PA FUERA! Redirigir al login.
+                return redirect('login')
+
+        response = self.get_response(request)
+        return response
 ==================================================
 ARCHIVO: .\core\models.py
 ==================================================
@@ -158,30 +230,86 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('ajustes/', views.configuracion_view, name='configuracion'),
+    # Menú Principal de Configuración
+    path('configuracion/', views.configuracion_menu, name='configuracion_menu'),
+
+    # Sub-páginas independientes
+    path('configuracion/identidad/', views.editar_identidad, name='conf_identidad'),
+    path('configuracion/economia/', views.editar_economia, name='conf_economia'),
+    path('configuracion/visual/', views.editar_visual, name='conf_visual'),
 ]
 ==================================================
 ARCHIVO: .\core\views.py
 ==================================================
 from django.shortcuts import render, redirect
-from django.contrib import messages
 from .models import Configuracion
-from .forms import ConfiguracionForm
+# IMPORTANTE: Importamos los 3 formularios nuevos, NO el viejo
+from .forms import ConfigIdentidadForm, ConfigEconomiaForm, ConfigVisualForm
+from django.contrib import messages
 
-def configuracion_view(request):
-    # Obtenemos la única configuración existente (o la crea si no existe)
+# 1. MENÚ PRINCIPAL
+def configuracion_menu(request):
     config = Configuracion.get_solo()
+    return render(request, 'core/configuracion_menu.html', {'config': config})
 
+# 2. EDITAR IDENTIDAD
+def editar_identidad(request):
+    config = Configuracion.get_solo()
+    
     if request.method == 'POST':
-        form = ConfiguracionForm(request.POST, request.FILES, instance=config)
+        form = ConfigIdentidadForm(request.POST, instance=config)
         if form.is_valid():
             form.save()
-            messages.success(request, "Configuración actualizada correctamente 💾")
-            return redirect('configuracion')
+            messages.success(request, 'Identidad actualizada correctamente.')
+            return redirect('configuracion_menu')
     else:
-        form = ConfiguracionForm(instance=config)
+        form = ConfigIdentidadForm(instance=config)
+    
+    return render(request, 'core/configuracion_form.html', {
+        'form': form, 
+        'titulo': 'Identidad del Negocio',
+        'icono': 'fas fa-store'
+    })
 
-    return render(request, 'core/configuracion.html', {'form': form})
+# 3. EDITAR ECONOMÍA
+def editar_economia(request):
+    config = Configuracion.get_solo()
+    
+    if request.method == 'POST':
+        form = ConfigEconomiaForm(request.POST, instance=config)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Tasas y Costos actualizados.')
+            return redirect('configuracion_menu')
+    else:
+        form = ConfigEconomiaForm(instance=config)
+
+    return render(request, 'core/configuracion_form.html', {
+        'form': form, 
+        'titulo': 'Economía y Costos',
+        'icono': 'fas fa-chart-line'
+    })
+
+# 4. EDITAR APARIENCIA
+def editar_visual(request):
+    config = Configuracion.get_solo()
+    
+    if request.method == 'POST':
+        form = ConfigVisualForm(request.POST, request.FILES, instance=config)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Apariencia actualizada.')
+            return redirect('configuracion_menu')
+    else:
+        form = ConfigVisualForm(instance=config)
+
+    return render(request, 'core/configuracion_form.html', {
+        'form': form, 
+        'titulo': 'Apariencia y Tickets',
+        'icono': 'fas fa-image'
+    })
+
+
 ==================================================
 ARCHIVO: .\core\__init__.py
 ==================================================
@@ -190,145 +318,475 @@ ARCHIVO: .\core\__init__.py
 ARCHIVO: .\core\templates\core\configuracion.html
 ==================================================
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
-<div class="container" style="padding: 20px; max-width: 1200px; margin: 0 auto;">
+
+<style>
+    .form-group { margin-bottom: 15px; text-align: left; }
+    .form-group label { display: block; font-size: 0.85em; font-weight: bold; color: #666; margin-bottom: 5px; }
     
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
-        <h2 style="color: #333; margin: 0;"><i class="fas fa-cogs"></i> Configuración del Sistema</h2>
-    </div>
+    /* Inputs estilo moderno */
+    .form-control-card {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 0.9em;
+        background-color: #f9f9f9;
+        transition: border-color 0.2s;
+    }
+    .form-control-card:focus {
+        background-color: #fff;
+        border-color: var(--primary-blue, #007bff);
+        outline: none;
+    }
 
-    <form method="POST" enctype="multipart/form-data">
-        {% csrf_token %}
+    /* Clase card-style simulada por si no está en tu CSS global */
+    .card-style {
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        border: 1px solid #eee;
+    }
+    
+    /* Botón flotante de guardar */
+    .btn-save-floating {
+        background-color: var(--primary-blue, #007bff);
+        color: white;
+        border: none;
+        padding: 10px 25px;
+        border-radius: 50px;
+        font-weight: bold;
+        cursor: pointer;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        display: flex; align-items: center; gap: 8px;
+    }
+    .btn-save-floating:hover { opacity: 0.9; transform: scale(1.05); }
+</style>
 
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 30px;">
+<form method="POST" enctype="multipart/form-data">
+    {% csrf_token %}
+
+    <div style="padding: 20px; max-width: 1000px; margin: 0 auto;">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+            <h2 style="color: var(--primary-blue); margin: 0;">
+                <i class="fas fa-cogs"></i> Configuración del Sistema
+            </h2>
+            <button type="submit" class="btn-save-floating">
+                <i class="fas fa-save"></i> Guardar Todo
+            </button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 30px;">
             
-            <div class="card-style" style="height: fit-content;">
-                <h3 style="color: var(--primary-blue); border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px;">
-                    🏢 Identidad del Negocio
-                </h3>
-                
-                <div class="form-group mb-3">
-                    <label style="font-weight: bold;">Nombre Empresa:</label>
-                    {{ form.nombre_empresa }}
+            <div class="card-style" style="padding: 30px; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <i class="fas fa-store" style="font-size: 3em; color: #ffc107; margin-bottom: 15px;"></i>
+                    <h3 style="color: #444; margin: 0;">Identidad</h3>
+                    <p style="color: #888; font-size: 0.9em;">Datos del negocio</p>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                    <div>
-                        <label style="font-weight: bold;">RIF / ID:</label>
-                        {{ form.rif }}
-                    </div>
-                    <div>
-                        <label style="font-weight: bold;">Teléfono:</label>
-                        {{ form.telefono }}
-                    </div>
+                <div class="form-group">
+                    <label>Nombre Empresa</label>
+                    <input type="text" name="nombre_empresa" value="{{ form.nombre_empresa.value|default:'' }}" class="form-control-card">
                 </div>
+                <div class="form-group">
+                    <label>RIF / Documento</label>
+                    <input type="text" name="rif" value="{{ form.rif.value|default:'' }}" class="form-control-card">
+                </div>
+                <div class="form-group">
+                    <label>Dirección</label>
+                    <textarea name="direccion" rows="2" class="form-control-card">{{ form.direccion.value|default:'' }}</textarea>
+                </div>
+                 <div class="form-group">
+                    <label>Teléfono</label>
+                    <input type="text" name="telefono" value="{{ form.telefono.value|default:'' }}" class="form-control-card">
+                </div>
+            </div>
 
-                <div class="form-group mb-3">
-                    <label style="font-weight: bold;">Dirección:</label>
-                    {{ form.direccion }}
-                </div>
-                
-                <div class="form-group mb-3">
-                    <label style="font-weight: bold;">Logo:</label>
-                    {{ form.logo }}
+            <div class="card-style" style="padding: 30px; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <i class="fas fa-chart-line" style="font-size: 3em; color: #28a745; margin-bottom: 15px;"></i>
+                    <h3 style="color: #444; margin: 0;">Economía</h3>
+                    <p style="color: #888; font-size: 0.9em;">Tasas e impuestos</p>
                 </div>
 
                 <div class="form-group">
-                    <label style="font-weight: bold;">Mensaje del Ticket:</label>
-                    {{ form.mensaje_ticket }}
+                    <label style="color: #28a745;">💵 Tasa Dólar (BCV)</label>
+                    <input type="number" step="0.01" name="tasa_cambio" value="{{ form.tasa_cambio.value|stringformat:'.2f' }}" class="form-control-card" style="font-weight: bold;">
                 </div>
-            </div>
-
-            <div style="display: flex; flex-direction: column; gap: 25px;">
                 
-                <div class="card-style" style="border-left: 5px solid #27ae60;">
-                    <h3 style="color: #27ae60; font-size: 1.2em; margin-bottom: 15px;">
-                        💰 Moneda e Impuestos
-                    </h3>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                        <div>
-                            <label style="font-weight: bold;">Tasa BCV ($):</label>
-                            {{ form.tasa_dolar }}
-                        </div>
-                        <div>
-                            <label style="font-weight: bold;">% IVA:</label>
-                            {{ form.iva_porcentaje }}
-                        </div>
+                <div style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>IVA (%)</label>
+                        <input type="number" step="0.01" name="iva" value="{{ form.iva.value|default:16 }}" class="form-control-card">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>IGTF (%)</label>
+                        <input type="number" step="0.01" name="igtf" value="{{ form.igtf.value|default:3 }}" class="form-control-card">
                     </div>
                 </div>
-
-                <div class="card-style" style="border-left: 5px solid #e67e22;">
-                    <h3 style="color: #e67e22; font-size: 1.2em; margin-bottom: 15px;">
-                        ➕ Costos y Cargos Extra
-                    </h3>
-                    
-                    <h5 style="margin-top: 10px; font-size: 0.9em; text-transform: uppercase; color: #777; border-bottom: 1px solid #eee; padding-bottom: 5px;">
-                        Cargos al Cliente
-                    </h5>
-                    
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                        <div>
-                            <label style="font-size: 0.85em; font-weight: bold;">% IGTF (Divisa)</label>
-                            {{ form.igtf_porcentaje }}
-                        </div>
-                        <div>
-                            <label style="font-size: 0.85em; font-weight: bold;">% Servicio</label>
-                            {{ form.servicio_porcentaje }}
-                        </div>
-                        <div>
-                            <label style="font-size: 0.85em; font-weight: bold;">Delivery Fijo ($)</label>
-                            {{ form.monto_delivery_fijo }}
-                        </div>
-                    </div>
-
-                    <h5 style="margin-top: 15px; font-size: 0.9em; text-transform: uppercase; color: #777; border-bottom: 1px solid #eee; padding-bottom: 5px;">
-                        Costos Operativos Internos
-                    </h5>
-                    
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px;">
-                        <div>
-                            <label style="font-size: 0.85em; font-weight: bold;">Caja Peque ($)</label>
-                            {{ form.costo_caja_pequena }}
-                        </div>
-                        <div>
-                            <label style="font-size: 0.85em; font-weight: bold;">Caja Grande ($)</label>
-                            {{ form.costo_caja_grande }}
-                        </div>
-                    </div>
-                    
-                    <div style="margin-top: 15px;">
-                        <label style="font-size: 0.85em; font-weight: bold;">% Gastos Operativos (Luz/Gas)</label>
-                        {{ form.gastos_operativos_porcentaje }}
-                    </div>
-                </div>
-
             </div>
-        </div>
 
-        <div style="margin-top: 30px; text-align: right;">
-            <button type="submit" class="action-btn" style="padding: 15px 40px; font-size: 1.1em; background: var(--primary-color); color: white; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                💾 Guardar Cambios
-            </button>
+            <div class="card-style" style="padding: 30px; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <i class="fas fa-image" style="font-size: 3em; color: #17a2b8; margin-bottom: 15px;"></i>
+                    <h3 style="color: #444; margin: 0;">Apariencia</h3>
+                    <p style="color: #888; font-size: 0.9em;">Logo y tickets</p>
+                </div>
+
+                <div class="form-group" style="text-align: center;">
+                    <label>Logo Actual</label>
+                    <div style="margin-bottom: 10px; border: 1px dashed #ccc; padding: 5px; border-radius: 5px;">
+                        {% if form.instance.logo %}
+                            <img src="{{ form.instance.logo.url }}" style="max-height: 60px;">
+                        {% else %}
+                            <span style="font-size: 0.8em; color: #aaa;">Sin Logo</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Subir Nuevo Logo</label>
+                    <input type="file" name="logo" class="form-control-card">
+                </div>
+
+                <div class="form-group">
+                    <label>Mensaje Ticket</label>
+                    <input type="text" name="mensaje_ticket" value="{{ form.mensaje_ticket.value|default:'' }}" class="form-control-card">
+                </div>
+            </div>
+
         </div>
-    </form>
+    </div>
+</form>
+{% endblock %}
+==================================================
+ARCHIVO: .\core\templates\core\configuracion_form.html
+==================================================
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div style="padding: 20px; max-width: 600px; margin: 0 auto;">
+    
+    <a href="{% url 'configuracion_menu' %}" style="text-decoration: none; color: #666; font-weight: bold; display: inline-flex; align-items: center; gap: 5px; margin-bottom: 20px;">
+        <i class="fas fa-arrow-left"></i> Volver al panel
+    </a>
+
+    <div class="card-style" style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);">
+        
+        <h2 style="color: var(--primary-blue); margin-top: 0; display: flex; align-items: center; gap: 10px;">
+            <i class="{{ icono }}"></i> {{ titulo }}
+        </h2>
+        <hr style="border: 0; border-top: 1px solid #eee; margin-bottom: 20px;">
+
+        <form method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+            
+            {% for field in form %}
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; font-weight: bold; color: #555; margin-bottom: 5px;">{{ field.label }}</label>
+                
+                <div style="width: 100%;">
+                    {{ field }}
+                </div>
+                
+                {% if field.help_text %}
+                <small style="color: #888;">{{ field.help_text }}</small>
+                {% endif %}
+                
+                {% if field.errors %}
+                <div style="color: red; font-size: 0.9em;">{{ field.errors }}</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+
+            <div style="margin-top: 30px; text-align: right;">
+                <button type="submit" style="background: var(--primary-blue); color: white; border: none; padding: 10px 25px; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 1rem;">
+                    <i class="fas fa-save"></i> Guardar Cambios
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
 
+<script>
+    document.querySelectorAll('input, textarea, select').forEach(el => {
+        if(el.type !== 'checkbox' && el.type !== 'file') {
+            el.style.width = '100%';
+            el.style.padding = '10px';
+            el.style.border = '1px solid #ccc';
+            el.style.borderRadius = '5px';
+            el.style.fontSize = '1em';
+        }
+    });
+</script>
+{% endblock %}
+==================================================
+ARCHIVO: .\core\templates\core\configuracion_menu.html
+==================================================
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+
 <style>
-    /* Pequeño ajuste para que los inputs se vean siempre bien */
-    .form-control {
-        width: 100%;
-        box-sizing: border-box; /* Importante para que el padding no rompa el ancho */
-        padding: 8px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
+    .config-grid {
+        display: grid;
+        /* Esto crea columnas automáticas de mínimo 250px */
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+        gap: 25px;
+        margin-top: 30px;
     }
-    label {
-        display: block; /* Para que el label siempre esté arriba del input */
-        margin-bottom: 5px;
+
+    .static-card {
+        /* --- TAMAÑO ESTÁTICO --- */
+        height: 280px; /* Altura FIJA para todas igual */
+        width: 100%;   /* Ocupa todo el ancho de su columna */
+        
+        /* --- ALINEACIÓN INTERNA --- */
+        display: flex;
+        flex-direction: column;
+        justify-content: center; /* Centra verticalmente */
+        align-items: center;     /* Centra horizontalmente */
+        
+        /* --- ESTÉTICA --- */
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+        border: 1px solid #f0f0f0;
+        padding: 20px;
+        text-align: center;
+        transition: all 0.3s ease;
+        text-decoration: none; /* Quita subrayado de links */
+    }
+
+    .static-card:hover {
+        transform: translateY(-5px); /* Se eleva un poco */
+        box-shadow: 0 10px 20px rgba(0,0,0,0.08);
+        border-color: var(--primary-blue); /* Borde azul al pasar mouse */
+    }
+
+    .static-card h3 {
+        color: #444;
+        margin: 15px 0 5px 0;
+        font-size: 1.3em;
+        font-weight: 700;
+    }
+
+    .static-card p {
+        margin: 0;
+        font-size: 0.9em;
+        line-height: 1.4;
+    }
+
+    /* Iconos grandes */
+    .card-icon {
+        font-size: 3.5em;
+        margin-bottom: 10px;
     }
 </style>
+
+<div style="padding: 20px; max-width: 1100px; margin: 0 auto;">
+    
+    <h2 style="color: var(--primary-blue); border-bottom: 2px solid #eee; padding-bottom: 15px;">
+        <i class="fas fa-cogs"></i> Panel de Configuración
+    </h2>
+
+    <div class="config-grid">
+        
+        <a href="{% url 'conf_identidad' %}" style="text-decoration: none;">
+            <div class="static-card">
+                <i class="fas fa-store card-icon" style="color: #ffc107;"></i>
+                
+                <h3>Identidad</h3>
+                
+                <p style="color: #555; font-weight: 600; margin-bottom: 5px;">
+                    {{ config.nombre_empresa|default:"Mi Negocio" }}
+                </p>
+                <p style="color: #999;">RIF, Dirección y Teléfonos</p>
+            </div>
+        </a>
+
+        <a href="{% url 'conf_economia' %}" style="text-decoration: none;">
+            <div class="static-card">
+                <i class="fas fa-chart-line card-icon" style="color: #28a745;"></i>
+                
+                <h3>Economía</h3>
+                
+                <p style="color: #28a745; font-weight: bold; font-size: 1.1em; margin-bottom: 5px;">
+                    Tasa: {{ config.tasa_dolar }} Bs
+                </p>
+                <p style="color: #999;">Impuestos, Delivery y Costos</p>
+            </div>
+        </a>
+
+        <a href="{% url 'conf_visual' %}" style="text-decoration: none;">
+            <div class="static-card">
+                <i class="fas fa-image card-icon" style="color: #17a2b8;"></i>
+                
+                <h3>Apariencia</h3>
+                
+                <p style="color: #555; margin-bottom: 5px;">Logo y Ticket</p>
+                <p style="color: #999;">Personalización visual</p>
+            </div>
+        </a>
+
+    </div>
+</div>
+
 {% endblock %}
+==================================================
+ARCHIVO: .\core\templates\core\login.html
+==================================================
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - POS System</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            background-color: #f0f2f5;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .login-card {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            border-top: 5px solid var(--primary-blue, #007bff);
+        }
+        .login-header i {
+            font-size: 3rem;
+            color: var(--primary-blue, #007bff);
+            margin-bottom: 10px;
+        }
+        .login-header h2 {
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .login-header p {
+            color: #777;
+            margin-bottom: 30px;
+            font-size: 0.9rem;
+        }
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            box-sizing: border-box; /* Importante para que no se salga */
+        }
+        .form-control:focus {
+            border-color: var(--primary-blue, #007bff);
+            outline: none;
+        }
+        .btn-login {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--primary-blue, #007bff);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .btn-login:hover {
+            opacity: 0.9;
+        }
+        .alert-error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+            border: 1px solid #ef9a9a;
+        }
+        .login-logo {
+            max-width: 150px;       /* Tamaño máximo */
+            max-height: 150px;
+            object-fit: contain;    /* Que no se deforme */
+            margin-bottom: 15px;
+            border-radius: 10px;    /* Bordes suaves opcionales */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login-card">
+        <div class="login-header">
+    
+            {% if config.logo %}
+                <img src="{{ config.logo.url }}" alt="Logo Restaurante" class="login-logo">
+            {% else %}
+                <i class="fas fa-pizza-slice"></i> 
+            {% endif %}
+
+            <h2>Bienvenido</h2>
+            <p>Ingresa al sistema de <strong>{{ config.nombre_empresa|default:"POS" }}</strong></p>
+        </div>
+
+        <form method="POST">
+            {% csrf_token %}
+            
+            {% if form.errors %}
+                <div class="alert-error">
+                    <i class="fas fa-exclamation-circle"></i> Usuario o contraseña incorrectos
+                </div>
+            {% endif %}
+
+            <div class="form-group">
+                <label>Usuario</label>
+                <input type="text" name="username" class="form-control" placeholder="Ej: admin" required autofocus>
+            </div>
+
+            <div class="form-group">
+                <label>Contraseña</label>
+                <input type="password" name="password" class="form-control" placeholder="••••••••" required>
+            </div>
+
+            <button type="submit" class="btn-login">
+                Ingresar al Sistema <i class="fas fa-arrow-right"></i>
+            </button>
+        </form>
+        
+        <p style="margin-top: 20px; font-size: 0.8em; color: #999;">
+            Sistema POS v1.0 &copy; 2024
+        </p>
+    </div>
+
+</body>
+</html>
 ==================================================
 ARCHIVO: .\dashboard\admin.py
 ==================================================
@@ -2839,6 +3297,10 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # --- AGREGA ESTO AL FINAL ---
+    # Reemplaza 'pos_core' con el nombre de tu carpeta de proyecto si es diferente,
+    # o simplemente usa 'core' si esa es tu app.
+    'core.middleware.LoginRequiredMiddleware', 
 ]
 
 ROOT_URLCONF = 'pos_core.urls'
@@ -2853,6 +3315,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'core.context_processors.configuracion_global',
             ],
         },
     },
@@ -2913,12 +3376,34 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Redirección tras iniciar sesión (generalmente al Dashboard o Index)
+LOGIN_REDIRECT_URL = 'panel_control' 
+
+# Redirección tras cerrar sesión (vuelve al login)
+LOGOUT_REDIRECT_URL = 'login' 
+
+# URL de la página de login (para proteger las vistas)
+LOGIN_URL = 'login'
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Configuración de Correo (Ejemplo con Gmail)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'frankdtg2004@gmail.com'  # <--- PON TU CORREO AQUÍ
+EMAIL_HOST_PASSWORD = 'eryj fpwj gyat vpli'  # <--- TU CONTRASEÑA DE APLICACIÓN
 ==================================================
 ARCHIVO: .\pos_core\urls.py
 ==================================================
 
 from django.contrib import admin
 from django.urls import path, include
+from django.contrib.auth import views as auth_views
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -2928,8 +3413,14 @@ urlpatterns = [
     path('reportes/', include('reports.urls')),
     path('maestros/', include('maestros.urls')),
     path('core/', include('core.urls')),
+    
+    # --- 2. RUTAS DE LOGIN Y LOGOUT ---
+    path('login/', auth_views.LoginView.as_view(template_name='core/login.html'), name='login'),
+    path('logout/', auth_views.LogoutView.as_view(next_page='login'), name='logout'),
 ]
 
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 ==================================================
 ARCHIVO: .\pos_core\wsgi.py
 ==================================================
@@ -3014,6 +3505,7 @@ urlpatterns = [
     path('pagos/', views.ventas_pago, name='ventas_pago'),
     path('auditoria/', views.auditoria_eliminaciones, name='auditoria_eliminaciones'),
     path('ventas-detalle/', views.reporte_ventas_detalle, name='reporte_ventas_detalle'),
+    path('insumos-agotados/', views.reporte_insumos_agotados, name='reporte_insumos_agotados'),
 ]
 ==================================================
 ARCHIVO: .\reports\views.py
@@ -3193,8 +3685,110 @@ def reporte_ventas_detalle(request):
         'total_periodo': total_periodo
     }
     return render(request, 'reports/sales_detail_report.html', context)
+
+# reports/views.py
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+from django.db.models import F, ExpressionWrapper, DecimalField
+from inventory.models import Insumo
+
+@login_required
+def reporte_insumos_agotados(request):
+    # CORRECCIÓN: Usamos 'stock_actual' en lugar de 'cantidad'
+    insumos_criticos = Insumo.objects.filter(
+        stock_actual__lte=F('stock_minimo')
+    ).annotate(
+        deficit=ExpressionWrapper(
+            F('stock_minimo') - F('stock_actual'),
+            output_field=DecimalField()
+        )
+    ).order_by('stock_actual') 
+
+    return render(request, 'reports/insumos_agotados.html', {
+        'insumos': insumos_criticos
+    })
 ==================================================
 ARCHIVO: .\reports\__init__.py
+==================================================
+
+==================================================
+ARCHIVO: .\reports\management\commands\enviar_alerta_stock.py
+==================================================
+from django.core.management.base import BaseCommand
+from django.core.mail import EmailMessage
+from django.template.loader import render_to_string
+from django.conf import settings
+from django.db.models import F, ExpressionWrapper, DecimalField
+from inventory.models import Insumo
+import datetime
+from io import BytesIO
+from xhtml2pdf import pisa
+
+class Command(BaseCommand):
+    help = 'Genera PDF de alertas de stock y lo envía por correo'
+
+    def handle(self, *args, **options):
+        self.stdout.write("Analizando inventario...")
+
+        # 1. Obtener datos (Calculando déficit igual que en la vista)
+        insumos_criticos = Insumo.objects.filter(
+            stock_actual__lte=F('stock_minimo')
+        ).annotate(
+            deficit=ExpressionWrapper(
+                F('stock_minimo') - F('stock_actual'),
+                output_field=DecimalField()
+            )
+        ).order_by('stock_actual')
+
+        if insumos_criticos.exists():
+            fecha_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+            
+            # 2. Renderizar el HTML con los datos
+            context = {
+                'insumos': insumos_criticos,
+                'fecha': fecha_str
+            }
+            html_string = render_to_string('reports/pdf_alerta.html', context)
+
+            # 3. Convertir HTML a PDF en memoria (BytesIO)
+            # Esto evita tener que guardar el archivo en el disco duro
+            pdf_file = BytesIO()
+            pisa_status = pisa.CreatePDF(html_string, dest=pdf_file)
+
+            if pisa_status.err:
+                self.stdout.write(self.style.ERROR('Error generando el PDF'))
+                return
+
+            # 4. Configurar el Correo con Adjunto
+            subject = f'🚨 REPORTE PDF: Insumos Agotados ({fecha_str})'
+            body = 'Adjunto encontrarás el reporte detallado de los insumos que requieren compra inmediata.'
+            email_from = settings.EMAIL_HOST_USER
+            recipient_list = ['frankdtg2004@hotmail.com'] # <--- REVISA TU CORREO AQUÍ
+
+            email = EmailMessage(
+                subject,
+                body,
+                email_from,
+                recipient_list,
+            )
+
+            # Adjuntar el PDF desde la memoria
+            # nombre_archivo, contenido, tipo_mime
+            email.attach('Alerta_Stock.pdf', pdf_file.getvalue(), 'application/pdf')
+
+            try:
+                email.send()
+                self.stdout.write(self.style.SUCCESS(f'✅ Correo con PDF enviado exitosamente ({insumos_criticos.count()} items).'))
+            except Exception as e:
+                self.stdout.write(self.style.ERROR(f'❌ Error enviando correo: {e}'))
+            
+            # Cerrar el archivo en memoria
+            pdf_file.close()
+
+        else:
+            self.stdout.write(self.style.SUCCESS('Inventario OK. No se generó reporte.'))
+==================================================
+ARCHIVO: .\reports\management\commands\__init__.py
 ==================================================
 
 ==================================================
@@ -3400,8 +3994,117 @@ ARCHIVO: .\reports\templates\reports\index.html
                 <p style="color: #888; font-size: 0.9em;">Venta por venta, productos y pagos</p>
             </div>
         </a>
+        <a href="{% url 'reporte_insumos_agotados' %}" style="text-decoration: none;">
+            <div class="card-style" style="text-align: center; padding: 30px; transition: transform 0.2s; border: 1px solid #ffcccc; background: #fffdf5;" 
+                onmouseover="this.style.transform='scale(1.03)'" 
+                onmouseout="this.style.transform='scale(1)'">
+                
+                <i class="fas fa-boxes" style="font-size: 3em; color: #dc3545; margin-bottom: 15px;"></i>
+                <h3 style="color: #444; margin: 0;">Insumos Agotados</h3>
+                <p style="color: #dc3545; font-size: 0.9em; font-weight: bold;">Reposición Materia Prima</p>
+            </div>
+        </a>
     </div>
 </div>
+{% endblock %}
+==================================================
+ARCHIVO: .\reports\templates\reports\insumos_agotados.html
+==================================================
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div style="padding: 20px; max-width: 1000px; margin: 0 auto;">
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; border-bottom: 2px solid #eee; padding-bottom: 15px;">
+        <div>
+            <h2 style="color: #dc3545; margin: 0; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-boxes"></i> Alerta de Insumos
+            </h2>
+            <p style="color: #666; margin: 5px 0 0 0;">
+                Materia prima que requiere reposición inmediata.
+            </p>
+        </div>
+        
+        <div style="display: flex; gap: 10px;">
+            <a href="{% url 'reporte_inventario' %}" class="btn-print" style="text-decoration: none; padding: 10px 20px; background: #f8f9fa; color: #333; border: 1px solid #ddd; border-radius: 5px; font-weight: bold;">
+                <i class="fas fa-arrow-left"></i> Volver
+            </a>
+            <button onclick="window.print()" class="btn-print" style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer;">
+                <i class="fas fa-print"></i> Imprimir
+            </button>
+        </div>
+    </div>
+
+    <div class="card-style" style="background: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid #ffcccc;">
+        
+        {% if insumos %}
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead style="background: #fff5f5; color: #c62828;">
+                <tr>
+                    <th style="padding: 15px; text-align: left;">Insumo</th>
+                    <th style="padding: 15px; text-align: center;">Unidad</th>
+                    <th style="padding: 15px; text-align: center;">Stock Actual</th>
+                    <th style="padding: 15px; text-align: center;">Mínimo</th>
+                    <th style="padding: 15px; text-align: center;">Faltante</th>
+                    <th style="padding: 15px; text-align: center;">Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in insumos %}
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 15px; font-weight: bold; color: #444;">
+                        {{ item.nombre }}
+                    </td>
+                    
+                    <td style="padding: 15px; text-align: center; color: #666; font-size: 0.9em;">
+                        {{ item.unidad }} 
+                    </td>
+                    
+                    <td style="padding: 15px; text-align: center; font-size: 1.1em;">
+                        {% if item.stock_actual <= 0 %}
+                            <span style="color: red; font-weight: bold;">0</span>
+                        {% else %}
+                            {{ item.stock_actual|floatformat:2 }}
+                        {% endif %}
+                    </td>
+                    
+                    <td style="padding: 15px; text-align: center; color: #555;">
+                        {{ item.stock_minimo|floatformat:2 }}
+                    </td>
+
+                    <td style="padding: 15px; text-align: center; font-weight: bold; color: #dc3545; background-color: #fff0f0;">
+                        -{{ item.deficit|floatformat:2 }}
+                    </td>
+
+                    <td style="padding: 15px; text-align: center;">
+                        {% if item.stock_actual <= 0 %}
+                            <span style="background: #dc3545; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75em; font-weight: bold;">AGOTADO</span>
+                        {% else %}
+                            <span style="background: #ffc107; color: #333; padding: 4px 10px; border-radius: 4px; font-size: 0.75em; font-weight: bold;">BAJO</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+            <div style="padding: 50px; text-align: center; color: #28a745;">
+                <i class="fas fa-check-circle" style="font-size: 4em; margin-bottom: 15px; opacity: 0.5;"></i>
+                <h3>Almacén Abastecido</h3>
+                <p>Todos los insumos están por encima del stock mínimo.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    @media print {
+        .btn-print, header, .sidebar { display: none !important; }
+        body { background: white; }
+        table { -webkit-print-color-adjust: exact; }
+    }
+</style>
 {% endblock %}
 ==================================================
 ARCHIVO: .\reports\templates\reports\inventory_report.html
@@ -3527,6 +4230,79 @@ ARCHIVO: .\reports\templates\reports\inventory_report.html
     });
 </script>
 {% endblock %}
+==================================================
+ARCHIVO: .\reports\templates\reports\pdf_alerta.html
+==================================================
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        @page {
+            size: letter portrait;
+            margin: 2cm;
+        }
+        body { font-family: Helvetica, sans-serif; color: #333; }
+        .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #dc3545; padding-bottom: 10px; }
+        h1 { color: #dc3545; font-size: 24px; margin: 0; }
+        .fecha { color: #666; font-size: 12px; margin-top: 5px; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th { background-color: #f8f9fa; color: #333; font-weight: bold; padding: 10px; text-align: left; border-bottom: 1px solid #ddd; font-size: 12px; }
+        td { padding: 8px; border-bottom: 1px solid #eee; font-size: 11px; color: #555; }
+        
+        .rojo { color: red; font-weight: bold; }
+        .badge { background: #dc3545; color: white; padding: 2px 5px; border-radius: 3px; font-size: 9px; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>ALERTA DE INVENTARIO</h1>
+        <div class="fecha">Reporte generado el: {{ fecha }}</div>
+        <p style="font-size: 12px;">Los siguientes insumos requieren reposición urgente.</p>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>INSUMO</th>
+                <th style="text-align: center;">STOCK ACTUAL</th>
+                <th style="text-align: center;">MÍNIMO</th>
+                <th style="text-align: center;">DÉFICIT</th>
+                <th style="text-align: center;">ESTADO</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in insumos %}
+            <tr>
+                <td><strong>{{ item.nombre|upper }}</strong></td>
+                
+                <td style="text-align: center;">
+                    {{ item.stock_actual|floatformat:-3 }} {{ item.unidad }}
+                </td>
+                
+                <td style="text-align: center;">
+                    {{ item.stock_minimo|floatformat:-3 }}
+                </td>
+
+                <td style="text-align: center; color: #dc3545; font-weight: bold;">
+                    {{ item.deficit }}
+                </td>
+
+                <td style="text-align: center;">
+                    <span class="badge">URGENTE</span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div style="margin-top: 50px; font-size: 10px; color: #999; text-align: center;">
+        Sistema POS - Reporte Automático
+    </div>
+
+</body>
+</html>
 ==================================================
 ARCHIVO: .\reports\templates\reports\sales_detail_report.html
 ==================================================
@@ -4120,7 +4896,7 @@ class DetalleOrden(models.Model):
     @property
     def subtotal(self):
         return self.cantidad * self.precio_unitario
-    
+
 class Pago(models.Model):
     METODOS = [
         ('EFECTIVO_USD', 'Efectivo ($)'),
@@ -4238,6 +5014,7 @@ urlpatterns = [
     path('mesa/<int:table_id>/cuenta/', views.generar_cuenta_pdf, name='generar_cuenta_pdf'),
     path('mesa/<int:table_id>/facturar/', views.facturar_mesa_ajax, name='facturar_mesa'),
     path('factura/<int:venta_id>/pdf/', views.generar_factura_pdf, name='generar_factura_pdf'),
+    path('toggle-llevar/<int:item_id>/', views.toggle_para_llevar, name='toggle_llevar'),
 ]
 
 ==================================================
@@ -4752,6 +5529,24 @@ def generar_cuenta_pdf(request, table_id):
 def facturar_mesa_ajax(request, table_id):
     if request.method == 'POST':
         try:
+            # --- LÓGICA DE DESCUENTO DE INVENTARIO ---
+            for item in orden.items.all():
+                producto = item.producto
+                
+                # 1. Descuento normal de ingredientes (Receta)
+                # (Aquí iría tu lógica actual de ingredientes...)
+
+                # 2. NUEVO: Descuento de Caja (Si es para llevar)
+                if item.es_para_llevar and producto.insumo_empaque:
+                    caja = producto.insumo_empaque
+                    
+                    # Verificamos si hay stock de cajas
+                    if caja.stock_actual >= item.cantidad:
+                        caja.stock_actual -= item.cantidad
+                        caja.save()
+                    else:
+                        # Opcional: Guardar un error o aviso de que faltaron cajas
+                        pass
             data = json.loads(request.body)
             # AHORA RECIBIMOS UNA LISTA DE PAGOS
             # Ejemplo: [{'metodo': 'ZELLE', 'monto': 10}, {'metodo': 'EFECTIVO_USD', 'monto': 5}]
@@ -4870,6 +5665,23 @@ def generar_factura_pdf(request, venta_id):
     if pisa_status.err:
         return HttpResponse('Error al generar PDF', status=500)
     return response
+
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import json
+from tables.models import DetalleOrden
+
+def toggle_para_llevar(request, item_id):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            item = DetalleOrden.objects.get(id=item_id)
+            item.es_para_llevar = data.get('status', False)
+            item.save()
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False})
 
 
 ==================================================
@@ -6240,6 +7052,38 @@ ARCHIVO: .\tables\templates\tables\order_detail.html
         }
     }
     </script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const toggles = document.querySelectorAll('.btn-toggle-llevar');
+
+            toggles.forEach(toggle => {
+                toggle.addEventListener('change', function() {
+                    const itemId = this.dataset.id;
+                    const esParaLlevar = this.checked;
+
+                    // Enviar petición al servidor
+                    fetch(`/tables/toggle-llevar/${itemId}/`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': '{{ csrf_token }}',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ 'status': esParaLlevar })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            console.log("Estado actualizado");
+                            // Opcional: Mostrar una notificación pequeña tipo Toast
+                        } else {
+                            alert("Error al actualizar estado");
+                            this.checked = !esParaLlevar; // Revertir si falló
+                        }
+                    });
+                });
+            });
+        });
+    </script>
 </body>
 </html>
 ==================================================
@@ -6379,6 +7223,9 @@ ARCHIVO: .\templates\base.html
 
             <aside class="sidebar">
                 <nav class="sidebar-nav">
+                    <div style="padding: 10px 20px; color: #aaa; font-size: 0.8em;">
+                            Logueado como: <strong style="color: grey;">{{ user.username|title }}</strong>
+                    </div>
                     <a href="{% url 'panel_control' %}" class="sidebar-link">
                        <i class="fas fa-tachometer-alt"></i> Dashboard
                     </a>
@@ -6403,9 +7250,18 @@ ARCHIVO: .\templates\base.html
                     <a href="{% url 'index' %}" class="sidebar-link">
                        <i class="fas fa-cash-register"></i> Punto de Venta
                     </a>
-                    <a href="{% url 'configuracion' %}" class="sidebar-link">
+                    <a href="{% url 'configuracion_menu' %}" class="sidebar-link">
                         <i class="fas fa-cog"></i> Configuración
                     </a>
+                    <div style="margin-top: auto; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
+
+                        <form action="{% url 'logout' %}" method="post" style="padding: 0 15px;">
+                            {% csrf_token %}
+                            <button type="submit" class="sidebar-link" style="background: none; border: none; width: 100%; text-align: left; color: #ff6b6b; cursor: pointer;">
+                                <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+                            </button>
+                        </form>
+                    </div>
                 </nav>
             </aside>
 

@@ -1,17 +1,43 @@
 from django import forms
 from .models import Configuracion
 
-class ConfiguracionForm(forms.ModelForm):
+# 1. FORMULARIO DE IDENTIDAD
+class ConfigIdentidadForm(forms.ModelForm):
     class Meta:
         model = Configuracion
-        fields = '__all__'
+        fields = ['nombre_empresa', 'rif', 'direccion', 'telefono']
         widgets = {
-            'direccion': forms.Textarea(attrs={'rows': 2}),
-            'mensaje_ticket': forms.Textarea(attrs={'rows': 2}),
+            'direccion': forms.Textarea(attrs={'rows': 3}),
         }
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Dar estilo a todos los campos
-        for field in self.fields:
-            self.fields[field].widget.attrs.update({'class': 'form-control'})
+# 2. FORMULARIO DE ECONOMÍA (CORREGIDO)
+class ConfigEconomiaForm(forms.ModelForm):
+    class Meta:
+        model = Configuracion
+        # AQUI ESTABA EL ERROR: Ahora usamos los nombres reales de tu models.py
+        fields = [
+            'tasa_dolar',           # Antes decía tasa_cambio
+            'iva_porcentaje',       # Antes decía iva
+            'igtf_porcentaje',      # Antes decía igtf
+            'servicio_porcentaje',
+            'monto_delivery_fijo',
+            'costo_caja_pequena',
+            'costo_caja_grande',
+            'gastos_operativos_porcentaje'
+        ]
+        # Etiquetas para que se vea bonito en la pantalla
+        labels = {
+            'tasa_dolar': 'Tasa del Dólar (BCV)',
+            'iva_porcentaje': 'IVA (%)',
+            'igtf_porcentaje': 'IGTF (%)',
+            'servicio_porcentaje': 'Propina / Servicio (%)',
+            'monto_delivery_fijo': 'Costo Delivery ($)',
+            'costo_caja_pequena': 'Costo Caja Pequeña ($)',
+            'costo_caja_grande': 'Costo Caja Grande ($)',
+        }
+
+# 3. FORMULARIO VISUAL
+class ConfigVisualForm(forms.ModelForm):
+    class Meta:
+        model = Configuracion
+        fields = ['logo', 'mensaje_ticket']

@@ -15,6 +15,9 @@
 
             <aside class="sidebar">
                 <nav class="sidebar-nav">
+                    <div style="padding: 10px 20px; color: #aaa; font-size: 0.8em;">
+                            Logueado como: <strong style="color: grey;">{{ user.username|title }}</strong>
+                    </div>
                     <a href="{% url 'panel_control' %}" class="sidebar-link">
                        <i class="fas fa-tachometer-alt"></i> Dashboard
                     </a>
@@ -39,9 +42,18 @@
                     <a href="{% url 'index' %}" class="sidebar-link">
                        <i class="fas fa-cash-register"></i> Punto de Venta
                     </a>
-                    <a href="{% url 'configuracion' %}" class="sidebar-link">
+                    <a href="{% url 'configuracion_menu' %}" class="sidebar-link">
                         <i class="fas fa-cog"></i> Configuración
                     </a>
+                    <div style="margin-top: auto; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
+
+                        <form action="{% url 'logout' %}" method="post" style="padding: 0 15px;">
+                            {% csrf_token %}
+                            <button type="submit" class="sidebar-link" style="background: none; border: none; width: 100%; text-align: left; color: #ff6b6b; cursor: pointer;">
+                                <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+                            </button>
+                        </form>
+                    </div>
                 </nav>
             </aside>
 

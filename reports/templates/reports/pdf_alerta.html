@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        @page {
+            size: letter portrait;
+            margin: 2cm;
+        }
+        body { font-family: Helvetica, sans-serif; color: #333; }
+        .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #dc3545; padding-bottom: 10px; }
+        h1 { color: #dc3545; font-size: 24px; margin: 0; }
+        .fecha { color: #666; font-size: 12px; margin-top: 5px; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th { background-color: #f8f9fa; color: #333; font-weight: bold; padding: 10px; text-align: left; border-bottom: 1px solid #ddd; font-size: 12px; }
+        td { padding: 8px; border-bottom: 1px solid #eee; font-size: 11px; color: #555; }
+        
+        .rojo { color: red; font-weight: bold; }
+        .badge { background: #dc3545; color: white; padding: 2px 5px; border-radius: 3px; font-size: 9px; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>ALERTA DE INVENTARIO</h1>
+        <div class="fecha">Reporte generado el: {{ fecha }}</div>
+        <p style="font-size: 12px;">Los siguientes insumos requieren reposición urgente.</p>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>INSUMO</th>
+                <th style="text-align: center;">STOCK ACTUAL</th>
+                <th style="text-align: center;">MÍNIMO</th>
+                <th style="text-align: center;">DÉFICIT</th>
+                <th style="text-align: center;">ESTADO</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in insumos %}
+            <tr>
+                <td><strong>{{ item.nombre|upper }}</strong></td>
+                
+                <td style="text-align: center;">
+                    {{ item.stock_actual|floatformat:-3 }} {{ item.unidad }}
+                </td>
+                
+                <td style="text-align: center;">
+                    {{ item.stock_minimo|floatformat:-3 }}
+                </td>
+
+                <td style="text-align: center; color: #dc3545; font-weight: bold;">
+                    {{ item.deficit }}
+                </td>
+
+                <td style="text-align: center;">
+                    <span class="badge">URGENTE</span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div style="margin-top: 50px; font-size: 10px; color: #999; text-align: center;">
+        Sistema POS - Reporte Automático
+    </div>
+
+</body>
+</html>

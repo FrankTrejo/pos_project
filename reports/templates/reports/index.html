@@ -58,6 +58,16 @@
                 <p style="color: #888; font-size: 0.9em;">Venta por venta, productos y pagos</p>
             </div>
         </a>
+        <a href="{% url 'reporte_insumos_agotados' %}" style="text-decoration: none;">
+            <div class="card-style" style="text-align: center; padding: 30px; transition: transform 0.2s; border: 1px solid #ffcccc; background: #fffdf5;" 
+                onmouseover="this.style.transform='scale(1.03)'" 
+                onmouseout="this.style.transform='scale(1)'">
+                
+                <i class="fas fa-boxes" style="font-size: 3em; color: #dc3545; margin-bottom: 15px;"></i>
+                <h3 style="color: #444; margin: 0;">Insumos Agotados</h3>
+                <p style="color: #dc3545; font-size: 0.9em; font-weight: bold;">Reposición Materia Prima</p>
+            </div>
+        </a>
     </div>
 </div>
 {% endblock %}

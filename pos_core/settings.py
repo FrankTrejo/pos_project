@@ -53,6 +53,10 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # --- AGREGA ESTO AL FINAL ---
+    # Reemplaza 'pos_core' con el nombre de tu carpeta de proyecto si es diferente,
+    # o simplemente usa 'core' si esa es tu app.
+    'core.middleware.LoginRequiredMiddleware', 
 ]
 
 ROOT_URLCONF = 'pos_core.urls'
@@ -67,6 +71,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'core.context_processors.configuracion_global',
             ],
         },
     },
@@ -126,3 +131,23 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Redirección tras iniciar sesión (generalmente al Dashboard o Index)
+LOGIN_REDIRECT_URL = 'panel_control' 
+
+# Redirección tras cerrar sesión (vuelve al login)
+LOGOUT_REDIRECT_URL = 'login' 
+
+# URL de la página de login (para proteger las vistas)
+LOGIN_URL = 'login'
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Configuración de Correo (Ejemplo con Gmail)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'frankdtg2004@gmail.com'  # <--- PON TU CORREO AQUÍ
+EMAIL_HOST_PASSWORD = 'eryj fpwj gyat vpli'  # <--- TU CONTRASEÑA DE APLICACIÓN

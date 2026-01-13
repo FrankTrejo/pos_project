@@ -1,0 +1,145 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - POS System</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            background-color: #f0f2f5;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .login-card {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            border-top: 5px solid var(--primary-blue, #007bff);
+        }
+        .login-header i {
+            font-size: 3rem;
+            color: var(--primary-blue, #007bff);
+            margin-bottom: 10px;
+        }
+        .login-header h2 {
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .login-header p {
+            color: #777;
+            margin-bottom: 30px;
+            font-size: 0.9rem;
+        }
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            box-sizing: border-box; /* Importante para que no se salga */
+        }
+        .form-control:focus {
+            border-color: var(--primary-blue, #007bff);
+            outline: none;
+        }
+        .btn-login {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--primary-blue, #007bff);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .btn-login:hover {
+            opacity: 0.9;
+        }
+        .alert-error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+            border: 1px solid #ef9a9a;
+        }
+        .login-logo {
+            max-width: 150px;       /* Tamaño máximo */
+            max-height: 150px;
+            object-fit: contain;    /* Que no se deforme */
+            margin-bottom: 15px;
+            border-radius: 10px;    /* Bordes suaves opcionales */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login-card">
+        <div class="login-header">
+    
+            {% if config.logo %}
+                <img src="{{ config.logo.url }}" alt="Logo Restaurante" class="login-logo">
+            {% else %}
+                <i class="fas fa-pizza-slice"></i> 
+            {% endif %}
+
+            <h2>Bienvenido</h2>
+            <p>Ingresa al sistema de <strong>{{ config.nombre_empresa|default:"POS" }}</strong></p>
+        </div>
+
+        <form method="POST">
+            {% csrf_token %}
+            
+            {% if form.errors %}
+                <div class="alert-error">
+                    <i class="fas fa-exclamation-circle"></i> Usuario o contraseña incorrectos
+                </div>
+            {% endif %}
+
+            <div class="form-group">
+                <label>Usuario</label>
+                <input type="text" name="username" class="form-control" placeholder="Ej: admin" required autofocus>
+            </div>
+
+            <div class="form-group">
+                <label>Contraseña</label>
+                <input type="password" name="password" class="form-control" placeholder="••••••••" required>
+            </div>
+
+            <button type="submit" class="btn-login">
+                Ingresar al Sistema <i class="fas fa-arrow-right"></i>
+            </button>
+        </form>
+        
+        <p style="margin-top: 20px; font-size: 0.8em; color: #999;">
+            Sistema POS v1.0 &copy; 2024
+        </p>
+    </div>
+
+</body>
+</html>

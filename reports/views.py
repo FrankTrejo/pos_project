@@ -173,3 +173,25 @@ def reporte_ventas_detalle(request):
         'total_periodo': total_periodo
     }
     return render(request, 'reports/sales_detail_report.html', context)
+
+# reports/views.py
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+from django.db.models import F, ExpressionWrapper, DecimalField
+from inventory.models import Insumo
+
+@login_required
+def reporte_insumos_agotados(request):
+    # CORRECCIÓN: Usamos 'stock_actual' en lugar de 'cantidad'
+    insumos_criticos = Insumo.objects.filter(
+        stock_actual__lte=F('stock_minimo')
+    ).annotate(
+        deficit=ExpressionWrapper(
+            F('stock_minimo') - F('stock_actual'),
+            output_field=DecimalField()
+        )
+    ).order_by('stock_actual') 
+
+    return render(request, 'reports/insumos_agotados.html', {
+        'insumos': insumos_criticos
+    })
