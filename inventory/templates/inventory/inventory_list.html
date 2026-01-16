@@ -1,108 +1,211 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}- Inventario{% endblock %}
+{% block title %}- Control de Inventario{% endblock %}
 
 {% block content %}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-<div style="padding: 20px;">
+<style>
+    /* Estilos del Dashboard */
+    .kpi-card {
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        border-left: 5px solid var(--primary-blue);
+    }
+    .badge-tipo {
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-size: 0.75em;
+        font-weight: bold;
+        text-transform: uppercase;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .badge-compra { background-color: #e3f2fd; color: #0d47a1; border: 1px solid #bbdefb; }
+    .badge-receta { background-color: #f3e5f5; color: #4a148c; border: 1px solid #e1bee7; }
     
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
-        
-        <div>
-            <h2 style="color: var(--primary-blue); margin: 0;">Gestión de Inventario</h2>
-            <p style="color: #666; margin: 5px 0 0 0; font-size: 0.95em;">
-                Valor Total Almacén: <b style="color: #333;">${{ valor_total|floatformat:2 }}</b>
-            </p>
+    /* Estilos de los Filtros */
+    .filter-container {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 20px;
+        background: white;
+        padding: 15px;
+        border-radius: 12px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+        align-items: center;
+    }
+    .search-input {
+        flex: 2;
+        padding: 12px 15px;
+        border-radius: 8px;
+        border: 1px solid #ddd;
+        font-size: 1rem;
+    }
+    .filter-select {
+        flex: 1;
+        padding: 12px 15px;
+        border-radius: 8px;
+        border: 1px solid #ddd;
+        font-size: 1rem;
+        background-color: #fff;
+        cursor: pointer;
+    }
+    .filter-select:focus, .search-input:focus {
+        border-color: var(--primary-blue);
+        outline: none;
+    }
+</style>
+
+<div style="padding: 20px; max-width: 1200px; margin: 0 auto;">
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px;">
+        <div class="kpi-card">
+            <div style="background: #e8f4fd; padding: 15px; border-radius: 50%; color: #0d6efd;">
+                <i class="fas fa-dollar-sign fa-lg"></i>
+            </div>
+            <div>
+                <div style="color: #666; font-size: 0.9em;">Valor Total Inventario</div>
+                <div style="font-size: 1.5em; font-weight: bold; color: #333;">${{ valor_total|floatformat:2 }}</div>
+            </div>
         </div>
 
-        <div style="display: flex; gap: 10px;">
-            
-            <a href="{% url 'insumo_create' %}" class="add-btn" style="background-color: #28a745; text-decoration: none; display: flex; align-items: center; gap: 8px;">
-                <i class="fas fa-plus-circle"></i> Nuevo Insumo
-            </a>
-
-            <a href="{% url 'inventory_move' %}" class="add-btn" style="background-color: #343a40; text-decoration: none; display: flex; align-items: center; gap: 8px;">
-                <i class="fas fa-exchange-alt"></i> Nuevo Movimiento
-            </a>
-            
+        <div class="kpi-card" style="border-left-color: #198754; justify-content: space-between;">
+            <div>
+                <div style="color: #666; font-size: 0.9em; margin-bottom: 5px;">Acciones Rápidas</div>
+                <div style="display: flex; gap: 8px;">
+                    <a href="{% url 'maestro_create' %}" title="Nuevo Producto (Compra)" style="background: #0d6efd; color: white; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 8px; text-decoration: none;">
+                        <i class="fas fa-truck"></i>
+                    </a>
+                    <a href="{% url 'receta_create' %}" title="Nueva Receta (Cocina)" style="background: #6610f2; color: white; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 8px; text-decoration: none;">
+                        <i class="fas fa-blender"></i>
+                    </a>
+                </div>
+            </div>
+            <button onclick="abrirModalMovimiento()" style="background: #343a40; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold;">
+                <i class="fas fa-exchange-alt"></i> Movimientos
+            </button>
         </div>
     </div>
 
-    <div class="card-style" style="overflow-x: auto;">
-        <table style="width: 100%; border-collapse: collapse;">
+    <div class="filter-container">
+        <input type="text" id="searchInput" onkeyup="filtrarTabla()" placeholder="🔍 Buscar por nombre..." class="search-input">
+        
+        <select id="estadoFilter" onchange="filtrarTabla()" class="filter-select">
+            <option value="todos">📦 Todos los Estados</option>
+            <option value="bajo">⚠️ Stock Crítico / Bajo</option>
+            <option value="ok">✅ Stock Saludable</option>
+            <option value="cero">⛔ Agotados (0)</option>
+        </select>
+
+        <select id="tipoFilter" onchange="filtrarTabla()" class="filter-select">
+            <option value="todos">📁 Todo Tipo</option>
+            <option value="insumo">🚚 Compras (Insumos)</option>
+            <option value="receta">🌪️ Recetas (Cocina)</option>
+        </select>
+    </div>
+
+    <div class="card-style" style="overflow-x: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+        <table style="width: 100%; border-collapse: separate; border-spacing: 0;" id="tablaInventario">
             <thead>
-                <tr style="background: #f8f9fa; text-align: left; border-bottom: 2px solid #ddd;">
-                    <th style="padding: 12px;">Producto</th>
-                    <th style="padding: 12px;">Stock Actual</th>
-                    <th style="padding: 12px;">Precio Bruto</th>
-                    <th style="padding: 12px;">Precio x G</th>
-                    <th style="padding: 12px;">Estado</th>
-                    <th style="padding: 12px;">Acción</th>
+                <tr style="background: #f8f9fa; text-align: left;">
+                    <th style="padding: 15px; border-bottom: 2px solid #eee;">Tipo</th>
+                    <th style="padding: 15px; border-bottom: 2px solid #eee;">Producto</th>
+                    <th style="padding: 15px; border-bottom: 2px solid #eee;">Stock Actual</th>
+                    <th style="padding: 15px; border-bottom: 2px solid #eee;">Costo Unit.</th>
+                    <th style="padding: 15px; border-bottom: 2px solid #eee;">Estado</th>
+                    <th style="padding: 15px; border-bottom: 2px solid #eee; text-align: center;">Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 {% for insumo in insumos %}
-                <tr style="border-bottom: 1px solid #f1f1f1;">
+                
+                <tr style="border-bottom: 1px solid #f1f1f1;" 
+                    class="fila-producto"
+                    data-nombre="{{ insumo.nombre|lower }}"
+                    data-tipo="{% if insumo.es_insumo_compuesto %}receta{% else %}insumo{% endif %}"
+                    data-estado="{% if insumo.stock_actual == 0 %}cero{% elif insumo.stock_actual <= insumo.stock_minimo %}bajo{% else %}ok{% endif %}">
                     
-                    <td style="padding: 12px; font-weight: bold;">{{ insumo.nombre }}</td>
-
-                    <td style="padding: 12px;">
-                        {% if insumo.stock_actual <= insumo.stock_minimo %}
-                            <span style="color: #dc3545; font-weight: bold;">{{ insumo.stock_actual|floatformat:0 }} {{ insumo.unidad.codigo }}</span>
+                    <td style="padding: 15px;">
+                        {% if insumo.es_insumo_compuesto %}
+                            <span class="badge-tipo badge-receta"><i class="fas fa-utensils"></i> Receta</span>
                         {% else %}
-                            {{ insumo.stock_actual|floatformat:0 }} {{ insumo.unidad.codigo }}
+                            <span class="badge-tipo badge-compra"><i class="fas fa-box"></i> Insumo</span>
                         {% endif %}
                     </td>
 
-                    <td style="padding: 12px; color: #666;">
-                        ${{ insumo.precio_mercado|default:"0.00" }} 
-                        <span style="font-size: 0.8em; color: #999;"></span>
+                    <td style="padding: 15px;">
+                        <div style="font-weight: bold; color: #333; font-size: 1.05em;">{{ insumo.nombre }}</div>
+                        <div style="font-size: 0.85em; color: #999;">{{ insumo.categoria.nombre|default:"Sin categoría" }}</div>
                     </td>
 
-                    <td style="padding: 12px 15px; background: #f0f7ff; font-weight: bold; color: #0d47a1;">
-                        ${{ insumo.costo_unitario|floatformat:5 }}
-                        <span style="font-size: 0.8em; font-weight: normal; color: #888;">/ {{ insumo.unidad.codigo }}</span>
-                    </td>
-
-                    <td style="padding: 12px;">
+                    <td style="padding: 15px;">
                         {% if insumo.stock_actual <= insumo.stock_minimo %}
-                            <span style="background: #ffebeb; color: #dc3545; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold;">
-                                <i class="fas fa-exclamation-triangle"></i> Bajo
-                            </span>
+                            <div style="color: #dc3545; font-weight: bold;">
+                                <i class="fas fa-exclamation-circle"></i> {{ insumo.stock_actual|floatformat:0 }} {{ insumo.unidad.codigo }}
+                            </div>
                         {% else %}
-                            <span style="background: #d1e7dd; color: #0f5132; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold;">
-                                <i class="fas fa-check"></i> OK
-                            </span>
+                            <div style="color: #333; font-weight: 500;">
+                                {{ insumo.stock_actual|floatformat:0 }} {{ insumo.unidad.codigo }}
+                            </div>
                         {% endif %}
                     </td>
 
-                    <td style="white-space: nowrap; padding: 12px;">
-                        <a href="{% url 'maestro_edit' insumo.id %}" title="Editar Maestro" style="background-color: #ffc107; color: #333; padding: 6px 10px; border-radius: 4px; margin-right: 4px; text-decoration: none; display: inline-block;">
-                            <i class="fas fa-pencil-alt"></i>
+                    <td style="padding: 15px;">
+                        <div style="font-family: monospace; font-size: 1.1em; color: #0d6efd;">
+                            ${{ insumo.costo_unitario|floatformat:4 }}
+                        </div>
+                    </td>
+
+                    <td style="padding: 15px;">
+                        {% if insumo.stock_actual <= insumo.stock_minimo %}
+                            <span style="background: #ffebeb; color: #dc3545; padding: 5px 10px; border-radius: 6px; font-size: 0.8em; font-weight: bold;">Bajo Stock</span>
+                        {% else %}
+                            <span style="background: #d1e7dd; color: #0f5132; padding: 5px 10px; border-radius: 6px; font-size: 0.8em; font-weight: bold;">Óptimo</span>
+                        {% endif %}
+                    </td>
+
+                    <td style="padding: 15px; text-align: center; white-space: nowrap;">
+                        
+                        <a href="{% url 'maestro_edit' insumo.id %}" title="Editar Configuración" style="color: #6c757d; margin-right: 10px; font-size: 1.1em;">
+                            <i class="fas fa-cog"></i>
                         </a>
+
+                        <button onclick="abrirModalMovimiento('{{ insumo.id }}')" title="Registrar Entrada/Salida" style="background: none; border: none; color: #198754; cursor: pointer; font-size: 1.1em; margin-right: 10px;">
+                            <i class="fas fa-plus-circle"></i>
+                        </button>
+
+                        {% if insumo.es_insumo_compuesto %}
+                            
+                            <a href="{% url 'insumo_composition' insumo.id %}" title="Ver/Editar Ingredientes" style="color: #6610f2; font-size: 1.1em; margin-right: 10px;">
+                                <i class="fas fa-scroll"></i>
+                            </a>
+                            
+                            <a href="{% url 'insumo_produccion' insumo.id %}" title="Cocinar (Descontar Ingredientes)" style="color: #d63384; font-size: 1.1em; margin-right: 10px;">
+                                <i class="fas fa-blender"></i>
+                            </a>
+
+                        {% else %}
+                            <span style="display:inline-block; width: 2.2em; margin-right:10px;"></span>
+                        {% endif %}
+
                         <form action="{% url 'insumo_delete' insumo.id %}" method="POST" style="display:inline-block;" onsubmit="return confirm('¿Eliminar {{ insumo.nombre }}?');">
                             {% csrf_token %}
-                            <button type="submit" style="background-color: #dc3545; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer;">
-                                <i class="fas fa-trash-alt"></i>
+                            <button type="submit" style="background: none; border: none; color: #dc3545; cursor: pointer; font-size: 1.1em;" title="Eliminar">
+                                <i class="fas fa-trash"></i>
                             </button>
                         </form>
-
-                        <a href="{% url 'inventory_move' %}" style="background-color: white; border: 1px solid #dee2e6; color: var(--primary-blue); padding: 5px 10px; border-radius: 4px; margin-left: 4px; text-decoration: none; display: inline-block;">
-                            <i class="fas fa-plus"></i>
-                        </a>
-                        <td style="white-space: nowrap; padding: 12px; text-align: center;">
-                            {% if insumo.es_insumo_compuesto %}
-                                <a href="{% url 'insumo_produccion' insumo.id %}" title="Producir / Cocinar" 
-                                style="background-color: #6610f2; color: white; padding: 8px 12px; border-radius: 6px; margin-right: 5px; text-decoration: none; display: inline-block;">
-                                    <i class="fas fa-blender"></i>
-                                </a>
-                            {% endif %}
-                        </td>
+                    </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="6" style="text-align:center; padding:20px;">Sin inventario</td></tr>
+                <tr><td colspan="6" style="text-align:center; padding: 40px;">No hay datos.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -110,57 +213,90 @@
 </div>
 
 <div id="modal-movimiento" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1000; justify-content:center; align-items:center; backdrop-filter: blur(2px);">
-    <div style="background:white; padding:30px; border-radius:12px; width:600px; max-width: 95%; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-        
+    <div style="background:white; padding:30px; border-radius:12px; width:500px; max-width: 95%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h3 style="margin:0; color:var(--primary-blue);">Registrar Movimiento</h3>
+            <h3 style="margin:0; color:var(--primary-blue);">Movimiento de Stock</h3>
             <button onclick="cerrarModal()" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
         </div>
-        
         <form action="{% url 'add_movement' %}" method="POST">
             {% csrf_token %}
-            
-            <label style="display:block; margin-bottom:5px; font-weight:bold;">Insumo:</label>
-            <select name="insumo_id" id="modal-insumo-select" required style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:6px; background-color: #f9f9f9;">
-                {% for ins in insumos %}
-                    <option value="{{ ins.id }}">{{ ins.nombre }} ({{ ins.unidad.codigo }})</option>
-                {% endfor %}
-            </select>
-
-            <label style="display:block; margin-bottom:5px; font-weight:bold;">Acción:</label>
-            <select name="tipo" id="modal-tipo-select" onchange="actualizarFormulario(this.value)" required style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:6px;">
-                <option value="ENTRADA">🟢 Entrada / Compra</option>
-                <option value="SALIDA">🔴 Salida / Merma</option>
-                <option value="AJUSTE">🔵 Ajuste Inventario</option>
-            </select>
-
-            <div style="display: flex; gap: 15px; margin-bottom: 15px;">
-                <div style="flex: 1;">
-                    <label style="display:block; margin-bottom:5px; font-weight:bold;">Cantidad (Peso/Unid):</label>
-                    <input type="text" inputmode="decimal" name="cantidad" required placeholder="Ej: 50" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px;">
-                </div>
-
-                <div id="contenedor-costo" style="flex: 1;">
-                    <label style="display:block; margin-bottom:5px; font-weight:bold;">Costo Total Factura ($):</label>
-                    <input type="text" inputmode="decimal" name="costo_total" id="input-costo" placeholder="Ej: 25.00" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px;">
-                    <small style="color:#888;">El sistema calculará el precio por Kg.</small>
-                </div>
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label style="font-weight:bold; display:block; margin-bottom: 5px;">Producto:</label>
+                <select name="insumo_id" id="modal-insumo-select" required class="form-control" style="width:100%; padding: 10px; border-radius: 6px; border: 1px solid #ddd;">
+                    {% for ins in insumos %}
+                        <option value="{{ ins.id }}">{{ ins.nombre }}</option>
+                    {% endfor %}
+                </select>
             </div>
-
-            <label style="display:block; margin-bottom:5px; font-weight:bold;">Nota:</label>
-            <textarea name="nota" rows="2" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px; resize: none;"></textarea>
-
-            <div style="margin-top:25px; text-align:right;">
-                <button type="button" onclick="cerrarModal()" style="margin-right:10px; padding:10px 20px; cursor:pointer;">Cancelar</button>
-                <button type="submit" class="add-btn" style="padding:10px 25px; cursor:pointer; border:none; border-radius:6px;">Guardar</button>
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label style="font-weight:bold; display:block; margin-bottom: 5px;">Tipo:</label>
+                <select name="tipo" id="modal-tipo-select" class="form-control" style="width:100%; padding: 10px; border-radius: 6px; border: 1px solid #ddd;">
+                    <option value="ENTRADA">🟢 ENTRADA (Compra)</option>
+                    <option value="SALIDA">🔴 SALIDA (Merma/Uso)</option>
+                    <option value="AJUSTE">🔵 AJUSTE (Inventario)</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 15px; background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                <label style="font-weight:bold; text-align: center; display:block;">Cantidad (Unidades/Bultos)</label>
+                <input type="number" step="0.01" name="cantidad_unidades" required placeholder="0" class="form-control" style="font-size: 1.5em; font-weight: bold; text-align: center; width: 100%;">
+            </div>
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label style="font-weight:bold;">Nota:</label>
+                <input type="text" name="nota" class="form-control" style="width:100%; padding: 10px; border-radius: 6px; border: 1px solid #ddd;">
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button type="button" onclick="cerrarModal()" style="flex: 1; padding: 12px; border: 1px solid #ddd; background: white; border-radius: 6px; cursor: pointer;">Cancelar</button>
+                <button type="submit" style="flex: 2; padding: 12px; background: #343a40; color: white; border: none; border-radius: 6px; cursor: pointer;">Confirmar</button>
             </div>
         </form>
     </div>
 </div>
 
 <script>
-    // Tu script de SweetAlert y funciones del modal...
-    // (Mantén el mismo script que te di en el paso anterior, funciona igual)
+    // --- LÓGICA DE FILTRADO COMBINADO ---
+    function filtrarTabla() {
+        // 1. Obtener valores de los 3 inputs
+        const texto = document.getElementById("searchInput").value.toLowerCase();
+        const estado = document.getElementById("estadoFilter").value;
+        const tipo = document.getElementById("tipoFilter").value;
+
+        // 2. Obtener todas las filas de productos
+        const filas = document.querySelectorAll(".fila-producto");
+
+        filas.forEach(fila => {
+            // Leer los datos de la fila (data-attributes)
+            const nombreFila = fila.getAttribute("data-nombre");
+            const estadoFila = fila.getAttribute("data-estado");
+            const tipoFila = fila.getAttribute("data-tipo");
+
+            // 3. Aplicar lógica (Coincide Texto? Y Coincide Estado? Y Coincide Tipo?)
+            let coincideTexto = nombreFila.includes(texto);
+            
+            let coincideEstado = true;
+            if (estado !== "todos") {
+                if (estado === "bajo") {
+                    // "Bajo" incluye Stock Bajo Y Cero
+                    coincideEstado = (estadoFila === "bajo" || estadoFila === "cero");
+                } else {
+                    coincideEstado = (estadoFila === estado);
+                }
+            }
+
+            let coincideTipo = true;
+            if (tipo !== "todos") {
+                coincideTipo = (tipoFila === tipo);
+            }
+
+            // 4. Mostrar u Ocultar
+            if (coincideTexto && coincideEstado && coincideTipo) {
+                fila.style.display = "";
+            } else {
+                fila.style.display = "none";
+            }
+        });
+    }
+
+    // Modal y Alertas
     document.addEventListener('DOMContentLoaded', function() {
         {% if messages %}
             {% for message in messages %}
@@ -176,29 +312,15 @@
     });
 
     function abrirModalMovimiento(insumoId = null, tipo = 'ENTRADA') {
-        document.getElementById('modal-movimiento').style.display = 'flex';
+        const modal = document.getElementById('modal-movimiento');
+        modal.style.display = 'flex';
         if(insumoId) document.getElementById('modal-insumo-select').value = insumoId;
-        
         document.getElementById('modal-tipo-select').value = tipo;
-        actualizarFormulario(tipo);
     }
 
     function cerrarModal() {
         document.getElementById('modal-movimiento').style.display = 'none';
     }
-
-    function actualizarFormulario(tipo) {
-        const divCosto = document.getElementById('contenedor-costo');
-        const inCosto = document.getElementById('input-costo');
-        if (tipo === 'ENTRADA') {
-            divCosto.style.display = 'block';
-            inCosto.required = true;
-        } else {
-            divCosto.style.display = 'none';
-            inCosto.required = false;
-        }
-    }
-    
     window.onclick = function(e) { if(e.target == document.getElementById('modal-movimiento')) cerrarModal(); }
 </script>
 {% endblock %}

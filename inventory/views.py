@@ -39,121 +39,95 @@ def add_movement(request):
         tipo = request.POST.get('tipo')
         nota = request.POST.get('nota')
         
-        # --- FUNCIÓN DE LIMPIEZA (La misma que ya teníamos) ---
-        def limpiar_numero(valor):
-            if not valor: return Decimal('0.0')
-            val_str = str(valor).strip()
-            val_str = re.sub(r'[^\d,.-]', '', val_str)
-            if ',' in val_str and '.' in val_str:
-                if val_str.find(',') > val_str.find('.'):
-                    val_str = val_str.replace('.', '').replace(',', '.')
-                else:
-                    val_str = val_str.replace(',', '')
-            elif ',' in val_str:
-                val_str = val_str.replace(',', '.')
-            try:
-                return Decimal(val_str) 
-            except:
-                return Decimal('0.0')
-
-        # 1. Obtenemos CANTIDAD (Peso) y COSTO TOTAL (Factura)
-        cantidad = limpiar_numero(request.POST.get('cantidad'))
-        
-        # OJO: Este ahora es el precio total que pagaste (ej: $50 por el saco)
-        costo_total_factura = limpiar_numero(request.POST.get('costo_total'))
-
-        if cantidad <= 0:
-            messages.error(request, "Error: La cantidad debe ser mayor a 0.")
-            return redirect('inventory_index')
-
+        try:
+            unidades = Decimal(request.POST.get('cantidad_unidades', '0'))
+        except:
+            unidades = 0
+            
         insumo = get_object_or_404(Insumo, id=insumo_id)
 
-        # 2. CÁLCULO DEL COSTO UNITARIO (Precio x Kg)
-        costo_unitario_calculado = insumo.costo_unitario # Por defecto (si es salida)
+        # --- CORRECCIÓN AQUÍ ---
+        # Antes bloqueábamos si era <= 0. 
+        # Ahora: Si es AJUSTE, permitimos negativos. Si es ENTRADA/SALIDA, exigimos positivos.
+        
+        if tipo != 'AJUSTE' and unidades <= 0:
+            messages.error(request, "Para Entradas y Salidas la cantidad debe ser mayor a 0.")
+            return redirect('inventory_index')
+            
+        if tipo == 'AJUSTE' and unidades == 0:
+             messages.error(request, "El ajuste no puede ser 0.")
+             return redirect('inventory_index')
 
-        if tipo == 'ENTRADA':
-            # Si compré $50 y son 25kg -> 50 / 25 = $2.00 c/u
-            if cantidad > 0:
-                costo_unitario_calculado = costo_total_factura / cantidad
-            else:
-                costo_unitario_calculado = Decimal('0.0')
+        # Calculamos gramos reales (manteniendo el signo si es negativo)
+        peso_por_unidad = insumo.peso_standar 
+        cantidad_real_gramos = unidades * peso_por_unidad
+        
+        # Costo (Solo informativo)
+        costo_total_movimiento = abs(unidades * insumo.precio_mercado)
 
         try:
             MovimientoInventario.objects.create(
                 insumo=insumo,
                 tipo=tipo,
-                cantidad=cantidad,
-                # Guardamos el costo unitario ya calculado (la división)
-                costo_unitario_movimiento=costo_unitario_calculado,
+                cantidad=cantidad_real_gramos, 
                 usuario=request.user if request.user.is_authenticated else None,
-                nota=nota
+                nota=f"{nota} (Carga: {unidades} Unds)",
+                costo_unitario_movimiento=costo_total_movimiento 
             )
-            messages.success(request, f"Exito: {tipo} registrada.")
+            messages.success(request, f"Movimiento registrado correctamente.")
         except Exception as e:
             messages.error(request, f"Error: {e}")
 
         return redirect('inventory_index')
     
     return redirect('inventory_index')
-    """Procesa el formulario usando Decimal para evitar errores de base de datos"""
     if request.method == 'POST':
         insumo_id = request.POST.get('insumo_id')
         tipo = request.POST.get('tipo')
         nota = request.POST.get('nota')
         
-        # --- FUNCIÓN DE LIMPIEZA CORREGIDA (Retorna Decimal) ---
-        def limpiar_numero(valor):
-            if not valor: return Decimal('0.0') # Retornamos Decimal
+        # SOLO RECIBIMOS LAS UNIDADES (Cajas, Sacos, Botellas)
+        try:
+            unidades = Decimal(request.POST.get('cantidad_unidades', '0'))
+        except:
+            unidades = 0
             
-            val_str = str(valor).strip()
-            
-            # Limpieza de caracteres no numéricos
-            val_str = re.sub(r'[^\d,.-]', '', val_str)
+        insumo = get_object_or_404(Insumo, id=insumo_id)
 
-            # Lógica de conversión (Punto vs Coma)
-            if ',' in val_str and '.' in val_str:
-                if val_str.find(',') > val_str.find('.'): # 1.200,50
-                    val_str = val_str.replace('.', '').replace(',', '.')
-                else: # 1,200.50
-                    val_str = val_str.replace(',', '')
-            elif ',' in val_str:
-                val_str = val_str.replace(',', '.')
-            
-            try:
-                # AQUÍ ESTABA EL ERROR: Antes era float(val_str)
-                return Decimal(val_str) 
-            except:
-                return Decimal('0.0')
-
-        # Procesamos
-        cantidad = limpiar_numero(request.POST.get('cantidad'))
-        costo = limpiar_numero(request.POST.get('costo'))
-
-        if cantidad <= 0:
-            messages.error(request, "Error: La cantidad debe ser mayor a 0.")
+        if unidades <= 0:
+            messages.error(request, "La cantidad debe ser mayor a 0.")
             return redirect('inventory_index')
 
-        insumo = get_object_or_404(Insumo, id=insumo_id)
+        # 1. BUSCAMOS EL PESO EN EL MAESTRO (Base de Datos)
+        # Ya no se lo pedimos al usuario.
+        peso_por_unidad = insumo.peso_standar 
+        
+        # Calculamos cuántos gramos reales están entrando
+        cantidad_real_gramos = unidades * peso_por_unidad
+
+        # 2. BUSCAMOS EL COSTO EN EL MAESTRO (Base de Datos)
+        costo_total_movimiento = unidades * insumo.precio_mercado
+
+        # Validación de seguridad: Si el producto no tiene peso configurado en el maestro
+        if peso_por_unidad <= 0:
+            messages.warning(request, f"⚠️ El producto '{insumo.nombre}' no tiene peso configurado en el Maestro. Se cargó en 0.")
 
         try:
             MovimientoInventario.objects.create(
                 insumo=insumo,
                 tipo=tipo,
-                cantidad=cantidad,
-                # Operador ternario corregido para asegurar Decimales
-                costo_unitario_movimiento=costo if tipo == 'ENTRADA' else insumo.costo_unitario,
+                cantidad=cantidad_real_gramos, # Guardamos gramos para el stock
                 usuario=request.user if request.user.is_authenticated else None,
-                nota=nota
+                nota=f"{nota} (Carga: {unidades} Unds x {peso_por_unidad} {insumo.unidad.codigo})",
+                costo_unitario_movimiento=costo_total_movimiento 
             )
-            messages.success(request, f"Exito: {tipo} registrada correctamente.")
+            messages.success(request, f"¡Éxito! Se procesaron {unidades} unidades. Stock aumentado en {cantidad_real_gramos} {insumo.unidad.codigo}.")
         except Exception as e:
-            # Este mensaje te dirá si hay otro error oculto
-            messages.error(request, f"Error de Base de Datos: {e}")
+            messages.error(request, f"Error: {e}")
 
         return redirect('inventory_index')
     
     return redirect('inventory_index')
-
 # 1. CREAR INSUMO NUEVO
 def insumo_create(request):
     if request.method == 'POST':
@@ -175,58 +149,137 @@ def insumo_create(request):
 
 # 2. GESTIONAR COMPOSICIÓN (Para Masa, Salsa, etc.)
 # inventory/views.py
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
+from .models import Insumo, IngredienteCompuesto
 
-@staff_member_required
-def insumo_composition(request, pk):
-    insumo_padre = get_object_or_404(Insumo, pk=pk)
+def insumo_composition(request, insumo_id):
+    insumo_padre = get_object_or_404(Insumo, id=insumo_id)
     
-    if not insumo_padre.es_insumo_compuesto:
-        messages.error(request, "Este insumo no es compuesto.")
-        return redirect('inventory_index')
-
-    if request.method == 'POST':
-        # --- LÓGICA DE ELIMINAR/AGREGAR (Se mantiene igual) ---
-        if 'delete_componente' in request.POST:
-            cid = request.POST.get('delete_componente')
-            IngredienteCompuesto.objects.filter(id=cid).delete()
-            insumo_padre.calcular_costo_desde_subreceta()
-            messages.warning(request, "Ingrediente eliminado.")
-            return redirect('insumo_composition', pk=pk)
-
-        form = ComponenteForm(request.POST)
-        if form.is_valid():
-            comp = form.save(commit=False)
-            comp.insumo_padre = insumo_padre
-            
-            if comp.insumo_hijo == insumo_padre:
-                 messages.error(request, "No puedes agregarse a sí mismo.")
-            else:
-                comp.save()
+    # 1. AGREGAR INGREDIENTE (Lógica POST se mantiene igual)
+    if request.method == 'POST' and 'add_ingredient' in request.POST:
+        hijo_id = request.POST.get('insumo_hijo')
+        cantidad = request.POST.get('cantidad')
+        
+        if hijo_id and cantidad:
+            try:
+                insumo_hijo = Insumo.objects.get(id=hijo_id)
+                IngredienteCompuesto.objects.create(
+                    insumo_padre=insumo_padre,
+                    insumo_hijo=insumo_hijo,
+                    cantidad=cantidad
+                )
+                # FORZAMOS RE-CALCULO INMEDIATO
                 insumo_padre.calcular_costo_desde_subreceta()
-                messages.success(request, "Ingrediente agregado.")
-            return redirect('insumo_composition', pk=pk)
-    else:
-        form = ComponenteForm()
+                messages.success(request, f"Agregado: {insumo_hijo.nombre}")
+            except Exception as e:
+                messages.error(request, f"Error al agregar: {e}")
+        
+        return redirect('insumo_composition', insumo_id=insumo_id)
 
-    # --- NUEVA LÓGICA DE CÁLCULO ---
-    componentes = insumo_padre.componentes.select_related('insumo_hijo').all()
-    
-    total_cantidad_receta = 0
-    
-    # Recorremos para calcular subtotales precisos en Python
-    for comp in componentes:
-        # Calculamos el costo exacto (Cantidad * Costo Unitario)
-        comp.costo_fila = comp.cantidad * comp.insumo_hijo.costo_unitario
-        # Sumamos al peso total
-        total_cantidad_receta += comp.cantidad
+    # 2. ELIMINAR INGREDIENTE (Lógica POST se mantiene igual)
+    if request.method == 'POST' and 'delete_ingredient' in request.POST:
+        ingrediente_id = request.POST.get('ingrediente_id')
+        try:
+            item = IngredienteCompuesto.objects.get(id=ingrediente_id)
+            nombre = item.insumo_hijo.nombre
+            item.delete()
+            # FORZAMOS RE-CALCULO INMEDIATO
+            insumo_padre.calcular_costo_desde_subreceta()
+            messages.success(request, f"Eliminado: {nombre}")
+        except:
+            messages.error(request, "Error al eliminar.")
+        return redirect('insumo_composition', insumo_id=insumo_id)
 
-    context = {
+    # 3. PREPARAR DATOS PARA LA VISTA (AQUÍ ESTÁ EL CAMBIO)
+    
+    # Insumos disponibles para el selector
+    insumos_disponibles = Insumo.objects.filter(es_insumo_compuesto=False).exclude(id=insumo_id).order_by('nombre')
+    
+    # Traemos los ingredientes actuales de la base de datos
+    # Usamos select_related para optimizar la consulta del costo unitario del hijo
+    raw_ingredientes = insumo_padre.componentes.select_related('insumo_hijo').all()
+
+    # --- CÁLCULO PRECISO EN PYTHON ---
+    ingredientes_procesados = []
+    costo_total_lote = 0
+
+    for comp in raw_ingredientes:
+        # Calculamos el subtotal exacto con decimales (Cantidad * Costo Unitario)
+        subtotal = comp.cantidad * comp.insumo_hijo.costo_unitario
+        
+        # Le "pegamos" este valor calculado al objeto ingrediente temporalmente
+        comp.subtotal_calculado = subtotal
+        
+        # Sumamos al total acumulado
+        costo_total_lote += subtotal
+        
+        # Agregamos a la lista nueva
+        ingredientes_procesados.append(comp)
+
+    return render(request, 'inventory/insumo_composition.html', {
         'insumo': insumo_padre,
-        'componentes': componentes,
-        'form': form,
-        'total_cantidad': total_cantidad_receta, # Enviamos el total a la plantilla
-    }
-    return render(request, 'inventory/insumo_composition.html', context)
+        'insumos_disponibles': insumos_disponibles,
+        'ingredientes': ingredientes_procesados, # Pasamos la lista procesada con los costos
+        'costo_total_lote': costo_total_lote
+    })
+    insumo_padre = get_object_or_404(Insumo, id=insumo_id)
+    
+    # 1. AGREGAR INGREDIENTE
+    if request.method == 'POST' and 'add_ingredient' in request.POST:
+        hijo_id = request.POST.get('insumo_hijo')
+        cantidad = request.POST.get('cantidad')
+        
+        if hijo_id and cantidad:
+            try:
+                insumo_hijo = Insumo.objects.get(id=hijo_id)
+                IngredienteCompuesto.objects.create(
+                    insumo_padre=insumo_padre,
+                    insumo_hijo=insumo_hijo,
+                    cantidad=cantidad
+                )
+                # FORZAMOS RE-CALCULO INMEDIATO
+                insumo_padre.calcular_costo_desde_subreceta()
+                messages.success(request, f"Agregado: {insumo_hijo.nombre}")
+            except Exception as e:
+                messages.error(request, f"Error al agregar: {e}")
+
+        
+        return redirect('insumo_composition', insumo_id=insumo_id)
+
+    # 2. ELIMINAR INGREDIENTE
+    if request.method == 'POST' and 'delete_ingredient' in request.POST:
+        ingrediente_id = request.POST.get('ingrediente_id')
+        try:
+            item = IngredienteCompuesto.objects.get(id=ingrediente_id)
+            nombre = item.insumo_hijo.nombre
+            item.delete()
+            # FORZAMOS RE-CALCULO INMEDIATO
+            insumo_padre.calcular_costo_desde_subreceta()
+            messages.success(request, f"Eliminado: {nombre}")
+        except:
+            messages.error(request, "Error al eliminar.")
+        return redirect('insumo_composition', insumo_id=insumo_id)
+
+    # 3. LISTAR (EXCLUYENDO AL PROPIO PADRE PARA EVITAR BUCLES INFINITOS)
+    # Mostramos todos los insumos disponibles para agregar, menos él mismo.
+    insumos_disponibles = Insumo.objects.filter(es_insumo_compuesto=False).exclude(id=insumo_id).order_by('nombre')
+    
+    # Si quieres permitir agregar OTRAS recetas dentro de esta receta (Sub-recetas), 
+    # quita el "es_insumo_compuesto=False" del filtro de arriba.
+
+    ingredientes = insumo_padre.componentes.all()
+
+    # --- NUEVO CÁLCULO PARA MOSTRAR ---
+    # Sumamos (Cantidad * Costo) de cada ingrediente
+    costo_total_lote = sum(comp.cantidad * comp.insumo_hijo.costo_unitario for comp in ingredientes)
+
+    return render(request, 'inventory/insumo_composition.html', {
+        'insumo': insumo_padre,
+        'insumos_disponibles': insumos_disponibles,
+        'ingredientes': ingredientes,
+        'costo_total_lote': costo_total_lote  # <--- ¡NO OLVIDES AGREGAR ESTO AQUÍ!
+    })
 
 @staff_member_required
 def inventory_move(request):
@@ -296,9 +349,164 @@ def insumo_delete(request, pk):
             
     return redirect('inventory_index')
 
+
+
+from django.db import transaction # IMPORTANTE: Agrega esto arriba
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
+from decimal import Decimal
+from .models import Insumo, MovimientoInventario
+
 @staff_member_required
-@staff_member_required
+# inventory/views.py
+
 def insumo_produccion(request, pk):
+    insumo_padre = get_object_or_404(Insumo, pk=pk)
+    ingredientes = insumo_padre.componentes.all()
+
+    if request.method == 'POST':
+        try:
+            # AHORA RECIBIMOS LOTES (Ej: 1, 2, 0.5)
+            lotes = Decimal(request.POST.get('cantidad_lotes', '1'))
+        except:
+            lotes = 0
+            
+        if lotes <= 0:
+            messages.error(request, "La cantidad de lotes debe ser mayor a 0.")
+            return redirect('insumo_produccion', pk=pk)
+
+        # 1. CALCULAMOS LA CANTIDAD FINAL A SUMAR AL STOCK
+        # Si el rendimiento base es 2700g y hago 2 lotes -> 5400g
+        rendimiento_base = insumo_padre.rendimiento
+        cantidad_total_producir = lotes * rendimiento_base
+
+        # 2. EL FACTOR DE MULTIPLICACIÓN ES SIMPLEMENTE LA CANTIDAD DE LOTES
+        # Si la receta está configurada para 1 lote, y hago 2, multiplico ingredientes por 2.
+        factor = lotes
+
+        try:
+            with transaction.atomic():
+                # A. VERIFICAR STOCK
+                errores_stock = []
+                for componente in ingredientes:
+                    cantidad_necesaria = componente.cantidad * factor
+                    if componente.insumo_hijo.stock_actual < cantidad_necesaria:
+                        errores_stock.append(f"Falta {componente.insumo_hijo.nombre} (Tienes {componente.insumo_hijo.stock_actual:g}, necesitas {cantidad_necesaria:g})")
+                
+                if errores_stock:
+                    for error in errores_stock:
+                        messages.error(request, error)
+                    return redirect('insumo_produccion', pk=pk)
+
+                # B. DESCONTAR INGREDIENTES
+                for componente in ingredientes:
+                    cantidad_a_descontar = componente.cantidad * factor
+                    
+                    MovimientoInventario.objects.create(
+                        insumo=componente.insumo_hijo,
+                        tipo='SALIDA',
+                        cantidad=cantidad_a_descontar,
+                        usuario=request.user,
+                        nota=f"Producción: {lotes} Lotes de {insumo_padre.nombre}"
+                    )
+
+                # C. SUMAR PRODUCTO TERMINADO
+                MovimientoInventario.objects.create(
+                    insumo=insumo_padre,
+                    tipo='ENTRADA',
+                    cantidad=cantidad_total_producir,
+                    usuario=request.user,
+                    # El costo unitario se mantiene, multiplicamos por la cantidad total producida
+                    costo_unitario_movimiento=insumo_padre.costo_unitario * cantidad_total_producir, 
+                    nota=f"Producción Finalizada ({lotes} Lotes)"
+                )
+                
+                messages.success(request, f"¡Listo! Se cocinaron {lotes} lotes ({cantidad_total_producir:g} {insumo_padre.unidad.codigo}).")
+                return redirect('inventory_index')
+
+        except Exception as e:
+            messages.error(request, f"Error: {e}")
+            return redirect('insumo_produccion', pk=pk)
+
+    return render(request, 'inventory/insumo_produccion.html', {
+        'insumo': insumo_padre,
+        'ingredientes': ingredientes
+    })
+    # Buscamos el producto "padre" (La Salsa, la Masa, etc.)
+    insumo_padre = get_object_or_404(Insumo, pk=pk)
+    
+    # Obtenemos sus ingredientes
+    ingredientes = insumo_padre.componentes.all()
+
+    if request.method == 'POST':
+        try:
+            cantidad_a_producir = Decimal(request.POST.get('cantidad_producir', '0'))
+        except:
+            cantidad_a_producir = 0
+            
+        if cantidad_a_producir <= 0:
+            messages.error(request, "Debes ingresar una cantidad mayor a 0.")
+            return redirect('insumo_produccion', pk=pk)
+
+        # VALIDACIÓN DE SEGURIDAD
+        rendimiento_base = insumo_padre.rendimiento
+        if rendimiento_base <= 0:
+            rendimiento_base = 1 # Evitar división por cero si no configuraste rendimiento
+
+        # Factor de Escala: Si la receta es para 1kg y hago 5kg, el factor es 5.
+        factor = cantidad_a_producir / rendimiento_base
+
+        # INICIO DE LA TRANSACCIÓN (Todo o Nada)
+        try:
+            with transaction.atomic():
+                
+                # 1. VERIFICAR STOCK SUFICIENTE
+                errores_stock = []
+                for componente in ingredientes:
+                    cantidad_necesaria = componente.cantidad * factor
+                    if componente.insumo_hijo.stock_actual < cantidad_necesaria:
+                        errores_stock.append(f"Falta {componente.insumo_hijo.nombre} (Tienes {componente.insumo_hijo.stock_actual}, necesitas {cantidad_necesaria})")
+                
+                if errores_stock:
+                    # Si falta algo, detenemos todo y avisamos
+                    for error in errores_stock:
+                        messages.error(request, error)
+                    return redirect('insumo_produccion', pk=pk)
+
+                # 2. DESCONTAR INGREDIENTES (SALIDA)
+                for componente in ingredientes:
+                    cantidad_a_descontar = componente.cantidad * factor
+                    
+                    MovimientoInventario.objects.create(
+                        insumo=componente.insumo_hijo,
+                        tipo='SALIDA',
+                        cantidad=cantidad_a_descontar,
+                        usuario=request.user,
+                        nota=f"Producción de {cantidad_a_producir} {insumo_padre.unidad.codigo} de {insumo_padre.nombre}"
+                    )
+
+                # 3. SUMAR PRODUCTO TERMINADO (ENTRADA)
+                MovimientoInventario.objects.create(
+                    insumo=insumo_padre,
+                    tipo='ENTRADA',
+                    cantidad=cantidad_a_producir,
+                    usuario=request.user,
+                    # El costo ya viene calculado en el insumo padre, pero aquí podríamos recalcularlo si quisiéramos
+                    costo_unitario_movimiento=insumo_padre.costo_unitario * cantidad_a_producir, 
+                    nota=f"Producción interna (Lote cocinado)"
+                )
+                
+                messages.success(request, f"¡Éxito! Se produjeron {cantidad_a_producir} {insumo_padre.unidad.codigo} de {insumo_padre.nombre}. Ingredientes descontados.")
+                return redirect('inventory_index')
+
+        except Exception as e:
+            messages.error(request, f"Ocurrió un error inesperado: {e}")
+            return redirect('insumo_produccion', pk=pk)
+
+    return render(request, 'inventory/insumo_produccion.html', {
+        'insumo': insumo_padre,
+        'ingredientes': ingredientes
+    })
     insumo_padre = get_object_or_404(Insumo, pk=pk)
     
     # Validaciones básicas
@@ -869,3 +1077,20 @@ def generar_comanda_interno_pdf(request, consumo_id):
         return HttpResponse('Error al generar PDF', status=500)
     
     return response
+
+from .forms import RecetaInsumoForm # Importa el formulario nuevo
+
+# Vista exclusiva para crear RECETAS en Inventario
+def receta_create(request):
+    if request.method == 'POST':
+        form = RecetaInsumoForm(request.POST) # Usa el form ligero
+        if form.is_valid():
+            insumo = form.save()
+            # ---> ESTA LÍNEA ES LA CLAVE <---
+            # Debe llevarte a 'insumo_composition' pasando el ID
+            return redirect('insumo_composition', insumo_id=insumo.id)
+            
+    else:
+        form = RecetaInsumoForm()
+    
+    return render(request, 'inventory/receta_form.html', {'form': form})

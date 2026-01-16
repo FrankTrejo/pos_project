@@ -54,29 +54,73 @@
             padding-left: 10px;
             width: 85%;
         }
-        /* El tamaño ahora hereda el estilo grande y negrita del padre (.prod) */
         .tamano {
-            /* Ya no es pequeño ni cursivo */
+            /* Hereda estilo del padre */
         }
-        /* Las notas siguen siendo pequeñas y debajo */
         .nota {
             font-size: 12px;
             font-weight: normal;
             font-style: italic;
-            display: block; /* Fuerza salto de línea solo para la nota */
+            display: block;
             margin-top: 2px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 10px;
+        }
+
+        /* --- NUEVOS ESTILOS PARA 'LLEVAR' --- */
+        .alert-global {
+            background-color: #000;
+            color: #fff;
+            font-size: 20px; /* Grande para que se vea de lejos */
+            font-weight: bold;
+            text-align: center;
+            padding: 10px;
+            border: 3px dashed #000; /* Borde por si la impresora no imprime fondo negro */
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            display: block;
+        }
+        
+        .badge-llevar {
+            background-color: #000;
+            color: #fff;
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 5px;
+            display: inline-block;
+            vertical-align: middle;
+            text-transform: uppercase;
         }
     </style>
 </head>
 <body>
     <div class="header">
-        <div class="mesa-title">MESA #{{ orden.mesa.number }}</div>
-    </div>
+        
+        {% if orden.tipo_servicio == 'LLEVAR' %}
+            <div class="alert-global">
+                📦 ¡¡ PARA LLEVAR !! 📦
+            </div>
+            <div class="mesa-title">TICKET #{{ orden.id }}</div>
+        
+        {% elif orden.tipo_servicio == 'DOMICILIO' %}
+            <div class="alert-global">
+                🛵 DELIVERY
+            </div>
+            <div class="mesa-title">TICKET #{{ orden.id }}</div>
+        
+        {% else %}
+            <div class="mesa-title">MESA #{{ orden.mesa.number }}</div>
+        {% endif %}
+        </div>
 
     <div class="meta-info">
         <b>Mesero:</b> {{ orden.mesero.username|upper|default:"SIN ASIGNAR" }}<br>
         <b>Hora:</b> {{ fecha|date:"d/m/Y - H:i" }}<br>
-        <b>Orden:</b> #{{ orden.id }}
+        <b>Orden ID:</b> #{{ orden.id }}
     </div>
 
     <table>
@@ -98,6 +142,9 @@
                          <span class="tamano">({{ item.producto.get_tamano_display|upper }})</span>
                     {% endif %}
                     
+                    {% if item.es_para_llevar %}
+                        <span class="badge-llevar">PARA LLEVAR 📦</span>
+                    {% endif %}
                     {% if item.nota %}
                         <span class="nota">** {{ item.nota }} **</span>
                     {% endif %}

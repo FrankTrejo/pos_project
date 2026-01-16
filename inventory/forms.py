@@ -1,20 +1,63 @@
 from django import forms
 from .models import Insumo, IngredienteCompuesto, MovimientoInventario
 
-# 1. FORMULARIO PARA CREAR EL INSUMO (Datos Básicos)
+from django import forms
+from .models import Insumo
+
+# Formulario LIGERO solo para crear Recetas (Sin precios de compra)
+class RecetaInsumoForm(forms.ModelForm):
+    class Meta:
+        model = Insumo
+        # Solo pedimos datos básicos. El precio y peso se calculan solos luego.
+        fields = ['nombre', 'categoria', 'unidad', 'stock_minimo']
+        
+        widgets = {
+            'nombre': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Ej: Salsa Napolitana'}),
+            'categoria': forms.Select(attrs={'class': 'form-input'}),
+            'unidad': forms.Select(attrs={'class': 'form-input'}),
+            'stock_minimo': forms.NumberInput(attrs={'class': 'form-input'}),
+        }
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        # Aquí forzamos a que SI SEA COMPUESTO
+        instance.es_insumo_compuesto = True
+        # Ponemos valores dummy en compra para que no falle la BD
+        instance.precio_mercado = 0
+        instance.peso_standar = 1 
+        instance.costo_unitario = 0 # Se calculará al agregar ingredientes
+        
+        if commit:
+            instance.save()
+        return instance
+
 class InsumoForm(forms.ModelForm):
     class Meta:
         model = Insumo
-        fields = ['nombre', 'categoria', 'unidad', 'stock_minimo', 'es_insumo_compuesto']
+        # AQUI AGREGAMOS 'peso_standar' y 'precio_mercado'
+        fields = ['nombre', 'categoria', 'unidad', 'stock_minimo', 'precio_mercado', 'peso_standar', 'merma_porcentaje', 'es_insumo_compuesto']
+        
         widgets = {
             'nombre': forms.TextInput(attrs={'class': 'form-input'}),
             'categoria': forms.Select(attrs={'class': 'form-input'}),
             'unidad': forms.Select(attrs={'class': 'form-input'}),
-            'stock_minimo': forms.NumberInput(attrs={'class': 'form-input', 'step': '0.1'}),
-            'costo_unitario': forms.NumberInput(attrs={'class': 'form-input', 'step': '0.01'}), # Se habilitará solo si NO es compuesto
+            'stock_minimo': forms.NumberInput(attrs={'class': 'form-input'}),
+            
+            # NUEVOS CAMPOS CONFIGURADOS
+            'precio_mercado': forms.NumberInput(attrs={
+                'class': 'form-input', 
+                'step': '0.01',
+                'placeholder': 'Costo total de compra ($)'
+            }),
+            'peso_standar': forms.NumberInput(attrs={
+                'class': 'form-input', 
+                'step': '0.001',
+                'placeholder': '¿Cuánto trae el saco/paquete? (Gr/Ml)'
+            }),
+            
+            'merma_porcentaje': forms.NumberInput(attrs={'class': 'form-input', 'step': '0.1'}),
             'es_insumo_compuesto': forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'check-compuesto'}),
         }
-
 # 2. FORMULARIO PARA AGREGAR INGREDIENTES A UN COMPUESTO
 class ComponenteForm(forms.ModelForm):
     class Meta:

@@ -1,77 +1,175 @@
 {% extends 'base.html' %}
 
 {% block title %}
-    {# CORRECCIÓN AQUÍ: Agregamos el endif que faltaba #}
-    {% if edit_mode %}- Editar {{ insumo.nombre }}{% else %}- Nuevo Insumo{% endif %}
+    {% if form.instance.pk %}- Editar {{ form.instance.nombre }}{% else %}- Nuevo Insumo{% endif %}
 {% endblock %}
 
 {% block content %}
-<div style="max-width: 600px; margin: 40px auto; padding: 20px;" class="card-style">
+
+<style>
+    /* Caja de costos: Estado Visible */
+    .seccion-costos {
+        opacity: 1;
+        max-height: 500px; /* Altura máxima suficiente */
+        overflow: hidden;
+        transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        transform: translateY(0);
+        margin-bottom: 25px;
+    }
+
+    /* Caja de costos: Estado Oculto */
+    .seccion-costos.oculto {
+        opacity: 0 !important;
+        max-height: 0 !important;
+        margin-bottom: 0 !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        border: none !important;
+        transform: translateY(-20px);
+        pointer-events: none; /* Desactiva clicks */
+    }
+</style>
+
+<div style="max-width: 800px; margin: 40px auto; padding: 20px;" class="card-style">
     
-    <div style="text-align: center; margin-bottom: 20px;">
+    <div style="text-align: center; margin-bottom: 30px;">
         <h2 style="color: var(--primary-blue);">
-            {% if edit_mode %}Editar Insumo{% else %}Nuevo Insumo{% endif %}
+            {% if form.instance.pk %}Editar Insumo{% else %}Nuevo Insumo{% endif %}
         </h2>
-        <p style="color: #666;">
-            {% if edit_mode %}Modifica los datos o la receta.{% else %}Registra materia prima o productos semielaborados.{% endif %}
-        </p>
+        <p style="color: #666;">Configuración del Maestro de Inventario</p>
     </div>
+
+    {% if form.errors %}
+        <div style="background-color: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #f5c6cb;">
+            <h4 style="margin-top:0; font-size: 1.1em;"><i class="fas fa-exclamation-triangle"></i> Revisa los siguientes errores:</h4>
+            <ul style="margin-bottom: 0; padding-left: 20px;">
+            {% for field in form %}
+                {% for error in field.errors %}
+                    <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                {% endfor %}
+            {% endfor %}
+            {% for error in form.non_field_errors %}
+                <li>{{ error }}</li>
+            {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
     
     <form method="POST">
         {% csrf_token %}
+
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 25px; border: 1px solid #e9ecef; display: flex; align-items: center; gap: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+            <div style="transform: scale(1.5); margin-left: 10px;">
+                {{ form.es_insumo_compuesto }}
+            </div>
+            <div>
+                <label for="id_es_insumo_compuesto" style="font-weight: bold; color: #2c3e50; cursor: pointer; margin: 0; font-size: 1.1em;">
+                    ¿Es un Producto Fabricado / Receta?
+                </label>
+                <div style="font-size: 0.9em; color: #6c757d; margin-top: 4px;">
+                    Marca esto si lo preparas en cocina (Ej: Salsas, Masas). <br>
+                    <span style="color: #d63384; font-weight: 500;">Al marcarlo, se ocultarán los costos de compra.</span>
+                </div>
+            </div>
+        </div>
         
-        <div style="margin-bottom: 15px;">
-            <label style="font-weight: bold;">Nombre del Insumo:</label>
+        <div style="margin-bottom: 20px;">
+            <label style="font-weight: bold; color: #495057;">Nombre del Insumo:</label>
             {{ form.nombre }}
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-            <div style="text-align: center;">
-                <label style="font-weight: bold;">Categoría:</label>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px;">
+            <div>
+                <label style="font-weight: bold; color: #495057;">Categoría:</label>
                 {{ form.categoria }}
             </div>
-            <div style="text-align: center;">
-                <label style="font-weight: bold;">Unidad Base (Almacén):</label>
+            <div>
+                <label style="font-weight: bold; color: #495057;">Unidad de Medida (Stock):</label>
                 {{ form.unidad }}
-                {% if not edit_mode %}
-                <small style="color: #999; font-size: 0.8em; display: block;">Selecciona la unidad más pequeña (Gramos/ML)</small>
-                {% endif %}
             </div>
         </div>
 
-        <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #90caf9;">
-            <div style="display: flex; align-items: center; gap: 10px;">
-                {{ form.es_insumo_compuesto }}
+        <div id="bloque-costos" class="seccion-costos" style="background: #e8f4fd; padding: 25px; border-radius: 10px; border: 1px solid #b6d4fe;">
+            <h4 style="margin-top:0; color: #0d6efd; font-size: 1rem; margin-bottom: 20px; border-bottom: 1px solid #badce3; padding-bottom: 10px;">
+                <i class="fas fa-shopping-cart"></i> Datos de Compra (Materia Prima)
+            </h4>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                 <div>
-                    <label for="check-compuesto" style="font-weight: bold; color: #0d47a1; cursor: pointer; margin: 0;">
-                        ¿Es un Insumo Compuesto? (Ej: Masa, Salsa)
-                    </label>
-                    <div style="font-size: 0.85em; color: #555; margin-top: 2px;">
-                        Actívalo si este insumo se "fabrica" internamente.
-                    </div>
+                    <label style="font-weight: bold; color: #0a58ca;">Costo de Compra ($):</label>
+                    {{ form.precio_mercado }}
+                    <small style="color: #666; display: block; margin-top: 5px;">Precio total pagado</small>
+                </div>
+                <div>
+                    <label style="font-weight: bold; color: #0a58ca;">Peso del Bulto/Saco:</label>
+                    {{ form.peso_standar }}
+                    <small style="color: #666; display: block; margin-top: 5px;">Cantidad que trae el empaque</small>
                 </div>
             </div>
 
-            {% if edit_mode and insumo.es_insumo_compuesto %}
-            <div style="margin-top: 15px; border-top: 1px solid #bbdefb; padding-top: 10px;">
-                <a href="{% url 'insumo_composition' insumo.id %}" style="display: block; text-align: center; background: white; color: #0d6efd; padding: 8px; border-radius: 5px; text-decoration: none; font-weight: bold; border: 1px solid #0d6efd;">
-                    <i class="fas fa-flask"></i> Modificar Receta / Ingredientes
-                </a>
+            <div style="margin-top: 20px;">
+                <label style="font-weight: bold; color: #495057;">Porcentaje de Merma (%):</label>
+                <div style="max-width: 150px;">
+                    {{ form.merma_porcentaje }}
+                </div>
             </div>
-            {% endif %}
         </div>
-        
-        <div style="margin-bottom: 25px;">
-             <label style="font-weight: bold;">Stock Mínimo (Alerta):</label>
+
+        {% if form.instance.pk and form.instance.es_insumo_compuesto %}
+        <div id="btn-configurar-receta" style="margin-bottom: 25px; animation: fadeIn 0.5s;">
+            <a href="{% url 'insumo_composition' form.instance.id %}" style="display: block; text-align: center; background: linear-gradient(135deg, #6610f2 0%, #520dc2 100%); color: white; padding: 15px; border-radius: 8px; text-decoration: none; font-weight: bold; box-shadow: 0 4px 15px rgba(102, 16, 242, 0.3); transition: transform 0.2s;">
+                <i class="fas fa-blender"></i> CONFIGURAR INGREDIENTES / RECETA
+            </a>
+        </div>
+        {% endif %}
+
+        <div style="margin-bottom: 30px;">
+             <label style="font-weight: bold; color: #495057;">Stock Mínimo (Alerta):</label>
              {{ form.stock_minimo }}
         </div>
 
-        <div style="display: flex; gap: 10px;">
-            <a href="{% url 'inventory_index' %}" style="padding: 10px 20px; color: #666; text-decoration: none;">Cancelar</a>
-            <button type="submit" class="add-btn" style="flex-grow: 1;">
-                {% if edit_mode %}Guardar Cambios{% else %}Guardar Insumo{% endif %}
+        <div style="display: flex; gap: 15px; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
+            <a href="{% url 'inventory_index' %}" style="padding: 12px 25px; color: #666; text-decoration: none; border-radius: 6px; background: #f1f3f5; font-weight: 500;">Cancelar</a>
+            <button type="submit" class="add-btn" style="flex-grow: 1; font-size: 1.1em; padding: 12px; border-radius: 6px;">
+                {% if form.instance.pk %}Guardar Cambios{% else %}Crear Insumo{% endif %}
             </button>
         </div>
     </form>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 1. Buscamos el checkbox por el ID estándar que Django genera
+        // (Django suele poner 'id_nombre_del_campo')
+        const checkbox = document.getElementById('id_es_insumo_compuesto');
+        const bloqueCostos = document.getElementById('bloque-costos');
+        
+        // Verificación de seguridad
+        if (!checkbox || !bloqueCostos) {
+            console.error("⚠️ Error JS: No encuentro el checkbox (id_es_insumo_compuesto) o el bloque de costos.");
+            return;
+        }
+
+        function animarInterfaz() {
+            if (checkbox.checked) {
+                // MODO RECETA: Ocultar costos
+                bloqueCostos.classList.add('oculto');
+                
+                // Opcional: Quitar 'required' para que no bloquee el envío si el navegador valida HTML5
+                const inputs = bloqueCostos.querySelectorAll('input');
+                inputs.forEach(input => input.removeAttribute('required'));
+            } else {
+                // MODO COMPRA: Mostrar costos
+                bloqueCostos.classList.remove('oculto');
+            }
+        }
+
+        // Escuchar cambios
+        checkbox.addEventListener('change', animarInterfaz);
+        
+        // Ejecutar al cargar la página
+        animarInterfaz();
+    });
+</script>
+
 {% endblock %}

@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block title %}- Nueva Receta{% endblock %}
+
+{% block content %}
+<div style="max-width: 500px; margin: 60px auto; padding: 30px;" class="card-style">
+    
+    <div style="text-align: center; margin-bottom: 30px;">
+        <div style="background: #f3e5f5; color: #6610f2; width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px;">
+            <i class="fas fa-blender fa-2x"></i>
+        </div>
+        <h2 style="color: var(--primary-blue); margin: 0;">Nueva Receta</h2>
+        <p style="color: #666;">Paso 1: Define el nombre del plato.</p>
+    </div>
+
+    <form method="POST">
+        {% csrf_token %}
+        
+        <div style="margin-bottom: 20px;">
+            <label style="font-weight: bold; color: #444;">Nombre del Plato / Preparación:</label>
+            {{ form.nombre }}
+            <small style="color: #888;">Ej: Salsa Napolitana, Pizza Margarita</small>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+            <div>
+                <label style="font-weight: bold; color: #444;">Categoría:</label>
+                {{ form.categoria }}
+            </div>
+            <div>
+                <label style="font-weight: bold; color: #444;">Unidad Final:</label>
+                {{ form.unidad }}
+            </div>
+        </div>
+        
+        <div style="margin-bottom: 30px;">
+             <label style="font-weight: bold; color: #444;">Alerta de Stock Mínimo:</label>
+             {{ form.stock_minimo }}
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+            <a href="{% url 'inventory_index' %}" style="padding: 12px 20px; color: #666; text-decoration: none;">Cancelar</a>
+            <button type="submit" class="add-btn" style="background-color: #6610f2; flex-grow: 1;">
+                Siguiente: Agregar Ingredientes <i class="fas fa-arrow-right"></i>
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,5 +1,32 @@
 
 ==================================================
+ARCHIVO: .\limpiar_zombie.py
+==================================================
+import sqlite3
+
+# Nombre de tu base de datos
+db_name = "db.sqlite3"
+
+print(f"🔌 Conectando a {db_name}...")
+conn = sqlite3.connect(db_name)
+cursor = conn.cursor()
+
+try:
+    # Intento 1: Borrar solo la columna problemática (Funciona en SQLite modernos)
+    print("INTENTO 1: Eliminando columna 'es_para_llevar'...")
+    cursor.execute("ALTER TABLE tables_detalleorden DROP COLUMN es_para_llevar")
+    print("✅ ¡ÉXITO! Columna eliminada. El sistema debería funcionar.")
+
+except sqlite3.OperationalError as e:
+    # Si falla (SQLite viejo), plan B: Borrar la tabla para que Django la recree
+    print(f"⚠️ Aviso: {e}")
+    print("INTENTO 2: La versión de SQLite es antigua. Borrando tabla 'tables_detalleorden'...")
+    cursor.execute("DROP TABLE IF EXISTS tables_detalleorden")
+    print("✅ Tabla borrada. Ahora debes ejecutar 'python manage.py migrate' para recrearla.")
+
+conn.commit()
+conn.close()
+==================================================
 ARCHIVO: .\manage.py
 ==================================================
 #!/usr/bin/env python
@@ -4896,7 +4923,7 @@ class DetalleOrden(models.Model):
     @property
     def subtotal(self):
         return self.cantidad * self.precio_unitario
-
+    
 class Pago(models.Model):
     METODOS = [
         ('EFECTIVO_USD', 'Efectivo ($)'),
@@ -5014,7 +5041,6 @@ urlpatterns = [
     path('mesa/<int:table_id>/cuenta/', views.generar_cuenta_pdf, name='generar_cuenta_pdf'),
     path('mesa/<int:table_id>/facturar/', views.facturar_mesa_ajax, name='facturar_mesa'),
     path('factura/<int:venta_id>/pdf/', views.generar_factura_pdf, name='generar_factura_pdf'),
-    path('toggle-llevar/<int:item_id>/', views.toggle_para_llevar, name='toggle_llevar'),
 ]
 
 ==================================================
@@ -5529,24 +5555,6 @@ def generar_cuenta_pdf(request, table_id):
 def facturar_mesa_ajax(request, table_id):
     if request.method == 'POST':
         try:
-            # --- LÓGICA DE DESCUENTO DE INVENTARIO ---
-            for item in orden.items.all():
-                producto = item.producto
-                
-                # 1. Descuento normal de ingredientes (Receta)
-                # (Aquí iría tu lógica actual de ingredientes...)
-
-                # 2. NUEVO: Descuento de Caja (Si es para llevar)
-                if item.es_para_llevar and producto.insumo_empaque:
-                    caja = producto.insumo_empaque
-                    
-                    # Verificamos si hay stock de cajas
-                    if caja.stock_actual >= item.cantidad:
-                        caja.stock_actual -= item.cantidad
-                        caja.save()
-                    else:
-                        # Opcional: Guardar un error o aviso de que faltaron cajas
-                        pass
             data = json.loads(request.body)
             # AHORA RECIBIMOS UNA LISTA DE PAGOS
             # Ejemplo: [{'metodo': 'ZELLE', 'monto': 10}, {'metodo': 'EFECTIVO_USD', 'monto': 5}]
@@ -5665,23 +5673,6 @@ def generar_factura_pdf(request, venta_id):
     if pisa_status.err:
         return HttpResponse('Error al generar PDF', status=500)
     return response
-
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-import json
-from tables.models import DetalleOrden
-
-def toggle_para_llevar(request, item_id):
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            item = DetalleOrden.objects.get(id=item_id)
-            item.es_para_llevar = data.get('status', False)
-            item.save()
-            return JsonResponse({'success': True})
-        except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)})
-    return JsonResponse({'success': False})
 
 
 ==================================================
@@ -7051,38 +7042,6 @@ ARCHIVO: .\tables\templates\tables\order_detail.html
             elRestante.innerText += " (Sobra)";
         }
     }
-    </script>
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            const toggles = document.querySelectorAll('.btn-toggle-llevar');
-
-            toggles.forEach(toggle => {
-                toggle.addEventListener('change', function() {
-                    const itemId = this.dataset.id;
-                    const esParaLlevar = this.checked;
-
-                    // Enviar petición al servidor
-                    fetch(`/tables/toggle-llevar/${itemId}/`, {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRFToken': '{{ csrf_token }}',
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ 'status': esParaLlevar })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            console.log("Estado actualizado");
-                            // Opcional: Mostrar una notificación pequeña tipo Toast
-                        } else {
-                            alert("Error al actualizar estado");
-                            this.checked = !esParaLlevar; // Revertir si falló
-                        }
-                    });
-                });
-            });
-        });
     </script>
 </body>
 </html>

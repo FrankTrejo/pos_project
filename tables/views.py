@@ -110,7 +110,9 @@ def table_order_view(request, table_id):
                 'id': detalle.producto.id,
                 'nombre': nombre_display,
                 'precio': float(detalle.precio_unitario),
-                'cantidad': detalle.cantidad
+                'cantidad': detalle.cantidad,
+                'tamano_codigo': detalle.producto.tamano, # Importante para saber qué caja usar
+                'para_llevar': detalle.es_para_llevar     # <--- RECUPERAMOS EL DATO
             })
 
     # Convertimos la lista a JSON string para que JS la pueda leer
@@ -357,7 +359,8 @@ def grabar_mesa_ajax(request, table_id):
                     orden=orden,
                     producto=prod_obj,
                     cantidad=cant,
-                    precio_unitario=precio
+                    precio_unitario=precio,
+                    es_para_llevar=item.get('para_llevar', False)
                 )
             
             # B) MARCAR MESA COMO OCUPADA
@@ -583,8 +586,39 @@ def facturar_mesa_ajax(request, table_id):
                             insumo=ing.insumo, tipo='SALIDA', cantidad=ing.cantidad * det.cantidad,
                             unidad_movimiento=ing.insumo.unidad, usuario=request.user,
                             nota=f"Fac: {codigo}"
+
+                            
                         )
 
+                # --- NUEVA LÓGICA: DESCUENTO DE CAJAS ---
+                if det.es_para_llevar:
+                    # 1. Mapa de Tamaños -> Nombres de Insumos en tu BD
+                    # Ajusta los nombres de la derecha según como los tengas en tu inventario
+                    MAPA_CAJAS = {
+                        'IND': 'CAJA INDIVIDUAL', 
+                        'MED': 'CAJA MEDIANA',
+                        'FAM': 'CAJA FAMILIAR'
+                    }
+                    
+                    nombre_caja = MAPA_CAJAS.get(det.producto.tamano)
+                    
+                    if nombre_caja:
+                        # Buscamos el insumo caja por nombre
+                        caja_insumo = Insumo.objects.filter(nombre__iexact=nombre_caja).first()
+                        
+                        if caja_insumo:
+                            # Descontamos 1 caja por cada pizza vendida
+                            MovimientoInventario.objects.create(
+                                insumo=caja_insumo,
+                                tipo='SALIDA',
+                                cantidad=det.cantidad, # Si pidió 2 pizzas, son 2 cajas
+                                unidad_movimiento=caja_insumo.unidad,
+                                usuario=request.user,
+                                nota=f"Empaque Fac: {codigo}"
+                            )
+                        else:
+                            # Opcional: Imprimir en consola si no encuentra la caja configurada
+                            print(f"⚠️ ALERTA: No se encontró el insumo '{nombre_caja}' en el inventario.")
                 orden.delete()
                 table.is_occupied = False
                 table.solicitud_pago = False

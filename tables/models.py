@@ -271,6 +271,19 @@ class Orden(models.Model):
     fecha_inicio = models.DateTimeField(auto_now_add=True)
     # Guardamos si ya se imprimió para saber si es "Comanda nueva" o "Reimpresión"
     impreso = models.BooleanField(default=False) 
+    # --- AGREGAR ESTO ---
+    TIPO_OPCIONES = [
+        ('MESA', 'Comer en Mesa'),
+        ('LLEVAR', 'Para Llevar'),
+        ('DOMICILIO', 'Domicilio'),
+    ]
+    
+    tipo_servicio = models.CharField(
+        max_length=20, 
+        choices=TIPO_OPCIONES, 
+        default='MESA',
+        verbose_name="Tipo de Servicio"
+    )
 
     def __str__(self):
         return f"Orden Mesa {self.mesa.number}"
@@ -287,6 +300,9 @@ class DetalleOrden(models.Model):
     precio_unitario = models.DecimalField(max_digits=10, decimal_places=2) # Precio al momento de pedir
     nota = models.CharField(max_length=200, blank=True, null=True) # Ej: "Sin cebolla"
 
+    # --- NUEVO CAMPO ---
+    es_para_llevar = models.BooleanField(default=False, verbose_name="¿Para Llevar?")
+    
     @property
     def subtotal(self):
         return self.cantidad * self.precio_unitario

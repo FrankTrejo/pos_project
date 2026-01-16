@@ -230,9 +230,10 @@
         function agregarAlCarrito(id, nombre, precio, tamano) {
             let precioFloat = parseFloat(precio);
             let nombreDisplay = nombre;
+            // Solo agregamos el tamaño al nombre si no es 'UNI' (Único)
             if(tamano !== 'UNI') nombreDisplay += ` (${tamano})`;
-            
-            // Buscar si ya existe para sumar cantidad
+
+            // Buscamos si el producto ya está en el carrito
             let existente = carrito.find(item => item.id == id && item.nombre == nombreDisplay);
             
             if (existente) {
@@ -242,7 +243,9 @@
                     id: id,
                     nombre: nombreDisplay,
                     precio: precioFloat,
-                    cantidad: 1
+                    cantidad: 1,
+                    tamano_codigo: tamano, // Guardamos el código para saber qué caja descontar
+                    para_llevar: false     // Por defecto NO es para llevar
                 });
             }
             renderizarCarrito();
@@ -260,24 +263,51 @@
                 sumaUsd += item.precio * item.cantidad;
                 
                 const fila = document.createElement('div');
-                fila.style.cssText = "display: grid; grid-template-columns: 2fr 1fr 1fr 30px; padding: 8px 0; border-bottom: 1px solid #eee; font-size: 0.9em; align-items: center;";
+                // IMPORTANTE: Definimos las columnas del Grid para que todo quepa bien
+                // Nombre | Cant | Precio | Checkbox | Borrar
+                fila.style.cssText = "display: grid; grid-template-columns: 2fr 0.5fr 1fr 0.5fr 30px; padding: 8px 0; border-bottom: 1px solid #eee; font-size: 0.9em; align-items: center;";
                 
+                // Si es para llevar, marcamos el checkbox visualmente
+                const checked = item.para_llevar ? 'checked' : '';
+                // Si es para llevar, mostramos un icono naranja
+                const etiquetaLlevar = item.para_llevar ? '<div style="font-size:0.7em; color:#e67e22; font-weight:bold;"><i class="fas fa-box"></i> Para Llevar</div>' : '';
+
                 fila.innerHTML = `
-                    <span>${item.nombre}</span>
+                    <div style="display:flex; flex-direction:column; padding-right:5px;">
+                        <span style="font-weight:500;">${item.nombre}</span>
+                        ${etiquetaLlevar}
+                    </div>
+                    
                     <span style="text-align: center;">x${item.cantidad}</span>
-                    <span style="text-align: right;">$${(item.precio * item.cantidad).toFixed(2)}</span>
-                    <button onclick="eliminarDelCarrito(${index})" style="background:none; border:none; color:red; cursor:pointer; margin-left:5px;">&times;</button>
+                    
+                    <span style="text-align: right; font-weight:bold;">$${(item.precio * item.cantidad).toFixed(2)}</span>
+                    
+                    <div style="text-align: center;" title="Marcar para llevar">
+                        <input type="checkbox" onchange="toggleParaLlevar(${index})" ${checked} style="transform: scale(1.3); cursor: pointer; accent-color: #e67e22;">
+                    </div>
+
+                    <button onclick="eliminarDelCarrito(${index})" style="background:none; border:none; color:#dc3545; cursor:pointer; font-size: 1.1em;">
+                        <i class="fas fa-times"></i>
+                    </button>
                 `;
                 contenedor.appendChild(fila);
             });
 
+            // Cálculos finales
             let sumaBs = sumaUsd * TASA_CAMBIO;
             totalUsdEl.innerText = sumaUsd.toFixed(2);
             totalBsEl.innerText = sumaBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
+            
             if(carrito.length === 0) {
                 contenedor.innerHTML = '<p style="text-align: center; color: #aaa; padding-top: 50px;">Carrito vacío</p>';
             }
+        }
+
+        // Nueva función para cambiar el estado "Para Llevar"
+        function toggleParaLlevar(index) {
+            // Invertimos el valor (true -> false, false -> true)
+            carrito[index].para_llevar = !carrito[index].para_llevar;
+            renderizarCarrito(); // Redibujamos para que aparezca el icono naranja
         }
 
         function eliminarDelCarrito(index) {

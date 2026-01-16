@@ -21,11 +21,29 @@ class Insumo(models.Model):
     categoria = models.ForeignKey(CategoriaInsumo, on_delete=models.SET_NULL, null=True)
     unidad = models.ForeignKey(UnidadMedida, on_delete=models.PROTECT, verbose_name="Unidad Base")
 
-    # MAESTRO DE COSTOS
-    cantidad_por_precio = models.DecimalField(max_digits=10, decimal_places=2, default=1000, verbose_name="Cant. Ref")
-    precio_mercado = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Precio Mercado ($)")
+    # --- MAESTRO DE COSTOS (LÓGICA CORREGIDA) ---
+    # Ahora definimos el peso del "bulto" o "unidad de compra"
+    peso_standar = models.DecimalField(
+        max_digits=12, 
+        decimal_places=3, 
+        default=1, 
+        verbose_name="Peso por Unidad de Compra (Gr/Ml)"
+    )
+    # Ejemplo: Saco de Harina = 25000 (gr)
+    
+    precio_mercado = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Costo de la Unidad ($)")
+    # Ejemplo: Precio del Saco = $45.00
+    
     merma_porcentaje = models.DecimalField(max_digits=5, decimal_places=2, default=0, verbose_name="% Merma")
     
+    # --- RENDIMIENTO (SE CALCULA AUTOMÁTICO) ---
+    rendimiento = models.DecimalField(
+        max_digits=12, 
+        decimal_places=3, 
+        default=1, 
+        verbose_name="Rendimiento (Cantidad Final Producida)"
+    )
+
     # COSTO Y STOCK
     costo_unitario = models.DecimalField(max_digits=12, decimal_places=6, default=0, verbose_name="Costo Real x Gramo")
     stock_actual = models.DecimalField(max_digits=12, decimal_places=3, default=0)
@@ -34,57 +52,196 @@ class Insumo(models.Model):
 
     def __str__(self): return f"{self.nombre}"
     
-    # PROPIEDAD PARA REPORTES
     @property
     def valor_total_invertido(self):
         return round(self.stock_actual * self.costo_unitario, 2)
 
+    # --- MÉTODO 1: CÁLCULO AUTOMÁTICO DE RECETAS ---
+    # inventory/models.py
 
-    # 1. MÉTODO DE CÁLCULO MEJORADO (Usa .update para evitar bucles)
+    # inventory/models.py
+
     def calcular_costo_desde_subreceta(self):
+        """
+        LÓGICA BLINDADA PARA RECETAS:
+        Calcula cuánto cuesta 1 GRAMO de la receta final.
+        Fórmula: (Costo Total de Ingredientes) / (Peso Total de la Receta)
+        """
+        # 1. VALIDACIÓN: Solo aplica si es Compuesto (Receta)
+        if not self.es_insumo_compuesto:
+            return
+
+        total_costo_fabricacion = Decimal(0)
+        total_peso_calculado = Decimal(0)
+
+        # 2. SUMAR COSTOS Y PESOS DE LOS INGREDIENTES
+        for componente in self.componentes.all():
+            # Cuánto cuesta esta cantidad de ingrediente (Ej: 2500g Tomate * Precio Tomate)
+            costo_linea = componente.cantidad * componente.insumo_hijo.costo_unitario
+            total_costo_fabricacion += costo_linea
+            
+            # Cuánto pesa este ingrediente
+            total_peso_calculado += componente.cantidad
+
+        # 3. DETERMINAR EL PESO FINAL (EL DIVISOR)
+        # Si definiste manualmente que la receta rinde 2700g (rendimiento), usamos eso.
+        # Si no, usamos la suma de los ingredientes.
+        if self.rendimiento > 1:
+            peso_final = self.rendimiento
+        else:
+            peso_final = total_peso_calculado
+            # Guardamos este peso calculado como rendimiento
+            self.rendimiento = peso_final
+
+        # 4. APLICAR LA FÓRMULA (DIVISIÓN)
+        # AQUÍ ESTÁ LA SOLUCIÓN: Costo Total / Peso Total = Costo Unitario
+        if peso_final > 0:
+            self.costo_unitario = total_costo_fabricacion / peso_final
+        else:
+            self.costo_unitario = 0
+
+        # 5. GUARDAR EN BASE DE DATOS
+        # Usamos update para ser directos y evitar bucles
+        Insumo.objects.filter(pk=self.pk).update(
+            costo_unitario=self.costo_unitario,
+            rendimiento=self.rendimiento
+        )
+        """
+        Lógica Blindada:
+        1. Suma todo lo que gastaste en ingredientes (Costo de Fabricación).
+        2. Suma todo lo que pesan los ingredientes (Peso Total).
+        3. REALIZA LA DIVISIÓN: Costo / Peso = Precio Real por Gramo.
+        """
+        # SOLO APLICA PARA COMPUESTOS (RECETAS)
+        if not self.es_insumo_compuesto:
+            return
+
+        total_costo_fabricacion = Decimal(0)
+        total_peso_resultante = Decimal(0)
+
+        # 1. Sumamos costo y peso de los ingredientes
+        for componente in self.componentes.all():
+            total_costo_fabricacion += componente.cantidad * componente.insumo_hijo.costo_unitario
+            total_peso_resultante += componente.cantidad
+
+        # 2. VALIDACIÓN DE PESO (DIVISOR)
+        # Si el usuario configuró manualmente que la receta rinde 2000g, usamos eso.
+        # Si no, usamos la suma automática de los ingredientes.
+        if self.rendimiento > 1:
+            peso_final_divisor = self.rendimiento
+        else:
+            peso_final_divisor = total_peso_resultante
+            # Actualizamos el rendimiento automáticamente si estaba en 0
+            self.rendimiento = peso_final_divisor
+
+        # 3. LA VALIDACIÓN QUE PEDISTE (CÁLCULO FINAL)
+        # Si es compuesto, JAMÁS guardamos el costo total ($13) como unitario.
+        # Siempre dividimos entre el peso ($13 / 1000g = $0.013).
+        
+        if peso_final_divisor > 0:
+            self.costo_unitario = total_costo_fabricacion / peso_final_divisor
+        else:
+            self.costo_unitario = 0
+
+        # Guardamos en BD usando update para no disparar bucles
+        Insumo.objects.filter(pk=self.pk).update(
+            costo_unitario=self.costo_unitario,
+            rendimiento=self.rendimiento
+        )
+        """
+        Calcula el costo unitario real (por gramo/ml) de una receta.
+        Fórmula: Costo Total de Ingredientes / Rendimiento Total.
+        """
+        if not self.es_insumo_compuesto:
+            return
+
+        # 1. Calcular Costo Total del Lote ($)
+        # (Cuánto cuesta la olla completa con todos los ingredientes)
+        total_costo_lote = Decimal(0)
+        total_peso_ingredientes = Decimal(0)
+
+        for componente in self.componentes.all():
+            total_costo_lote += componente.cantidad * componente.insumo_hijo.costo_unitario
+            total_peso_ingredientes += componente.cantidad
+
+        # 2. Definir el Divisor (Rendimiento)
+        # VALIDACIÓN IMPORTANTE: 
+        # Si el usuario configuró un rendimiento manual (ej: 2700g) usamos ese.
+        # Si no (está en 0 o 1), usamos la suma de los pesos de los ingredientes.
+        if self.rendimiento > 1: 
+            peso_final = self.rendimiento
+        else:
+            peso_final = total_peso_ingredientes
+            # Si calculamos el peso sumando, actualizamos el campo rendimiento para referencia
+            if peso_final > 0:
+                self.rendimiento = peso_final
+
+        # 3. CÁLCULO DEL PRECIO POR GRAMO (Tu validación solicitada)
+        # Nunca guardamos el precio de fabricación directo. Siempre dividimos.
+        if peso_final > 0:
+            nuevo_costo_unitario = total_costo_lote / peso_final
+        else:
+            # Si no hay peso (receta vacía), el costo unitario es 0
+            nuevo_costo_unitario = 0
+
+        # 4. Guardar en Base de Datos
+        # Usamos .update() para ser eficientes y evitar bucles de señales
+        Insumo.objects.filter(pk=self.pk).update(
+            costo_unitario=nuevo_costo_unitario,
+            rendimiento=self.rendimiento
+        )
         if not self.es_insumo_compuesto:
             return
 
         total_costo = Decimal('0.0')
-        total_peso = Decimal('0.0')
+        total_peso_teorico = Decimal('0.0') 
         
-        # Sumamos ingredientes
+        # Recorremos los ingredientes
         for componente in self.componentes.all():
+            # 1. Sumar Costo ($)
             total_costo += componente.cantidad * componente.insumo_hijo.costo_unitario
-            total_peso += componente.cantidad
             
-        # LÓGICA DE CATEGORÍA
-        nombre_cat = self.categoria.nombre.upper() if self.categoria else ""
-        ES_MEZCLA = nombre_cat in ['INSUMO PRODUCIDO', 'SUB-RECETA', 'MEZCLA', 'MASAS']
+            # 2. Sumar Peso (Gramos/ML) - AUTOMÁTICO
+            total_peso_teorico += componente.cantidad
+            
+        # 3. Asignamos el rendimiento calculado automáticamente
+        self.rendimiento = total_peso_teorico 
 
-        if ES_MEZCLA and total_peso > 0:
-            # Caso MASA: Dividimos (1.63 / 1549 = 0.00105)
-            nuevo_costo = total_costo / total_peso
+        # 4. Cálculo del Costo Unitario (Costo Total / Peso Total)
+        if total_peso_teorico > 0:
+            nuevo_costo_unitario = total_costo / total_peso_teorico
         else:
-            # Caso PIZZA: Sumamos directo (1.63)
-            nuevo_costo = total_costo
+            nuevo_costo_unitario = total_costo 
 
-        # Actualizamos DIRECTO en la base de datos para no llamar a save() de nuevo
-        Insumo.objects.filter(pk=self.pk).update(costo_unitario=nuevo_costo)
-
-    # 2. MÉTODO SAVE QUE DISPARA EL CÁLCULO
+        # Actualizamos la base de datos directamente
+        Insumo.objects.filter(pk=self.pk).update(
+            costo_unitario=nuevo_costo_unitario,
+            rendimiento=total_peso_teorico
+        )
+    
+    # --- MÉTODO 2: CÁLCULO DESDE EL MAESTRO (MATERIA PRIMA) ---
     def save(self, *args, **kwargs):
-        # A) Lógica para Materia Prima (Precio Mercado)
-        if not self.es_insumo_compuesto and self.precio_mercado >= 0:
-            cantidad_ref = self.cantidad_por_precio if self.cantidad_por_precio > 0 else 1
-            rendimiento = 1 - (self.merma_porcentaje / 100)
-            precio_base = self.precio_mercado / cantidad_ref
+        # Si NO es receta (es materia prima: Harina, Tomate, etc)
+        if not self.es_insumo_compuesto:
+            # Fórmula: Costo Unitario = Precio del Saco / Peso del Saco
+            # Aplicamos la merma si existe (a mayor merma, mayor costo real)
             
-            if rendimiento > 0:
-                self.costo_unitario = precio_base / rendimiento
+            if self.precio_mercado > 0 and self.peso_standar > 0:
+                costo_base = self.precio_mercado / self.peso_standar
+                
+                factor_merma = 1 - (self.merma_porcentaje / 100)
+                
+                if factor_merma > 0:
+                    self.costo_unitario = costo_base / factor_merma
+                else:
+                    self.costo_unitario = costo_base
             else:
-                self.costo_unitario = precio_base
+                # Si no hay datos, mantenemos el costo en 0 o el anterior
+                pass
 
-        # B) Guardamos los cambios básicos (Nombre, Categoría, etc)
         super().save(*args, **kwargs)
 
-        # C) SI ES COMPUESTO -> FORZAMOS RE-CÁLCULO INMEDIATAMENTE
-        # Esto arregla tu problema: al cambiar categoría y guardar, se recalcula el precio.
+        # Si ES receta, recalculamos después de guardar por seguridad
         if self.es_insumo_compuesto:
             self.calcular_costo_desde_subreceta()
 
@@ -104,25 +261,41 @@ class MovimientoInventario(models.Model):
     usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     nota = models.CharField(max_length=255, blank=True, null=True)
 
-# SEÑAL (Mantén la que tenías para actualizar stock, solo asegúrate que funcione)
+# --- SEÑAL DE ACTUALIZACIÓN DE STOCK ---
 @receiver(post_save, sender=MovimientoInventario)
 def actualizar_stock_conversion(sender, instance, created, **kwargs):
     if created:
         insumo = instance.insumo
+        # Si hay factor de conversión (ej: Kilos a Gramos), lo aplicamos
         factor = instance.unidad_movimiento.factor if instance.unidad_movimiento else 1
-        cantidad_en_gramos = instance.cantidad * factor
         
-        # Actualizar Stock
-        if instance.tipo == 'ENTRADA' or instance.tipo == 'AJUSTE':
+        # Obtenemos la cantidad real en la unidad base (Gramos/ML)
+        # Usamos abs() para asegurar que el número sea positivo y la matemática la decidimos abajo
+        cantidad_en_gramos = abs(instance.cantidad * factor)
+        
+        # --- LÓGICA CORREGIDA ---
+        
+        if instance.tipo == 'ENTRADA':
+            # COMPRAS: SUMAN (+)
             insumo.stock_actual += cantidad_en_gramos
-            # Si es compra directa, actualizamos costo (solo si no es compuesto)
-            costo_nuevo = instance.costo_unitario_movimiento / factor if (factor > 0 and instance.costo_unitario_movimiento > 0) else 0
-            if not insumo.es_insumo_compuesto and costo_nuevo > 0 and instance.tipo == 'ENTRADA':
-                 insumo.costo_unitario = costo_nuevo
-                 
+
         elif instance.tipo == 'SALIDA':
+            # CONSUMO/MERMA: RESTAN (-)
             insumo.stock_actual -= cantidad_en_gramos
-            if insumo.stock_actual < 0: insumo.stock_actual = 0
+            
+        elif instance.tipo == 'AJUSTE':
+            # AJUSTE: DEPENDE DEL SIGNO
+            # Si en la vista mandamos un negativo, resta. Si es positivo, suma.
+            # Pero como la vista manda el número tal cual, vamos a asumir que:
+            # AJUSTE POSITIVO = SUMA (Corrección de sobrante)
+            # Para restar usando ajuste, tendríamos que permitir negativos en la vista.
+            # Por seguridad, trataremos el AJUSTE igual que una ENTRADA (Suma).
+            # SI QUIERES RESTAR, USA "SALIDA".
+            insumo.stock_actual += instance.cantidad * factor
+
+        # Evitamos stock negativo
+        if insumo.stock_actual < 0:
+            insumo.stock_actual = 0
             
         insumo.save()
 
@@ -130,17 +303,13 @@ class ConsumoInterno(models.Model):
     TIPOS = [
         ('PERSONAL', 'Comida de Personal'),
         ('CORTESIA', 'Cortesía / Regalo'),
-        ('MERMA', 'Merma / Dañado'), # De paso aprovechamos para esto
+        ('MERMA', 'Merma / Dañado'),
     ]
     
     tipo = models.CharField(max_length=20, choices=TIPOS)
     fecha = models.DateTimeField(auto_now_add=True)
     usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
-    
-    # Para saber qué fue (Ej: "Pizza Personal de Juan" o "Regalo Mesa 4")
     descripcion = models.CharField(max_length=255) 
-    
-    # Opcional: Para calcular cuánto le costó a la empresa ese regalo
     costo_estimado = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def __str__(self):

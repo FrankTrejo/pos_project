@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}- Cocinar {{ insumo.nombre }}{% endblock %}
+
+{% block content %}
+<div style="max-width: 900px; margin: 40px auto; padding: 20px;">
+    
+    <div style="background: linear-gradient(135deg, #198754 0%, #146c43 100%); color: white; padding: 30px; border-radius: 12px; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(25, 135, 84, 0.3);">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <div style="font-size: 0.9em; opacity: 0.9; text-transform: uppercase; letter-spacing: 1px;">Módulo de Cocina</div>
+                <h1 style="margin: 5px 0 0 0; font-size: 2.2em;"><i class="fas fa-fire-burner"></i> {{ insumo.nombre }}</h1>
+            </div>
+            <div style="text-align: right; background: rgba(255,255,255,0.1); padding: 10px 20px; border-radius: 10px;">
+                <div style="font-size: 0.8em; opacity: 0.9;">STOCK ACTUAL</div>
+                <div style="font-size: 1.8em; font-weight: bold;">{{ insumo.stock_actual|floatformat:1 }} {{ insumo.unidad.codigo }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 30px;">
+        
+        <div class="card-style" style="padding: 30px; height: fit-content; border-top: 5px solid #198754;">
+            <h3 style="color: #333; margin-top: 0; margin-bottom: 20px;">1. ¿Cuántos Lotes?</h3>
+            
+            <form method="POST" id="form-produccion">
+                {% csrf_token %}
+                
+                <div style="margin-bottom: 25px;">
+                    <label style="font-weight: bold; display: block; margin-bottom: 10px; color: #555;">Número de Tandas / Lotes:</label>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <input type="number" step="any" name="cantidad_lotes" id="inputLotes" 
+                            value="1" min="0"
+                            required 
+                            oninput="calcularRequerimientos()"
+                            style="font-size: 2.5em; padding: 10px; width: 100%; border-radius: 12px; border: 2px solid #198754; text-align: center; color: #198754; font-weight: bold; background: #f8fff9;">
+                    </div>
+                    <small style="display: block; text-align: center; margin-top: 8px; color: #888;">
+                        1 Lote Estándar = {{ insumo.rendimiento|floatformat:0 }} {{ insumo.unidad.codigo }}
+                    </small>
+                </div>
+
+                <div style="background: #e9ecef; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 25px;">
+                    <span style="color: #666; font-size: 0.9em;">Total a Producir (Resultado):</span><br>
+                    <strong style="font-size: 1.4em; color: #333;" id="txtResultado">0 {{ insumo.unidad.codigo }}</strong>
+                </div>
+
+                <button type="submit" class="add-btn" style="width: 100%; font-size: 1.2em; padding: 15px; background-color: #198754; box-shadow: 0 4px 6px rgba(25, 135, 84, 0.2);">
+                    <i class="fas fa-check-circle"></i> Confirmar y Cocinar
+                </button>
+                <a href="{% url 'inventory_index' %}" style="display: block; text-align: center; margin-top: 15px; color: #666; text-decoration: none;">Cancelar</a>
+            </form>
+        </div>
+
+        <div class="card-style" style="padding: 0; overflow: hidden; border-top: 5px solid #dc3545;">
+            <div style="padding: 20px; background: #fff5f5; border-bottom: 1px solid #ffebeb;">
+                <h3 style="margin: 0; color: #dc3545; font-size: 1.2em;"><i class="fas fa-shopping-basket"></i> Ingredientes a Usar</h3>
+                <small style="color: #d63384;">Estos items se restarán del inventario automáticamente</small>
+            </div>
+            
+            <div style="max-height: 500px; overflow-y: auto;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    {% for comp in ingredientes %}
+                    <tr style="border-bottom: 1px solid #f8f9fa;">
+                        <td style="padding: 15px;">
+                            <div style="font-weight: bold; color: #333;">{{ comp.insumo_hijo.nombre }}</div>
+                            <div style="font-size: 0.85em; color: {% if comp.insumo_hijo.stock_actual <= 0 %}#dc3545{% else %}#198754{% endif %}; margin-top: 4px;">
+                                <i class="fas fa-cubes"></i> Stock: {{ comp.insumo_hijo.stock_actual|floatformat:1 }} {{ comp.insumo_hijo.unidad.codigo }}
+                            </div>
+                        </td>
+                        <td style="padding: 15px; text-align: right; background: #fff;">
+                            <span class="dato-base" 
+                                  data-cantidad-base="{{ comp.cantidad }}" 
+                                  data-unidad="{{ comp.insumo_hijo.unidad.codigo }}">
+                                ...
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Valor del rendimiento base (Lo que rinde 1 lote)
+    const rendimientoBase = parseFloat("{{ insumo.rendimiento|stringformat:'f' }}") || 0;
+    const unidadProducto = "{{ insumo.unidad.codigo }}";
+
+    function calcularRequerimientos() {
+        // 1. Obtener Lotes
+        const input = document.getElementById('inputLotes');
+        let lotes = parseFloat(input.value);
+        
+        if (isNaN(lotes) || lotes < 0) lotes = 0;
+
+        // 2. Calcular Resultado Total
+        const totalProducir = lotes * rendimientoBase;
+        document.getElementById('txtResultado').innerText = totalProducir.toLocaleString('es-ES') + " " + unidadProducto;
+
+        // 3. Actualizar Ingredientes
+        const filas = document.querySelectorAll('.dato-base');
+        filas.forEach(span => {
+            const base = parseFloat(span.getAttribute('data-cantidad-base'));
+            const unidad = span.getAttribute('data-unidad');
+            
+            // Multiplicamos directo: Base x Lotes
+            const necesario = base * lotes;
+            
+            // Renderizar con estilo
+            span.innerHTML = `<div style="font-size:1.1em; font-weight:bold; color:#dc3545;">- ${necesario.toLocaleString('es-ES', {minimumFractionDigits: 1, maximumFractionDigits: 2})} ${unidad}</div>`;
+        });
+    }
+
+    // Ejecutar al cargar
+    document.addEventListener('DOMContentLoaded', calcularRequerimientos);
+</script>
+{% endblock %}

@@ -1,119 +1,239 @@
 {% extends 'base.html' %}
-{% block title %}- Receta {{ insumo.nombre }}{% endblock %}
+{% load static %}
+
+{% block title %}- Receta: {{ insumo.nombre }}{% endblock %}
 
 {% block content %}
-
 <style>
-    .composition-form {
-        background-color: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #e9ecef; margin-bottom: 25px;
-        display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end;
+    .recipe-header {
+        background: linear-gradient(135deg, #6610f2 0%, #4a0c8a 100%);
+        color: white;
+        padding: 30px;
+        border-radius: 12px;
+        margin-bottom: 30px;
+        box-shadow: 0 4px 15px rgba(102, 16, 242, 0.3);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
     }
-    .composition-form input, .composition-form select {
-        width: 100%; padding: 8px 10px; border: 1px solid #ced4da; border-radius: 5px; height: 40px; box-sizing: border-box;
+    .panel-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        border: 1px solid #eee;
+        overflow: hidden;
+        height: 100%;
     }
-    .btn-add-ingredient {
-        height: 40px; width: 50px; background-color: #343a40; color: white; border: none; border-radius: 5px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;
+    .panel-header {
+        background: #f8f9fa;
+        padding: 15px 20px;
+        border-bottom: 1px solid #eee;
+        font-weight: bold;
+        color: #555;
+        font-size: 1.1em;
     }
-    .field-group { display: flex; flex-direction: column; }
-    .field-grow { flex-grow: 1; min-width: 200px; }
-    .field-fixed { width: 150px; }
+    .cost-display {
+        background: #e8f4fd; 
+        color: #0d6efd; 
+        padding: 10px 20px; 
+        border-radius: 8px; 
+        text-align: right;
+    }
+    .unit-badge {
+        font-size: 0.8em; 
+        background: rgba(255,255,255,0.2); 
+        padding: 2px 8px; 
+        border-radius: 4px;
+    }
+    /* Lista de ingredientes */
+    .ingrediente-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 20px;
+        border-bottom: 1px solid #f1f1f1;
+        transition: background 0.2s;
+    }
+    .ingrediente-row:hover {
+        background-color: #f9f9f9;
+    }
 </style>
 
-<div style="max-width: 900px; margin: 40px auto; padding: 20px;">
-    
-    <div style="margin-bottom: 30px; text-align: center;">
-        <h2 style="color: #0d6efd; margin: 0;">Composición: {{ insumo.nombre }}</h2>
-        <p style="color: #666; margin-top: 10px;">
-            Define la receta para fabricar <b>{{ total_cantidad|floatformat:0 }} {{ insumo.unidad.codigo }}</b> de este insumo.
-        </p>
-    </div>
+<div style="padding: 20px; max-width: 1200px; margin: 0 auto;">
 
-    <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 25px;">
+    <div class="recipe-header">
+        <div>
+            <div style="font-size: 0.9em; opacity: 0.8; margin-bottom: 5px;">CONFIGURACIÓN DE RECETA</div>
+            <h1 style="margin: 0; font-size: 2em;">
+                <i class="fas fa-blender"></i> {{ insumo.nombre }}
+            </h1>
+            <div style="margin-top: 10px; display: flex; gap: 15px;">
+                <span class="unit-badge"><i class="fas fa-tag"></i> Categoría: {{ insumo.categoria }}</span>
+                <span class="unit-badge"><i class="fas fa-balance-scale"></i> Unidad: {{ insumo.unidad.nombre }}</span>
+            </div>
+        </div>
         
-        <div class="card-style" style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #ddd; height: fit-content; text-align: center;">
-            <h3 style="margin-top: 0; color: #444;">Costo Calculado</h3>
-            <hr style="margin: 10px 0; border: 0; border-top: 1px solid #eee;">
-            
-            <div style="font-size: 2.2em; font-weight: bold; color: #28a745; margin: 15px 0;">
-                ${{ insumo.costo_unitario|floatformat:4 }}
-            </div>
-            
-            <div style="font-size: 0.9em; color: #666; margin-bottom: 20px;">
-                Costo por cada {{ total_cantidad|floatformat:0 }} {{ insumo.unidad.nombre }}
-            </div>
-
-            <a href="{% url 'inventory_index' %}" class="add-btn" style="display: block; text-decoration: none; background: #343a40; color: white; padding: 10px; border-radius: 5px;">
-                <i class="fas fa-check"></i> Finalizar y Volver
+        <div style="text-align: right;">
+            <a href="{% url 'inventory_index' %}" style="color: white; text-decoration: none; background: rgba(255,255,255,0.2); padding: 10px 20px; border-radius: 8px; font-weight: bold; display: inline-flex; align-items: center; gap: 8px;">
+                <i class="fas fa-arrow-left"></i> Volver al Inventario
             </a>
         </div>
+    </div>
 
-        <div class="card-style" style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #ddd;">
-            <h3 style="margin-top: 0; margin-bottom: 15px; color: #444;">Ingredientes / Sub-insumos</h3>
-            
-            <form method="POST" class="composition-form">
-                {% csrf_token %}
-                <div class="field-group field-grow">
-                    <label style="font-weight: bold; margin-bottom: 5px; font-size: 0.9em;">Ingrediente (Hijo):</label>
-                    {{ form.insumo_hijo }}
-                </div>
-                <div class="field-group field-fixed">
-                    <label style="font-weight: bold; margin-bottom: 5px; font-size: 0.9em;">Cant. ({{ insumo.unidad.codigo }}):</label>
-                    {{ form.cantidad }}
-                </div>
-                <div class="field-group">
-                    <button type="submit" class="btn-add-ingredient" title="Agregar Ingrediente"><i class="fas fa-plus"></i></button>
-                </div>
-            </form>
+    <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 25px; align-items: start;">
+        
+        <div class="panel-card">
+            <div class="panel-header" style="border-left: 5px solid #198754;">
+                <i class="fas fa-plus-circle"></i> Agregar Ingrediente
+            </div>
+            <div style="padding: 20px;">
+                <form method="POST">
+                    {% csrf_token %}
+                    <input type="hidden" name="add_ingredient" value="true">
 
-            <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
-                <thead>
-                    <tr style="border-bottom: 2px solid #eee; text-align: left; color: #666; font-size: 0.9em;">
-                        <th style="padding: 10px;">Insumo</th>
-                        <th style="padding: 10px;">Cantidad</th>
-                        <th style="padding: 10px;">Costo Aprox.</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for comp in componentes %}
-                    <tr style="border-bottom: 1px solid #f9f9f9;">
-                        <td style="padding: 10px; font-weight: bold;">{{ comp.insumo_hijo.nombre }}</td>
-                        <td style="padding: 10px;">
-                            {{ comp.cantidad|floatformat:0  }} {{ comp.insumo_hijo.unidad.codigo|floatformat:0 }}
-                        </td>
-                        <td style="padding: 10px; color: #666;">
-                            ${{ comp.costo_fila|floatformat:4 }}
-                        </td>
-                        <td style="padding: 10px; text-align: right;">
-                            <form method="POST" onsubmit="return confirm('¿Eliminar?');">
+                    <div style="margin-bottom: 15px;">
+                        <label style="font-weight: bold; display: block; margin-bottom: 5px;">Buscar Producto:</label>
+                        <input type="text" id="filtroInsumo" onkeyup="filtrarSelect()" placeholder="Ej: Harina..." 
+                               class="form-control" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ddd;">
+                    </div>
+
+                    <div style="margin-bottom: 15px;">
+                        <label style="font-weight: bold; display: block; margin-bottom: 5px;">Seleccionar:</label>
+                        <select name="insumo_hijo" id="selectInsumo" required size="5" class="form-control" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ddd; background: #fff;">
+                            {% for item in insumos_disponibles %}
+                                <option value="{{ item.id }}">
+                                    {{ item.nombre }} (${{ item.costo_unitario|floatformat:4 }}/{{ item.unidad.codigo }})
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <small style="color: #666;">Selecciona uno de la lista</small>
+                    </div>
+
+                    <div style="margin-bottom: 20px;">
+                        <label style="font-weight: bold; display: block; margin-bottom: 5px;">Cantidad a Usar:</label>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="number" step="0.001" name="cantidad" required placeholder="0.00" 
+                                   class="form-control" style="flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #ddd; font-size: 1.2em; font-weight: bold;">
+                            <span style="color: #666; font-weight: bold;">{{ insumo.unidad.codigo }}</span>
+                        </div>
+                    </div>
+
+                    <button type="submit" style="width: 100%; padding: 12px; background: #198754; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 1.1em;">
+                        Agregar a la Mezcla
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="panel-card">
+            <div class="panel-header" style="border-left: 5px solid #0d6efd; display: flex; justify-content: space-between;">
+                <span><i class="fas fa-list-ul"></i> Composición Actual</span>
+                <span style="font-size: 0.9em; font-weight: normal; color: #666;">{{ ingredientes.count }} Ingredientes</span>
+            </div>
+
+            <div style="min-height: 200px;">
+                {% if ingredientes %}
+                    {% for comp in ingredientes %}
+                    <div class="ingrediente-row">
+                        <div style="flex: 2;">
+                            <div style="font-weight: bold; color: #333;">{{ comp.insumo_hijo.nombre }}</div>
+                            <div style="font-size: 0.85em; color: #999;">
+                                Costo Base: ${{ comp.insumo_hijo.costo_unitario|floatformat:5 }}
+                            </div>
+                        </div>
+                        
+                        <div style="flex: 1; text-align: center; font-weight: bold; color: #555;">
+                            {{ comp.cantidad|floatformat:0 }} {{ comp.insumo_hijo.unidad.codigo }}
+                        </div>
+                        
+                        <div style="flex: 1; text-align: right; font-weight: bold; color: #0d6efd;">
+                            ${{ comp.subtotal_calculado|floatformat:2 }}
+                        </div>
+
+                        <div style="flex: 0.5; text-align: right;">
+                            <form method="POST" style="display:inline;">
                                 {% csrf_token %}
-                                <input type="hidden" name="delete_componente" value="{{ comp.id }}">
-                                <button type="submit" style="background: none; border: none; color: #dc3545; cursor: pointer;">
-                                    <i class="fas fa-trash"></i>
+                                <input type="hidden" name="delete_ingredient" value="true">
+                                <input type="hidden" name="ingrediente_id" value="{{ comp.id }}">
+                                <button type="submit" style="background: none; border: none; color: #dc3545; cursor: pointer;" title="Quitar">
+                                    <i class="fas fa-times-circle"></i>
                                 </button>
                             </form>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr><td colspan="4" style="padding: 30px; text-align: center; color: #999;">Sin ingredientes.</td></tr>
+                        </div>
+                    </div>
                     {% endfor %}
-                </tbody>
-                
-                {% if componentes %}
-                <tfoot>
-                    <tr style="background-color: #f1f8ff; border-top: 2px solid #0d6efd;">
-                        <td style="padding: 15px 10px; font-weight: bold; color: #0d6efd;">TOTAL MEZCLA:</td>
-                        <td style="padding: 15px 10px; font-weight: bold; color: #333;">
-                            {{ total_cantidad|floatformat:0  }} {{ insumo.unidad.codigo }}
-                        </td>
-                        <td colspan="2" style="padding: 15px 10px; color: #666; font-size: 0.9em;">
-                            <i>{{ insumo.costo_unitario|floatformat:4 }}</i>
-                        </td>
-                    </tr>
-                </tfoot>
+                {% else %}
+                    <div style="text-align: center; padding: 40px; color: #999;">
+                        <i class="fas fa-carrot fa-3x" style="margin-bottom: 15px; opacity: 0.3;"></i><br>
+                        La olla está vacía.<br>Agrega ingredientes desde el panel izquierdo.
+                    </div>
                 {% endif %}
-            </table>
+            </div>
+
+            <div style="background: #f8f9fa; border-top: 2px solid #0d6efd; padding: 20px;">
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #ccc; padding-bottom: 15px; margin-bottom: 15px;">
+                    <div>
+                        <div style="color: #333; font-weight: bold; font-size: 1.1em;">
+                            <i class="fas fa-money-bill-wave"></i> Costo Total de la Receta
+                        </div>
+                        <div style="font-size: 0.85em; color: #666;">
+                            (Suma de todos los ingredientes)
+                        </div>
+                    </div>
+                    <div style="font-size: 1.8em; font-weight: bold; color: #0d6efd;">
+                        ${{ costo_total_lote|floatformat:2 }}
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px;">
+                    <div>
+                        <div style="color: #666; font-size: 0.9em;">Peso Total (Rendimiento)</div>
+                        <div style="font-size: 1.4em; font-weight: bold; color: #555;">
+                            {{ insumo.rendimiento|floatformat:0 }} {{ insumo.unidad.codigo }}
+                        </div>
+                    </div>
+                    
+                    <div style="text-align: right;">
+                        <div style="color: #666; font-size: 0.9em; text-transform: uppercase;">Costo por Gramo/Unidad</div>
+                        <div style="font-size: 2em; font-weight: bold; color: #198754;">
+                            ${{ insumo.costo_unitario|floatformat:5 }}
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="font-size: 0.85em; color: #666; background: #fff3cd; padding: 10px; border-radius: 6px; border: 1px solid #ffeeba;">
+                    <i class="fas fa-calculator"></i> 
+                    El sistema divide el <b>Costo Total (${{ costo_total_lote|floatformat:0 }})</b> 
+                    entre el <b>Peso Total ({{ insumo.rendimiento|floatformat:0 }})</b> 
+                    para obtener el costo unitario real.
+                    <div style="margin-top: 25px;">
+                        <a href="{% url 'inventory_index' %}" style="display: block; width: 100%; text-align: center; background: #198754; color: white; padding: 15px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 1.2em; box-shadow: 0 4px 6px rgba(25, 135, 84, 0.2);">
+                            <i class="fas fa-check-circle"></i> Confirmar y Finalizar Receta
+                        </a>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+
+<script>
+    function filtrarSelect() {
+        var input, filter, select, options, i;
+        input = document.getElementById("filtroInsumo");
+        filter = input.value.toUpperCase();
+        select = document.getElementById("selectInsumo");
+        options = select.getElementsByTagName("option");
+        
+        for (i = 0; i < options.length; i++) {
+            txtValue = options[i].textContent || options[i].innerText;
+            if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                options[i].style.display = "";
+            } else {
+                options[i].style.display = "none";
+            }
+        }
+    }
+</script>
 {% endblock %}
