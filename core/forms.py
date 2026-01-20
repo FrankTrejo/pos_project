@@ -1,5 +1,6 @@
 from django import forms
 from .models import Configuracion
+from tables.models import CostoAdicional
 
 # 1. FORMULARIO DE IDENTIDAD
 class ConfigIdentidadForm(forms.ModelForm):
@@ -41,3 +42,16 @@ class ConfigVisualForm(forms.ModelForm):
     class Meta:
         model = Configuracion
         fields = ['logo', 'mensaje_ticket']
+
+class CostoAdicionalForm(forms.ModelForm):
+    class Meta:
+        model = CostoAdicional
+        fields = ['nombre', 'tipo', 'valor_defecto']
+        widgets = {
+            'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Caja Mediana, Gas...'}),
+            'tipo': forms.Select(attrs={'class': 'form-select'}),
+            'valor_defecto': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+        }
+        labels = {
+            'valor_defecto': 'Valor ($ o %)'
+        }

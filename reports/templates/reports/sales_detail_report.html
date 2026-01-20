@@ -4,6 +4,78 @@
 {% block title %}- Detalle de Ventas{% endblock %}
 
 {% block content %}
+<style>
+    /* ESTILOS PARA LA ANULACIÓN */
+    .fila-anulada {
+        background-color: #fff5f5 !important; /* Fondo rojizo suave */
+    }
+    .fila-anulada td {
+        color: #999 !important; /* Texto gris */
+    }
+    .badge {
+        padding: 5px 10px;
+        border-radius: 15px;
+        font-weight: bold;
+        font-size: 0.8em;
+        display: inline-block;
+    }
+    .bg-success { background-color: #d1e7dd; color: #0f5132; } /* Verde */
+    .bg-danger { background-color: #f8d7da; color: #842029; } /* Rojo */
+    
+    /* Modal Styles */
+    .modal-overlay {
+        display: none; 
+        position: fixed; 
+        top: 0; left: 0; 
+        width: 100%; height: 100%; 
+        background: rgba(0,0,0,0.5); 
+        z-index: 9999; 
+        justify-content: center; 
+        align-items: center;
+    }
+    .modal-content {
+        background: white; 
+        padding: 25px; 
+        border-radius: 10px; 
+        width: 400px; 
+        text-align: center;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    /* Estilos para los botones de filtro */
+    .btn-filtro {
+        padding: 8px 16px;
+        text-decoration: none;
+        border-radius: 20px;
+        border: 1px solid #ccc;
+        color: #666;
+        font-weight: 500;
+        background: white;
+        transition: all 0.2s;
+        font-size: 0.9em;
+    }
+    .btn-filtro:hover {
+        background: #f0f0f0;
+        color: #333;
+    }
+
+    /* Estados Activos */
+    .btn-filtro.active {
+        background: #6c757d;
+        color: white;
+        border-color: #6c757d;
+    }
+    .btn-filtro.active-success {
+        background: #198754; /* Verde */
+        color: white;
+        border-color: #198754;
+    }
+    .btn-filtro.active-danger {
+        background: #dc3545; /* Rojo */
+        color: white;
+        border-color: #dc3545;
+    }
+</style>
+
 <div style="padding: 20px; max-width: 1400px; margin: 0 auto;">
     
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
@@ -28,7 +100,34 @@
             </button>
         </form>
     </div>
+    <div style="margin: 20px 0; display: flex; gap: 10px;">
+        
+        <a href="?fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}&estado=todas" 
+           class="btn-filtro {% if estado_filtro == 'todas' %}active{% endif %}">
+            Todas
+        </a>
 
+        <a href="?fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}&estado=validas" 
+           class="btn-filtro {% if estado_filtro == 'validas' %}active-success{% endif %}">
+            <i class="fas fa-check-circle"></i> Solo Cobradas
+        </a>
+
+        <a href="?fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}&estado=anuladas" 
+           class="btn-filtro {% if estado_filtro == 'anuladas' %}active-danger{% endif %}">
+            <i class="fas fa-ban"></i> Solo Anuladas
+        </a>
+
+    </div>
+
+    <div style="background: ...">
+        <span style="font-size: 1.4em; font-weight: bold;">
+            {% if estado_filtro == 'anuladas' %}
+                Total Anulado: <span style="color: #dc3545;">${{ total_periodo|floatformat:2 }}</span>
+            {% else %}
+                Total Facturado: <span style="color: #0d47a1;">${{ total_periodo|floatformat:2 }}</span>
+            {% endif %}
+        </span>
+    </div>
     <div style="background: #e3f2fd; color: #0d47a1; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #bbdefb; display: flex; justify-content: space-between; align-items: center;">
         <span style="font-size: 1.1em;">Mostrando <b>{{ ventas.count }}</b> transacciones</span>
         <span style="font-size: 1.4em; font-weight: bold;">Total Facturado: ${{ total_periodo|floatformat:2 }}</span>
@@ -41,15 +140,14 @@
                     <th style="padding: 12px;">Fecha / Hora</th>
                     <th style="padding: 12px;">N° Factura</th>
                     <th style="padding: 12px;">Mesero</th>
-                    <th style="padding: 12px; width: 30%;">Productos</th>
-                    <th style="padding: 12px; width: 20%;">Métodos de Pago</th>
-                    <th style="padding: 12px; text-align: right;">Total ($)</th>
-                    <th style="padding: 12px; text-align: center;">PDF</th>
-                </tr>
+                    <th style="padding: 12px; width: 25%;">Productos</th>
+                    <th style="padding: 12px;">Métodos de Pago</th>
+                    <th style="padding: 12px;">Estado</th> <th style="padding: 12px; text-align: right;">Total ($)</th>
+                    <th style="padding: 12px; text-align: center;">Acciones</th> </tr>
             </thead>
             <tbody>
                 {% for venta in ventas %}
-                <tr style="border-bottom: 1px solid #eee; hover: background-color: #f9f9f9;">
+                <tr class="{% if venta.anulada %}fila-anulada{% endif %}" style="border-bottom: 1px solid #eee;">
                     
                     <td style="padding: 12px; white-space: nowrap; vertical-align: top;">
                         <div style="font-weight: bold;">{{ venta.fecha|date:"d/m/Y" }}</div>
@@ -57,7 +155,7 @@
                     </td>
 
                     <td style="padding: 12px; vertical-align: top;">
-                        <span style="background: #eee; padding: 3px 8px; border-radius: 4px; font-family: monospace; font-weight: bold;">
+                        <span style="background: #eee; padding: 3px 8px; border-radius: 4px; font-family: monospace; font-weight: bold; color: #333;">
                             {{ venta.codigo_factura }}
                         </span>
                     </td>
@@ -84,35 +182,58 @@
                         {% if venta.pagos.exists %}
                             {% for pago in venta.pagos.all %}
                                 <div style="margin-bottom: 3px;">
-                                    <span style="font-weight: 600; font-size: 0.85em; color: #555;">{{ pago.get_metodo_display }}:</span>
+                                    <span style="font-weight: 600; font-size: 0.85em;">{{ pago.get_metodo_display }}:</span>
                                     ${{ pago.monto }}
                                 </div>
                             {% endfor %}
-                            
-                            <div style="margin-top: 5px; font-size: 0.8em; color: #888; border-top: 1px dashed #ddd; padding-top: 2px;">
-                                Recibido: ${{ venta.monto_recibido }}
-                                {% if venta.propina > 0 %}| Propina: ${{ venta.propina }}{% endif %}
-                            </div>
                         {% else %}
                             {{ venta.get_metodo_pago_display }}
                         {% endif %}
                     </td>
 
+                    <td style="padding: 12px; vertical-align: top;">
+                        {% if venta.anulada %}
+                            <span class="badge bg-danger">ANULADA</span>
+                            {% if venta.motivo_anulacion %}
+                                <div style="font-size: 0.8em; margin-top: 5px; font-style: italic;">
+                                    "{{ venta.motivo_anulacion }}"
+                                </div>
+                            {% endif %}
+                        {% else %}
+                            <span class="badge bg-success">COBRADA</span>
+                        {% endif %}
+                    </td>
+
                     <td style="padding: 12px; text-align: right; vertical-align: top;">
-                        <b style="color: #28a745; font-size: 1.1em;">${{ venta.total|floatformat:2 }}</b>
+                        {% if venta.anulada %}
+                            <del style="color: #999;">${{ venta.total|floatformat:2 }}</del>
+                        {% else %}
+                            <b style="color: #28a745; font-size: 1.1em;">${{ venta.total|floatformat:2 }}</b>
+                        {% endif %}
                     </td>
 
                     <td style="padding: 12px; text-align: center; vertical-align: top;">
-                        <a href="{% url 'generar_factura_pdf' venta.id %}" target="_blank" title="Ver Factura PDF" 
-                           style="color: #dc3545; font-size: 1.2em;">
-                            <i class="fas fa-file-pdf"></i>
-                        </a>
+                        <div style="display: flex; gap: 10px; justify-content: center;">
+                            
+                            <a href="{% url 'generar_factura_pdf' venta.id %}" target="_blank" title="Ver Factura PDF" 
+                               style="color: #dc3545; font-size: 1.2em;">
+                                <i class="fas fa-file-pdf"></i>
+                            </a>
+
+                            {% if not venta.anulada %}
+                                <button onclick="abrirModalAnular('{{ venta.id }}', '{{ venta.codigo_factura }}')" 
+                                        style="background: none; border: none; cursor: pointer; color: #6c757d; font-size: 1.2em;" 
+                                        title="Anular Venta (Devolver Stock)">
+                                    <i class="fas fa-ban"></i>
+                                </button>
+                            {% endif %}
+                        </div>
                     </td>
 
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="7" style="padding: 30px; text-align: center; color: #999;">
+                    <td colspan="8" style="padding: 30px; text-align: center; color: #999;">
                         No se encontraron ventas en este rango de fechas.
                     </td>
                 </tr>
@@ -121,4 +242,61 @@
         </table>
     </div>
 </div>
+
+<div id="modalAnular" class="modal-overlay">
+    <div class="modal-content">
+        <h3 style="color: #dc3545; margin-top: 0;"><i class="fas fa-exclamation-triangle"></i> Anular Venta</h3>
+        
+        <p>¿Estás seguro de anular la factura <b id="lblFactura"></b>?</p>
+        
+        <div style="background: #fff3cd; color: #856404; padding: 10px; border-radius: 5px; font-size: 0.9em; margin-bottom: 15px;">
+            Esta acción devolverá los ingredientes al inventario y restará el dinero de la caja.
+        </div>
+        
+        <form id="formAnular" method="POST" action="">
+            {% csrf_token %}
+            <div style="margin-bottom: 20px; text-align: left;">
+                <label style="font-weight: bold; display: block; margin-bottom: 5px;">Motivo de la anulación:</label>
+                <input type="text" name="motivo" required placeholder="Ej: Error de cajero, Cliente devolvió..." 
+                       style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px;">
+            </div>
+            
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button type="button" onclick="cerrarModalAnular()" 
+                        style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                    Cancelar
+                </button>
+                <button type="submit" 
+                        style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                    Confirmar Anulación
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function abrirModalAnular(id, codigo) {
+        // Ponemos el número de factura en el texto
+        document.getElementById('lblFactura').innerText = "#" + codigo;
+        
+        // Construimos la URL dinámicamente. 
+        // IMPORTANTE: Asegúrate de que tu URL en urls.py sea: path('venta/anular/<int:venta_id>/', ...)
+        // Si tienes un prefijo 'pos/', agrégalo abajo.
+        document.getElementById('formAnular').action = "/venta/anular/" + id + "/"; 
+        
+        document.getElementById('modalAnular').style.display = 'flex';
+    }
+
+    function cerrarModalAnular() {
+        document.getElementById('modalAnular').style.display = 'none';
+    }
+
+    // Cerrar si hacen click fuera del modal
+    window.onclick = function(event) {
+        if (event.target == document.getElementById('modalAnular')) {
+            cerrarModalAnular();
+        }
+    }
+</script>
 {% endblock %}

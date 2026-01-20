@@ -149,8 +149,74 @@ def auditoria_eliminaciones(request):
     logs = AuditoriaEliminacion.objects.all().order_by('-fecha')
     return render(request, 'reports/auditoria_list.html', {'logs': logs})
 
+# reports/views.py
+
 @staff_member_required
 def reporte_ventas_detalle(request):
+    # 1. Filtros de Fecha
+    fecha_inicio = request.GET.get('fecha_inicio', timezone.now().strftime('%Y-%m-%d'))
+    fecha_fin = request.GET.get('fecha_fin', timezone.now().strftime('%Y-%m-%d'))
+    
+    # 2. Capturamos el filtro de estado (todas, validas, anuladas)
+    estado_filtro = request.GET.get('estado', 'todas') # Por defecto 'todas'
+
+    # 3. Consulta Base (Por fecha)
+    ventas = Venta.objects.filter(
+        fecha__date__range=[fecha_inicio, fecha_fin]
+    ).select_related('mesero').prefetch_related('detalles', 'pagos').order_by('-fecha')
+
+    # 4. APLICACIÓN DE FILTROS Y CÁLCULO DE TOTALES
+    total_periodo = 0
+
+    if estado_filtro == 'anuladas':
+        # CASO A: Solo ver las canceladas
+        ventas = ventas.filter(anulada=True)
+        # El total muestra cuánto dinero se "perdió" en anulaciones
+        total_periodo = ventas.aggregate(Sum('total'))['total__sum'] or 0
+
+    elif estado_filtro == 'validas':
+        # CASO B: Solo ver las cobradas
+        ventas = ventas.filter(anulada=False)
+        total_periodo = ventas.aggregate(Sum('total'))['total__sum'] or 0
+
+    else:
+        # CASO C: Ver todas (Mix)
+        # Aquí mostramos la lista completa, pero el total SUMA SOLO LO REAL (No anulado)
+        total_periodo = ventas.filter(anulada=False).aggregate(Sum('total'))['total__sum'] or 0
+
+    context = {
+        'ventas': ventas,
+        'fecha_inicio': fecha_inicio,
+        'fecha_fin': fecha_fin,
+        'total_periodo': total_periodo,
+        'estado_filtro': estado_filtro # Pasamos esto para pintar los botones
+    }
+    return render(request, 'reports/sales_detail_report.html', context)
+    # 1. Filtros de Fecha
+    fecha_inicio = request.GET.get('fecha_inicio', timezone.now().strftime('%Y-%m-%d'))
+    fecha_fin = request.GET.get('fecha_fin', timezone.now().strftime('%Y-%m-%d'))
+
+    # 2. Consulta General (Trae TODAS para la lista, incluidas anuladas)
+    # Esto se mantiene igual para que en la tabla veas las filas rojas
+    ventas = Venta.objects.filter(
+        fecha__date__range=[fecha_inicio, fecha_fin]
+    ).select_related('mesero').prefetch_related(
+        'detalles', 
+        'pagos'    
+    ).order_by('-fecha')
+
+    # 3. CÁLCULO CORREGIDO: 
+    # Aplicamos .filter(anulada=False) ANTES de sumar.
+    # Así el dinero de las anuladas no entra en la suma final.
+    total_periodo = ventas.filter(anulada=False).aggregate(Sum('total'))['total__sum'] or 0
+
+    context = {
+        'ventas': ventas,
+        'fecha_inicio': fecha_inicio,
+        'fecha_fin': fecha_fin,
+        'total_periodo': total_periodo
+    }
+    return render(request, 'reports/sales_detail_report.html', context)
     # 1. Filtros de Fecha
     fecha_inicio = request.GET.get('fecha_inicio', timezone.now().strftime('%Y-%m-%d'))
     fecha_fin = request.GET.get('fecha_fin', timezone.now().strftime('%Y-%m-%d'))

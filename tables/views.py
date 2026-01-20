@@ -660,3 +660,57 @@ def generar_factura_pdf(request, venta_id):
         return HttpResponse('Error al generar PDF', status=500)
     return response
 
+# pos/views.py
+from django.db import transaction
+from django.utils import timezone
+from inventory.models import MovimientoInventario
+
+def anular_venta(request, venta_id):
+    if request.method == 'POST':
+        venta = get_object_or_404(Venta, id=venta_id)
+        motivo = request.POST.get('motivo', 'Sin motivo especificado')
+
+        if venta.anulada:
+            messages.error(request, "Esta venta ya estaba anulada.")
+            return redirect('reporte_ventas') # O el nombre de tu URL del reporte
+
+        try:
+            with transaction.atomic():
+                # 1. DEVOLVER INGREDIENTES AL INVENTARIO
+                # Recorremos cada plato vendido en esa factura
+                for detalle in venta.detalles.all():
+                    producto = detalle.producto
+                    cantidad_vendida = detalle.cantidad
+                    
+                    if producto:
+                        # Buscamos la receta de ese producto
+                        ingredientes = producto.ingredientes.all()
+                        
+                        for ingrediente in ingredientes:
+                            insumo = ingrediente.insumo
+                            # Cantidad a devolver = (Lo que lleva 1 plato * Platos vendidos)
+                            cantidad_a_reponer = ingrediente.cantidad * cantidad_vendida
+                            
+                            # Registramos el movimiento de entrada (Devolución)
+                            MovimientoInventario.objects.create(
+                                insumo=insumo,
+                                tipo='ENTRADA', # Es una entrada porque regresa al almacén
+                                cantidad=cantidad_a_reponer,
+                                usuario=request.user,
+                                nota=f"ANULACIÓN Venta #{venta.codigo_factura}: {producto.nombre}",
+                                costo_unitario_movimiento=insumo.costo_unitario 
+                            )
+
+                # 2. MARCAR VENTA COMO ANULADA
+                venta.anulada = True
+                venta.motivo_anulacion = motivo
+                venta.fecha_anulacion = timezone.now()
+                venta.usuario_anulacion = request.user
+                venta.save()
+                
+                messages.success(request, f"Venta #{venta.codigo_factura} anulada correctamente. Inventario repuesto.")
+
+        except Exception as e:
+            messages.error(request, f"Error al anular: {e}")
+
+    return redirect('reporte_ventas_detalle') # Cambia esto por el nombre de tu url de reporte
