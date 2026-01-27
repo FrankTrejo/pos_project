@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'reports',
     'maestros',
     'core',
+    'staff',
 ]
 
 MIDDLEWARE = [

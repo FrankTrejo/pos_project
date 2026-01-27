@@ -34,14 +34,14 @@
             <p class="summary-text">Ventas hoy: $1,200</p>
             <a href="{% url 'reportes_index' %}" class="summary-link">Ver estadísticas</a>
         </div>
-
-        <div class="card-style summary-card text-center">
-            <i class="fas fa-user-tie card-icon"></i>
-            <h3>Personal</h3>
-            <p class="summary-text">8 Empleados activos</p>
-            <a href="#" class="summary-link">Administrar equipo</a>
-        </div>
-
+        {% if request.user.is_superuser or request.user.is_staff %}
+            <div class="card-style summary-card text-center">
+                <i class="fas fa-user-tie card-icon"></i>
+                <h3>Personal</h3>
+                <p class="summary-text">8 Empleados activos</p>
+                <a href="{% url 'staff_list' %}" class="summary-link">Administrar equipo</a>
+            </div>
+        {% endif %}
         <div class="card-style summary-card text-center">
             <i class="fas fa-cash-register card-icon"></i>
             <h3>Punto de Venta</h3>

@@ -89,7 +89,7 @@ def table_order_view(request, table_id):
     
     categorias = Categoria.objects.all()
     productos = Producto.objects.filter(precio__gt=0).select_related('categoria').order_by('nombre')
-    meseros = User.objects.filter(is_active=True)
+    meseros = User.objects.filter(is_active=True, groups__name='Mesero')
 
     # 2. LOGICA: RECUPERAR EL CARRITO GUARDADO
     orden_activa = Orden.objects.filter(mesa=table).first()
@@ -395,7 +395,85 @@ def eliminar_mesa_ajax(request, table_id):
             return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
     return JsonResponse({'status': 'error'}, status=400)
 
+# tables/views.py
+
 def generar_cuenta_pdf(request, table_id):
+    table = get_object_or_404(Table, id=table_id)
+    orden = Orden.objects.filter(mesa=table).first()
+    
+    if not orden:
+        return HttpResponse("No hay orden activa para esta mesa", status=404)
+
+    tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
+    tasa_valor = float(tasa_obj.precio) if tasa_obj else 0
+
+    # Marcamos solicitud de pago
+    table.solicitud_pago = True
+    table.save()
+
+    detalles_con_conversion = []
+    
+    # IMPORTANTE: Inicializamos el Gran Total en 0 para recalcularlo correctamente
+    total_acumulado_usd = 0 
+
+    for item in orden.detalles.all():
+        # 1. Calcular cuánto suman los extras de ESTA pizza
+        # Accedemos a la relación 'extras_elegidos' del modelo
+        costo_extras = sum(float(extra.precio) for extra in item.extras_elegidos.all())
+        
+        # 2. Precio Real Unitario = Precio Pizza + Precio Extras
+        precio_unitario_real = float(item.precio_unitario) + costo_extras
+        
+        # 3. Subtotal Real = (Precio Real) * Cantidad
+        subtotal_linea_usd = precio_unitario_real * item.cantidad
+        
+        # 4. Sumamos al Gran Total de la cuenta
+        total_acumulado_usd += subtotal_linea_usd
+        
+        # Conversión a Bolívares de la línea
+        subtotal_linea_bs = subtotal_linea_usd * tasa_valor
+
+        detalles_con_conversion.append({
+            'cantidad': item.cantidad,
+            'producto': item.producto.nombre,
+            'tamano': item.producto.get_tamano_display(),
+            
+            # Enviamos el precio base original para mostrar "REF BASE"
+            'precio_usd': item.precio_unitario, 
+            
+            # Enviamos el SUBTOTAL CORREGIDO (con extras) para la columna derecha
+            'subtotal_usd': subtotal_linea_usd, 
+            'subtotal_bs': subtotal_linea_bs,
+            'extras_elegidos': item.extras_elegidos.all() 
+        })
+
+    # Calculamos el total en Bs basado en el nuevo total USD
+    total_acumulado_bs = total_acumulado_usd * tasa_valor
+
+    context = {
+        'orden': orden,
+        'detalles': detalles_con_conversion,
+        'fecha': timezone.now(),
+        'tasa': tasa_valor,
+        
+        # Usamos los totales recalculados
+        'total_usd': total_acumulado_usd, 
+        'total_bs': total_acumulado_bs
+    }
+
+    template_path = 'tables/cuenta_pdf.html'
+    template = get_template(template_path)
+    html = template.render(context)
+
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'filename="cuenta_mesa_{table.number}.pdf"'
+    
+    # Corrección para evitar error de tamaño
+    pisa_status = pisa.CreatePDF(html, dest=response)
+    
+    if pisa_status.err:
+        return HttpResponse('Error al generar PDF', status=500)
+    return response
     table = get_object_or_404(Table, id=table_id)
     orden = Orden.objects.filter(mesa=table).first()
     

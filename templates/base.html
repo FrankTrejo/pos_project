@@ -36,9 +36,11 @@
                     <a href="{% url 'reportes_index' %}" class="sidebar-link">
                         <i class="fas fa-chart-line"></i> Reportes
                     </a>
-                    <a href="#" class="sidebar-link">
-                       <i class="fas fa-user-tie"></i> Personal
-                    </a>
+                    {% if request.user.is_superuser or request.user.is_staff %}
+                        <a href="{% url 'staff_list' %}" class="sidebar-link">
+                        <i class="fas fa-user-tie"></i> Personal
+                        </a>
+                    {% endif %}
                     <a href="{% url 'index' %}" class="sidebar-link">
                        <i class="fas fa-cash-register"></i> Punto de Venta
                     </a>
