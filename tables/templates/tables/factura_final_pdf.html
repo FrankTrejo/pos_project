@@ -10,6 +10,14 @@
         table { width: 100%; margin-top: 10px; }
         td { vertical-align: top; }
         .right { text-align: right; }
+        
+        /* Estilo para los extras en la factura */
+        .extra-row {
+            font-size: 9px;
+            color: #555;
+            font-style: italic;
+            margin-left: 5px;
+        }
     </style>
 </head>
 <body>
@@ -35,7 +43,17 @@
             {% for item in detalles %}
             <tr>
                 <td>{{ item.cantidad }}</td>
-                <td>{{ item.nombre_producto }}</td>
+                <td>
+                    {{ item.nombre_producto }}
+                    
+                    {% if item.extras.exists %}
+                        <div class="extra-row">
+                            {% for extra in item.extras.all %}
+                                + {{ extra.nombre_extra }} (${{ extra.precio }})<br>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    </td>
                 <td class="right">${{ item.subtotal }}</td>
             </tr>
             {% endfor %}
@@ -50,7 +68,6 @@
     </div>
 
     <div class="line"></div>
-
     <div class="line"></div>
 
     <div>

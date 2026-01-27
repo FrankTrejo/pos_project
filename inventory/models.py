@@ -21,6 +21,10 @@ class Insumo(models.Model):
     categoria = models.ForeignKey(CategoriaInsumo, on_delete=models.SET_NULL, null=True)
     unidad = models.ForeignKey(UnidadMedida, on_delete=models.PROTECT, verbose_name="Unidad Base")
 
+    es_extra = models.BooleanField(default=False, verbose_name="¿Se vende como Extra?")
+    precio_venta_extra = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Precio de Venta Extra ($)")
+    cantidad_porcion_extra = models.DecimalField(max_digits=10, decimal_places=4, default=0.00, help_text="Cantidad a descontar por cada extra vendido (Ej: 0.050 para 50g)")
+
     # --- MAESTRO DE COSTOS (LÓGICA CORREGIDA) ---
     # Ahora definimos el peso del "bulto" o "unidad de compra"
     peso_standar = models.DecimalField(

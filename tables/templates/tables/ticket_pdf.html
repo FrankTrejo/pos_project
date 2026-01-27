@@ -55,7 +55,8 @@
             width: 85%;
         }
         .tamano {
-            /* Hereda estilo del padre */
+            font-size: 0.9em;
+            font-weight: normal;
         }
         .nota {
             font-size: 12px;
@@ -70,15 +71,15 @@
             font-size: 10px;
         }
 
-        /* --- NUEVOS ESTILOS PARA 'LLEVAR' --- */
+        /* --- ESTILOS PARA 'LLEVAR' --- */
         .alert-global {
             background-color: #000;
             color: #fff;
-            font-size: 20px; /* Grande para que se vea de lejos */
+            font-size: 20px;
             font-weight: bold;
             text-align: center;
             padding: 10px;
-            border: 3px dashed #000; /* Borde por si la impresora no imprime fondo negro */
+            border: 3px dashed #000;
             margin-bottom: 15px;
             text-transform: uppercase;
             display: block;
@@ -95,27 +96,40 @@
             vertical-align: middle;
             text-transform: uppercase;
         }
+
+        /* --- ESTILO PARA EXTRAS (MODIFICADO) --- */
+        .lista-extras {
+            margin-top: 5px;
+            font-size: 14px;
+            font-weight: normal;
+            color: #333;
+            border-top: 1px dotted #ccc; /* Pequeño separador */
+            padding-top: 2px;
+        }
+        .item-extra {
+            /* Quitamos el padding y el "before" anterior */
+            margin-left: 5px;
+            padding: 2px 0;
+        }
+        /* Clase para resaltar la palabra EXTRA */
+        .label-extra {
+            font-weight: bold;
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
     <div class="header">
-        
         {% if orden.tipo_servicio == 'LLEVAR' %}
-            <div class="alert-global">
-                📦 ¡¡ PARA LLEVAR !! 📦
-            </div>
+            <div class="alert-global">📦 ¡¡ PARA LLEVAR !! 📦</div>
             <div class="mesa-title">TICKET #{{ orden.id }}</div>
-        
         {% elif orden.tipo_servicio == 'DOMICILIO' %}
-            <div class="alert-global">
-                🛵 DELIVERY
-            </div>
+            <div class="alert-global">🛵 DELIVERY</div>
             <div class="mesa-title">TICKET #{{ orden.id }}</div>
-        
         {% else %}
             <div class="mesa-title">MESA #{{ orden.mesa.number }}</div>
         {% endif %}
-        </div>
+    </div>
 
     <div class="meta-info">
         <b>Mesero:</b> {{ orden.mesero.username|upper|default:"SIN ASIGNAR" }}<br>
@@ -142,9 +156,21 @@
                          <span class="tamano">({{ item.producto.get_tamano_display|upper }})</span>
                     {% endif %}
                     
-                    {% if item.es_para_llevar %}
-                        <span class="badge-llevar">PARA LLEVAR 📦</span>
+                    {% if item.extras_elegidos.exists %}
+                        <div class="lista-extras">
+                            {% for extra in item.extras_elegidos.all %}
+                                <div class="item-extra">
+                                    <span class="label-extra">>> EXTRA:</span> {{ extra.insumo.nombre|upper }}
+                                </div>
+                            {% endfor %}
+                        </div>
                     {% endif %}
+                    {% if item.es_para_llevar %}
+                        <div style="margin-top: 5px;">
+                            <span class="badge-llevar">PARA LLEVAR 📦</span>
+                        </div>
+                    {% endif %}
+                    
                     {% if item.nota %}
                         <span class="nota">** {{ item.nota }} **</span>
                     {% endif %}

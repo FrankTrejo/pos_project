@@ -314,6 +314,14 @@ class DetalleOrden(models.Model):
     @property
     def subtotal(self):
         return self.cantidad * self.precio_unitario
+
+class DetalleOrdenExtra(models.Model):
+    detalle_orden = models.ForeignKey(DetalleOrden, on_delete=models.CASCADE, related_name='extras_elegidos')
+    insumo = models.ForeignKey(Insumo, on_delete=models.PROTECT, verbose_name="Ingrediente Extra")
+    precio = models.DecimalField(max_digits=10, decimal_places=2, help_text="Precio cobrado por el extra")
+
+    def __str__(self):
+        return f"Extra {self.insumo.nombre} en {self.detalle_orden.producto.nombre}"
     
 class Pago(models.Model):
     METODOS = [
@@ -331,3 +339,13 @@ class Pago(models.Model):
 
     def __str__(self):
         return f"{self.get_metodo_display()}: ${self.monto}"
+    
+# tables/models.py
+
+class DetalleVentaExtra(models.Model):
+    detalle_venta = models.ForeignKey(DetalleVenta, related_name='extras', on_delete=models.CASCADE)
+    nombre_extra = models.CharField(max_length=100)
+    precio = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def __str__(self):
+        return f"Extra {self.nombre_extra} en venta {self.detalle_venta.id}"

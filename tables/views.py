@@ -1,36 +1,32 @@
-# tables/views.py (CÓDIGO COMPLETO Y CORREGIDO)
+# tables/views.py
 
+import json
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.db.models import Max
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.contrib.admin.views.decorators import staff_member_required
-import json
-from .models import CostoAdicional, CostoAsignadoProducto # Importar modelos nuevos
-from .forms import CostoAdicionalForm # Importar form nuevo
-# --- IMPORTS NUEVOS ---
-import json
-from django.http import HttpResponse
 from django.template.loader import get_template
-from xhtml2pdf import pisa
-from django.utils import timezone
-from .models import Orden, DetalleOrden # Importa tus nuevos modelos
-import json
-from reports.models import AuditoriaEliminacion
-
-# Tus modelos y formularios
-from .models import Table, Categoria, Producto, TasaBCV, IngredienteProducto, Venta, DetalleVenta, Pago
-from .forms import ProductoBasicForm, RecetaProductoForm, ProductoPriceForm
-from .scrapping import obtener_tasa_bcv
-
-# tables/views.py
 from django.db import transaction
 from django.utils import timezone
-import uuid
+from django.core.serializers.json import DjangoJSONEncoder
+from xhtml2pdf import pisa
 
-# Asegúrate de tener estos imports arriba:
+# --- IMPORTACIONES DE MODELOS CORRECTAS ---
+from .models import (
+    Table, Categoria, Producto, TasaBCV, IngredienteProducto, 
+    Venta, DetalleVenta, Pago, Orden, DetalleOrden, 
+    DetalleOrdenExtra, CostoAdicional, CostoAsignadoProducto, DetalleVentaExtra
+)
+from .forms import (
+    ProductoBasicForm, RecetaProductoForm, ProductoPriceForm, 
+    CostoAdicionalForm
+)
+# Importamos modelos de otras apps
 from inventory.models import MovimientoInventario, Insumo
+from reports.models import AuditoriaEliminacion
+from .scrapping import obtener_tasa_bcv
 
 # ==========================================
 #  LÓGICA ORIGINAL (MESAS Y POS)
@@ -58,7 +54,6 @@ def toggle_status(request, table_id):
     if request.method == 'POST':
         table = get_object_or_404(Table, id=table_id)
         table.is_occupied = not table.is_occupied
-        # Si se libera la mesa, quitamos al mesero
         if not table.is_occupied:
             table.mesero = None
         table.save()
@@ -87,48 +82,58 @@ def asignar_mesero(request, table_id):
 def table_order_view(request, table_id):
     table = get_object_or_404(Table, id=table_id)
     
-    # 1. Recuperamos la Tasa y Productos (Código que ya tenías)
+    # 1. Recuperamos la Tasa y Productos
     tasa_actual_texto = obtener_tasa_bcv()
     tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
     tasa_numerica = float(tasa_obj.precio) if tasa_obj else 0
+    
     categorias = Categoria.objects.all()
-    productos = Producto.objects.filter(precio__gt=0).select_related('categoria')
+    productos = Producto.objects.filter(precio__gt=0).select_related('categoria').order_by('nombre')
     meseros = User.objects.filter(is_active=True)
 
-    # 2. LOGICA NUEVA: RECUPERAR EL CARRITO GUARDADO
+    # 2. LOGICA: RECUPERAR EL CARRITO GUARDADO
     orden_activa = Orden.objects.filter(mesa=table).first()
     carrito_recuperado = []
     
     if orden_activa:
-        # Convertimos los detalles de la BD a una lista de diccionarios para JS
         for detalle in orden_activa.detalles.all():
             nombre_display = detalle.producto.nombre
             if detalle.producto.tamano != 'UNI':
                 nombre_display += f" ({detalle.producto.tamano})"
-                
+            
+            # Recuperar Extras
+            extras_ids = list(detalle.extras_elegidos.values_list('insumo_id', flat=True))
+
             carrito_recuperado.append({
                 'id': detalle.producto.id,
                 'nombre': nombre_display,
                 'precio': float(detalle.precio_unitario),
                 'cantidad': detalle.cantidad,
-                'tamano_codigo': detalle.producto.tamano, # Importante para saber qué caja usar
-                'para_llevar': detalle.es_para_llevar     # <--- RECUPERAMOS EL DATO
+                'tamano_codigo': detalle.producto.tamano,
+                'para_llevar': detalle.es_para_llevar,
+                'extras': extras_ids # <--- ESTO ES VITAL
             })
 
-    # Convertimos la lista a JSON string para que JS la pueda leer
-    carrito_json = json.dumps(carrito_recuperado)
-
+    carrito_json = json.dumps(carrito_recuperado, cls=DjangoJSONEncoder)
+    
+    # 3. EXTRAS DISPONIBLES
+    lista_extras = Insumo.objects.filter(es_extra=True, stock_actual__gt=0).values(
+        'id', 'nombre', 'precio_venta_extra', 'unidad__codigo'
+    )
+    extras_json = json.dumps(list(lista_extras), cls=DjangoJSONEncoder)
+    
     context = {
         'table': table,
-        'tasa_cambio': tasa_actual_texto,
-        'tasa_valor': tasa_numerica,
+        'tasa_cambio': tasa_actual_texto, # Para HTML
+        'tasa_valor': tasa_numerica,      # Para JS
         'categorias': categorias,
         'productos': productos,
         'meseros': meseros,
-        # DATOS NUEVOS
         'orden_activa': orden_activa,
         'carrito_json': carrito_json, 
+        'extras_json': extras_json,
     }
+    
     return render(request, 'tables/order_detail.html', context)
 
 
@@ -136,13 +141,11 @@ def table_order_view(request, table_id):
 #  NUEVA LÓGICA (PRODUCTOS Y RECETAS)
 # ==========================================
 
-# 1. CATÁLOGO DE PRODUCTOS
 @staff_member_required
 def product_list(request):
     productos = Producto.objects.all().order_by('nombre')
     return render(request, 'products/product_list.html', {'productos': productos})
 
-# 2. PASO 1: CREAR DATOS BÁSICOS
 @staff_member_required
 def product_create(request, pk=None):
     if pk:
@@ -157,7 +160,7 @@ def product_create(request, pk=None):
         if form.is_valid():
             prod = form.save(commit=False)
             if not pk:
-                prod.precio = 0 # Precio temporal
+                prod.precio = 0 
             prod.save()
             messages.success(request, "Datos básicos guardados.")
             return redirect('recipe_manager', pk=prod.pk)
@@ -166,7 +169,6 @@ def product_create(request, pk=None):
 
     return render(request, 'products/product_form.html', {'form': form, 'titulo': titulo})
 
-# 3. PASO 2: GESTOR DE RECETAS
 @staff_member_required
 def recipe_manager(request, pk):
     producto = get_object_or_404(Producto, pk=pk)
@@ -196,13 +198,10 @@ def recipe_manager(request, pk):
     }
     return render(request, 'products/recipe_manager.html', context)
 
-# 4. PASO 3: PRECIO FINAL
-@staff_member_required
 @staff_member_required
 def product_pricing(request, pk):
     producto = get_object_or_404(Producto, pk=pk)
     
-    # LÓGICA: AGREGAR O ELIMINAR COSTOS ADICIONALES
     if request.method == 'POST':
         
         # A) Eliminar un costo
@@ -212,19 +211,14 @@ def product_pricing(request, pk):
             messages.warning(request, "Costo adicional eliminado.")
             return redirect('product_pricing', pk=pk)
         
-        # B) Agregar un costo nuevo (CON CORRECCIÓN DE COMAS)
+        # B) Agregar un costo nuevo
         if 'add_costo' in request.POST:
-            # 1. Creamos una copia editable de los datos recibidos
             datos_formulario = request.POST.copy()
-            
-            # 2. Limpieza manual de la coma en 'valor_aplicado'
             valor_sucio = datos_formulario.get('valor_aplicado', '')
             if ',' in valor_sucio:
-                datos_formulario['valor_aplicado'] = valor_sucio.replace('.', '').replace(',', '.') # Quitamos punto de miles y cambiamos coma decimal
+                datos_formulario['valor_aplicado'] = valor_sucio.replace('.', '').replace(',', '.')
             
-            # 3. Pasamos los datos ya limpios al formulario
             form_costo = CostoAdicionalForm(datos_formulario)
-            
             if form_costo.is_valid():
                 nuevo_costo = form_costo.save(commit=False)
                 nuevo_costo.producto = producto
@@ -232,13 +226,11 @@ def product_pricing(request, pk):
                 messages.success(request, "Costo adicional agregado correctamente.")
                 return redirect('product_pricing', pk=pk)
             else:
-                # 4. Si falla, avisamos por qué (Esto es vital para depurar)
                 messages.error(request, f"Error al agregar costo: {form_costo.errors}")
 
-        # C) Guardar Precio Final (Formulario de precio)
+        # C) Guardar Precio Final
         if 'save_price' in request.POST:
             datos_precio = request.POST.copy()
-            # Limpieza también para el precio final
             precio_sucio = datos_precio.get('precio', '')
             if ',' in precio_sucio:
                  datos_precio['precio'] = precio_sucio.replace('.', '').replace(',', '.')
@@ -251,7 +243,6 @@ def product_pricing(request, pk):
             else:
                  messages.error(request, f"Error en el precio: {form_precio.errors}")
     
-    # Formularios vacíos para renderizar
     form_precio = ProductoPriceForm(instance=producto)
     form_costo = CostoAdicionalForm()
 
@@ -265,63 +256,20 @@ def product_pricing(request, pk):
         'costo_total_final': producto.costo_total_real,
     }
     return render(request, 'products/product_pricing.html', context)
-    producto = get_object_or_404(Producto, pk=pk)
-    
-    # LÓGICA: AGREGAR O ELIMINAR COSTOS ADICIONALES
-    if request.method == 'POST':
-        # A) Eliminar un costo
-        if 'delete_costo' in request.POST:
-            cid = request.POST.get('delete_costo')
-            CostoAsignadoProducto.objects.filter(id=cid).delete()
-            messages.warning(request, "Costo adicional eliminado.")
-            return redirect('product_pricing', pk=pk)
-        
-        # B) Agregar un costo nuevo
-        if 'add_costo' in request.POST:
-            form_costo = CostoAdicionalForm(request.POST)
-            if form_costo.is_valid():
-                nuevo_costo = form_costo.save(commit=False)
-                nuevo_costo.producto = producto
-                nuevo_costo.save()
-                messages.success(request, "Costo adicional agregado.")
-                return redirect('product_pricing', pk=pk)
-
-        # C) Guardar Precio Final (Formulario de precio)
-        if 'save_price' in request.POST:
-            form_precio = ProductoPriceForm(request.POST, instance=producto)
-            if form_precio.is_valid():
-                form_precio.save()
-                messages.success(request, f"¡Producto '{producto.nombre}' configurado exitosamente!")
-                return redirect('product_list')
-    
-    # Formularios vacíos para renderizar
-    form_precio = ProductoPriceForm(instance=producto)
-    form_costo = CostoAdicionalForm()
-
-    context = {
-        'producto': producto,
-        'form_precio': form_precio,
-        'form_costo': form_costo,
-        # Datos calculados
-        'costo_receta': producto.costo_receta,
-        'costos_adicionales': producto.costos_adicionales.all(), # Lista de costos agregados
-        'total_indirectos': producto.costo_indirectos_total,
-        'costo_total_final': producto.costo_total_real, # La suma maestra
-    }
-    return render(request, 'products/product_pricing.html', context)
 
 @staff_member_required
 def product_delete(request, pk):
     producto = get_object_or_404(Producto, pk=pk)
-    
     if request.method == 'POST':
         nombre = producto.nombre
         producto.delete()
         messages.success(request, f"Producto '{nombre}' eliminado correctamente.")
-        
     return redirect('product_list')
 
-# 1. FUNCIÓN PARA GUARDAR (AJAX)
+# ==========================================
+#  FUNCIONES AJAX (GUARDADO Y FACTURACIÓN)
+# ==========================================
+
 def grabar_mesa_ajax(request, table_id):
     if request.method == 'POST':
         try:
@@ -331,23 +279,19 @@ def grabar_mesa_ajax(request, table_id):
             
             table = Table.objects.get(id=table_id)
             
-            # Buscamos al mesero por nombre (o podrías pasar el ID mejor)
             mesero_obj = None
             if mesero_nombre:
                 mesero_obj = User.objects.filter(username=mesero_nombre).first()
 
-            # A) CREAR O ACTUALIZAR LA ORDEN
-            # Usamos update_or_create o get_or_create. 
-            # Si ya hay orden, la borramos y creamos nueva (o actualizamos, simplifiquemos borrando detalles previos)
-            
+            # 1. Crear/Recuperar Orden
             orden, created = Orden.objects.get_or_create(mesa=table)
             orden.mesero = mesero_obj
             orden.save()
             
-            # Limpiamos detalles viejos para sobreescribir con el carrito actual
-            # (En un sistema más complejo, solo agregarías lo nuevo)
+            # 2. BORRÓN Y CUENTA NUEVA
             orden.detalles.all().delete()
             
+            # 3. Guardar nuevos items
             for item in items:
                 prod_id = item.get('id')
                 cant = item.get('cantidad')
@@ -355,15 +299,32 @@ def grabar_mesa_ajax(request, table_id):
                 
                 prod_obj = Producto.objects.get(id=prod_id)
                 
-                DetalleOrden.objects.create(
+                # A) Detalle Principal
+                nuevo_detalle = DetalleOrden.objects.create(
                     orden=orden,
                     producto=prod_obj,
                     cantidad=cant,
                     precio_unitario=precio,
                     es_para_llevar=item.get('para_llevar', False)
                 )
-            
-            # B) MARCAR MESA COMO OCUPADA
+
+                # B) GUARDAR EXTRAS
+                ids_extras = item.get('extras', [])
+                if ids_extras:
+                    for extra_id in ids_extras:
+                        try:
+                            insumo = Insumo.objects.get(id=extra_id)
+                            DetalleOrdenExtra.objects.create(
+                                detalle_orden=nuevo_detalle,
+                                insumo=insumo,
+                                precio=insumo.precio_venta_extra
+                            )
+                        except Insumo.DoesNotExist:
+                            print(f"Error: Insumo ID {extra_id} no existe.")
+                        except Exception as e_extra:
+                            print(f"Error guardando extra: {e_extra}")
+
+            # 4. Actualizar Mesa
             table.is_occupied = True
             table.mesero = mesero_obj
             table.save()
@@ -371,15 +332,14 @@ def grabar_mesa_ajax(request, table_id):
             return JsonResponse({'status': 'ok', 'orden_id': orden.id})
             
         except Exception as e:
+            print(f"ERROR GRABAR MESA: {e}")
             return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
-    return JsonResponse({'status': 'error'}, status=400)
+            
+    return JsonResponse({'status': 'error', 'message': 'Método no permitido'}, status=400)
 
 
-# 2. FUNCIÓN GENERAR PDF
 def generar_ticket_pdf(request, orden_id):
     orden = get_object_or_404(Orden, id=orden_id)
-    
-    # Contexto para el HTML del ticket
     context = {
         'orden': orden,
         'detalles': orden.detalles.all(),
@@ -387,18 +347,14 @@ def generar_ticket_pdf(request, orden_id):
         'total': orden.total_calculado
     }
     
-    # Renderizamos el HTML
-    template_path = 'tables/ticket_pdf.html' # Crearemos este archivo ahora
+    template_path = 'tables/ticket_pdf.html' 
     template = get_template(template_path)
     html = template.render(context)
 
-    # Creamos el PDF
     response = HttpResponse(content_type='application/pdf')
-    # Esto hace que se descargue. Si quieres verlo en el navegador quita 'attachment;'
     response['Content-Disposition'] = f'filename="comanda_cocina_mesa_{orden.mesa.number}.pdf"'
 
     pisa_status = pisa.CreatePDF(html, dest=response)
-
     if pisa_status.err:
         return HttpResponse('Error al generar PDF', status=500)
     return response
@@ -406,24 +362,20 @@ def generar_ticket_pdf(request, orden_id):
 def eliminar_mesa_ajax(request, table_id):
     if request.method == 'POST':
         try:
-            # 1. Obtener datos (incluyendo el motivo que viene del JS)
             data = json.loads(request.body)
             motivo = data.get('motivo', 'Sin motivo especificado')
             
             table = get_object_or_404(Table, id=table_id)
             orden = Orden.objects.filter(mesa=table).first()
 
-            # 2. Si hay orden, guardamos la evidencia antes de borrar
             if orden:
                 detalles_texto = ""
                 total_calc = 0
-                
                 for det in orden.detalles.all():
                     subt = det.cantidad * det.precio_unitario
                     total_calc += float(subt)
                     detalles_texto += f"{det.cantidad}x {det.producto.nombre} (${subt:.2f})\n"
 
-                # CREAR REGISTRO DE AUDITORÍA
                 AuditoriaEliminacion.objects.create(
                     usuario_responsable=request.user if request.user.is_authenticated else None,
                     mesa_numero=table.number,
@@ -432,39 +384,30 @@ def eliminar_mesa_ajax(request, table_id):
                     total_eliminado=total_calc,
                     motivo=motivo
                 )
-                
-                # Borrar la orden física
                 orden.delete()
             
-            # 3. Liberar la mesa
             table.is_occupied = False
             table.mesero = None
             table.save()
-            
             return JsonResponse({'status': 'ok'})
 
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
-    
     return JsonResponse({'status': 'error'}, status=400)
 
 def generar_cuenta_pdf(request, table_id):
-    # 1. Obtener datos
     table = get_object_or_404(Table, id=table_id)
     orden = Orden.objects.filter(mesa=table).first()
     
     if not orden:
         return HttpResponse("No hay orden activa para esta mesa", status=404)
 
-    # 2. Obtener Tasa BCV para los cálculos
     tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
     tasa_valor = float(tasa_obj.precio) if tasa_obj else 0
 
-    # 3. CAMBIO DE ESTADO (Mesa Amarilla)
     table.solicitud_pago = True
     table.save()
 
-    # 4. Preparar datos para el PDF
     detalles_con_conversion = []
     total_usd = orden.total_calculado
     total_bs = float(total_usd) * tasa_valor
@@ -477,45 +420,37 @@ def generar_cuenta_pdf(request, table_id):
             'tamano': item.producto.get_tamano_display(),
             'precio_usd': item.precio_unitario,
             'subtotal_usd': item.subtotal,
-            'subtotal_bs': subtotal_bs, # Dato extra para el ticket
+            'subtotal_bs': subtotal_bs,
+            # Pasamos el objeto original para acceder a extras en el template
+            'extras_elegidos': item.extras_elegidos.all() 
         })
 
     context = {
         'orden': orden,
-        'detalles': detalles_con_conversion,
+        'detalles': detalles_con_conversion, # Usamos la lista procesada
         'fecha': timezone.now(),
         'tasa': tasa_valor,
         'total_usd': total_usd,
         'total_bs': total_bs
     }
 
-    # 5. Generar PDF
     template_path = 'tables/cuenta_pdf.html'
     template = get_template(template_path)
     html = template.render(context)
 
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = f'filename="cuenta_mesa_{table.number}.pdf"'
-
     pisa_status = pisa.CreatePDF(html, dest=response)
     if pisa_status.err:
         return HttpResponse('Error al generar PDF', status=500)
-    
     return response
-
-# --- FUNCIÓN DE FACTURACIÓN CORREGIDA (Secuencial) ---
-# tables/views.py
 
 @staff_member_required
 def facturar_mesa_ajax(request, table_id):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            # AHORA RECIBIMOS UNA LISTA DE PAGOS
-            # Ejemplo: [{'metodo': 'ZELLE', 'monto': 10}, {'metodo': 'EFECTIVO_USD', 'monto': 5}]
             lista_pagos = data.get('lista_pagos', []) 
-            
-            # Datos para cálculos finales
             monto_total_recibido = float(data.get('monto_recibido_total', 0))
             es_propina = data.get('es_propina', False)
             
@@ -525,100 +460,125 @@ def facturar_mesa_ajax(request, table_id):
             if not orden:
                 return JsonResponse({'status': 'error', 'message': 'No hay orden.'})
 
-            # --- VALIDACIÓN DE INVENTARIO (IGUAL QUE ANTES) ---
+            # --- 1. RECALCULAR TOTALES REALES (Base + Extras) ---
+            # No confiamos solo en el total guardado, lo recalculamos para estar seguros
+            total_venta_real = 0
+            for det in orden.detalles.all():
+                precio_base = float(det.precio_unitario)
+                costo_extras = sum(float(e.precio) for e in det.extras_elegidos.all())
+                subtotal_linea = (precio_base + costo_extras) * det.cantidad
+                total_venta_real += subtotal_linea
+            
+            # Ajustamos la diferencia y propina con el nuevo total real
+            diferencia = monto_total_recibido - total_venta_real
+            propina_calc = diferencia if (diferencia > 0 and es_propina) else 0
+
+            # --- 2. VALIDACIÓN DE STOCK (Intacta) ---
             insumos_requeridos = {} 
             for detalle in orden.detalles.all():
-                ingredientes = detalle.producto.ingredientes.all()
-                for ing in ingredientes:
+                # Ingredientes
+                for ing in detalle.producto.ingredientes.all():
                     total_item = ing.cantidad * detalle.cantidad
                     if ing.insumo.id in insumos_requeridos: insumos_requeridos[ing.insumo.id] += total_item
                     else: insumos_requeridos[ing.insumo.id] = total_item
+                # Extras
+                for extra in detalle.extras_elegidos.all():
+                    cant_extra = extra.insumo.cantidad_porcion_extra 
+                    if cant_extra > 0:
+                        if extra.insumo.id in insumos_requeridos: insumos_requeridos[extra.insumo.id] += cant_extra
+                        else: insumos_requeridos[extra.insumo.id] = cant_extra
 
             faltantes = []
             for i_id, cant in insumos_requeridos.items():
                 ins_obj = Insumo.objects.get(id=i_id)
                 if ins_obj.stock_actual < cant:
-                    faltantes.append(f"❌ {ins_obj.nombre}: Tienes {ins_obj.stock_actual:.2f}, necesitas {cant:.2f}")
+                    faltantes.append(f"❌ {ins_obj.nombre}: Stock {ins_obj.stock_actual:.2f} / Req {cant:.2f}")
 
             if faltantes:
                 return JsonResponse({'status': 'error', 'message': "STOCK INSUFICIENTE:\n" + "\n".join(faltantes)})
-            # ---------------------------------------------------
 
-            total_venta = float(orden.total_calculado)
-            diferencia = monto_total_recibido - total_venta
-            propina_calc = diferencia if (diferencia > 0 and es_propina) else 0
-
+            # --- 3. TRANSACCIÓN DE GUARDADO ---
             with transaction.atomic():
-                # 1. NUMERACIÓN
+                # Numeración
                 ultima = Venta.objects.last()
                 nuevo_num = (int(ultima.codigo_factura) + 1) if (ultima and ultima.codigo_factura.isdigit()) else 1
                 codigo = f"{nuevo_num:06d}"
 
-                # 2. CREAR VENTA (Metodo general MIXTO si hay varios, o el único si es uno)
                 metodo_general = 'MIXTO' if len(lista_pagos) > 1 else lista_pagos[0]['metodo']
                 
+                # Crear Venta con el TOTAL REAL RECALCULADO
                 venta = Venta.objects.create(
                     codigo_factura=codigo,
-                    total=total_venta,
-                    metodo_pago=metodo_general, # 'MIXTO' o el específico
+                    total=total_venta_real, # <--- USAMOS EL RECALCULADO
+                    metodo_pago=metodo_general,
                     mesero=orden.mesero,
                     mesa_numero=table.number,
                     monto_recibido=monto_total_recibido,
                     propina=propina_calc
                 )
 
-                # 3. REGISTRAR LOS PAGOS INDIVIDUALES
+                # Registrar Pagos
                 for p in lista_pagos:
-                    Pago.objects.create(
-                        venta=venta,
-                        metodo=p['metodo'],
-                        monto=p['monto']
-                    )
+                    Pago.objects.create(venta=venta, metodo=p['metodo'], monto=p['monto'])
 
-                # 4. DETALLES Y DESCUENTO INVENTARIO (Igual que antes)
+                # Procesar Detalles
                 for det in orden.detalles.all():
-                    DetalleVenta.objects.create(
-                        venta=venta, producto=det.producto, nombre_producto=det.producto.nombre,
-                        cantidad=det.cantidad, precio_unitario=det.precio_unitario, subtotal=det.subtotal
+                    # Calculamos subtotal individual para este item
+                    precio_base = float(det.precio_unitario)
+                    costo_extras = sum(float(e.precio) for e in det.extras_elegidos.all())
+                    subtotal_real = (precio_base + costo_extras) * det.cantidad
+
+                    # Crear DetalleVenta
+                    dv = DetalleVenta.objects.create(
+                        venta=venta, 
+                        producto=det.producto, 
+                        nombre_producto=det.producto.nombre,
+                        cantidad=det.cantidad, 
+                        precio_unitario=det.precio_unitario, # Precio base visual
+                        subtotal=subtotal_real # Subtotal con extras incluidos
                     )
+                    
+                    # === AQUÍ GUARDAMOS LOS EXTRAS EN EL HISTÓRICO ===
+                    for extra_orden in det.extras_elegidos.all():
+                        DetalleVentaExtra.objects.create(
+                            detalle_venta=dv,
+                            nombre_extra=extra_orden.insumo.nombre,
+                            precio=extra_orden.precio
+                        )
+                    # =================================================
+
+                    # Descuento Inventario (Receta)
                     for ing in det.producto.ingredientes.all():
                         MovimientoInventario.objects.create(
                             insumo=ing.insumo, tipo='SALIDA', cantidad=ing.cantidad * det.cantidad,
                             unidad_movimiento=ing.insumo.unidad, usuario=request.user,
-                            nota=f"Fac: {codigo}"
-
-                            
+                            nota=f"Fac: {codigo} - {det.producto.nombre}"
                         )
-
-                # --- NUEVA LÓGICA: DESCUENTO DE CAJAS ---
-                if det.es_para_llevar:
-                    # 1. Mapa de Tamaños -> Nombres de Insumos en tu BD
-                    # Ajusta los nombres de la derecha según como los tengas en tu inventario
-                    MAPA_CAJAS = {
-                        'IND': 'CAJA INDIVIDUAL', 
-                        'MED': 'CAJA MEDIANA',
-                        'FAM': 'CAJA FAMILIAR'
-                    }
                     
-                    nombre_caja = MAPA_CAJAS.get(det.producto.tamano)
-                    
-                    if nombre_caja:
-                        # Buscamos el insumo caja por nombre
-                        caja_insumo = Insumo.objects.filter(nombre__iexact=nombre_caja).first()
-                        
-                        if caja_insumo:
-                            # Descontamos 1 caja por cada pizza vendida
+                    # Descuento Inventario (Extras)
+                    for extra in det.extras_elegidos.all():
+                        if extra.insumo.cantidad_porcion_extra > 0:
                             MovimientoInventario.objects.create(
-                                insumo=caja_insumo,
-                                tipo='SALIDA',
-                                cantidad=det.cantidad, # Si pidió 2 pizzas, son 2 cajas
-                                unidad_movimiento=caja_insumo.unidad,
-                                usuario=request.user,
-                                nota=f"Empaque Fac: {codigo}"
+                                insumo=extra.insumo, tipo='SALIDA', 
+                                cantidad=extra.insumo.cantidad_porcion_extra,
+                                unidad_movimiento=extra.insumo.unidad, usuario=request.user,
+                                nota=f"Fac: {codigo} - Extra {extra.insumo.nombre}"
                             )
-                        else:
-                            # Opcional: Imprimir en consola si no encuentra la caja configurada
-                            print(f"⚠️ ALERTA: No se encontró el insumo '{nombre_caja}' en el inventario.")
+
+                # Descuento de Cajas (Empaques)
+                for det in orden.detalles.all():
+                    if det.es_para_llevar:
+                        MAPA_CAJAS = {'IND': 'CAJA INDIVIDUAL', 'MED': 'CAJA MEDIANA', 'FAM': 'CAJA FAMILIAR'}
+                        nombre_caja = MAPA_CAJAS.get(det.producto.tamano)
+                        if nombre_caja:
+                            caja_insumo = Insumo.objects.filter(nombre__iexact=nombre_caja).first()
+                            if caja_insumo:
+                                MovimientoInventario.objects.create(
+                                    insumo=caja_insumo, tipo='SALIDA', cantidad=det.cantidad,
+                                    unidad_movimiento=caja_insumo.unidad, usuario=request.user,
+                                    nota=f"Empaque Fac: {codigo}"
+                                )
+
                 orden.delete()
                 table.is_occupied = False
                 table.solicitud_pago = False
@@ -631,13 +591,11 @@ def facturar_mesa_ajax(request, table_id):
             return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
     return JsonResponse({'status': 'error'}, status=400)
 
-# 2. GENERAR FACTURA PDF FINAL
 @staff_member_required
 def generar_factura_pdf(request, venta_id):
     venta = get_object_or_404(Venta, id=venta_id)
     tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
     tasa_valor = float(tasa_obj.precio) if tasa_obj else 0
-    
     total_bs = float(venta.total) * tasa_valor
 
     context = {
@@ -651,66 +609,46 @@ def generar_factura_pdf(request, venta_id):
     template_path = 'tables/factura_final_pdf.html'
     template = get_template(template_path)
     html = template.render(context)
-
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = f'filename="Factura_{venta.codigo_factura}.pdf"'
-
     pisa_status = pisa.CreatePDF(html, dest=response)
     if pisa_status.err:
         return HttpResponse('Error al generar PDF', status=500)
     return response
 
-# pos/views.py
-from django.db import transaction
-from django.utils import timezone
-from inventory.models import MovimientoInventario
-
 def anular_venta(request, venta_id):
     if request.method == 'POST':
         venta = get_object_or_404(Venta, id=venta_id)
         motivo = request.POST.get('motivo', 'Sin motivo especificado')
-
         if venta.anulada:
             messages.error(request, "Esta venta ya estaba anulada.")
-            return redirect('reporte_ventas') # O el nombre de tu URL del reporte
+            return redirect('reporte_ventas') 
 
         try:
             with transaction.atomic():
-                # 1. DEVOLVER INGREDIENTES AL INVENTARIO
-                # Recorremos cada plato vendido en esa factura
                 for detalle in venta.detalles.all():
                     producto = detalle.producto
                     cantidad_vendida = detalle.cantidad
-                    
                     if producto:
-                        # Buscamos la receta de ese producto
-                        ingredientes = producto.ingredientes.all()
-                        
-                        for ingrediente in ingredientes:
-                            insumo = ingrediente.insumo
-                            # Cantidad a devolver = (Lo que lleva 1 plato * Platos vendidos)
-                            cantidad_a_reponer = ingrediente.cantidad * cantidad_vendida
-                            
-                            # Registramos el movimiento de entrada (Devolución)
+                        # Reponer receta base
+                        for ingrediente in producto.ingredientes.all():
                             MovimientoInventario.objects.create(
-                                insumo=insumo,
-                                tipo='ENTRADA', # Es una entrada porque regresa al almacén
-                                cantidad=cantidad_a_reponer,
+                                insumo=ingrediente.insumo, tipo='ENTRADA',
+                                cantidad=ingrediente.cantidad * cantidad_vendida,
                                 usuario=request.user,
                                 nota=f"ANULACIÓN Venta #{venta.codigo_factura}: {producto.nombre}",
-                                costo_unitario_movimiento=insumo.costo_unitario 
+                                costo_unitario_movimiento=ingrediente.insumo.costo_unitario 
                             )
-
-                # 2. MARCAR VENTA COMO ANULADA
+                        # Nota: Reponer extras sería ideal si los guardaras en historial
+                        
                 venta.anulada = True
                 venta.motivo_anulacion = motivo
                 venta.fecha_anulacion = timezone.now()
                 venta.usuario_anulacion = request.user
                 venta.save()
-                
-                messages.success(request, f"Venta #{venta.codigo_factura} anulada correctamente. Inventario repuesto.")
+                messages.success(request, f"Venta #{venta.codigo_factura} anulada.")
 
         except Exception as e:
             messages.error(request, f"Error al anular: {e}")
 
-    return redirect('reporte_ventas_detalle') # Cambia esto por el nombre de tu url de reporte
+    return redirect('reporte_ventas_detalle')
