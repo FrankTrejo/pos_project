@@ -10,11 +10,11 @@
         padding: 10px 12px;
         border: 1px solid #ced4da;
         border-radius: 6px;
-        box-sizing: border-box; /* <--- LA CLAVE: El padding no aumenta el ancho total */
+        box-sizing: border-box; 
         font-size: 1rem;
         color: #495057;
         background-color: #fff;
-        height: 42px; /* Altura uniforme */
+        height: 42px; 
     }
 
     .form-input:focus, select:focus {
@@ -109,6 +109,20 @@
             {{ form.stock_minimo }}
         </div>
 
+        <div style="background: #eef2f7; padding: 15px 20px; border-radius: 8px; border: 1px solid #dae1e7; margin-bottom: 30px; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <label for="{{ form.es_extra.id_for_label }}" style="font-weight: 600; color: #2c3e50; font-size: 1.05em; display: flex; align-items: center; margin: 0; cursor: pointer;">
+                    <i class="fas fa-plus-circle" style="color: #3498db; margin-right: 8px;"></i> ¿Disponible como Extra?
+                </label>
+                <div style="font-size: 0.85em; color: #7f8c8d; margin-top: 4px;">
+                    Actívalo para que aparezca en la lista de precios de extras (ej: Queso, Jamón).
+                </div>
+            </div>
+            
+            <div class="form-check form-switch" style="margin: 0;">
+                {{ form.es_extra }}
+            </div>
+        </div>
         <div style="display: flex; gap: 15px;">
             <a href="{% url 'maestro_list' %}" style="padding: 12px 25px; color: #555; text-decoration: none; border: 1px solid #ddd; border-radius: 6px; font-weight: 500; background: #fff;">
                 Cancelar
@@ -119,4 +133,31 @@
         </div>
     </form>
 </div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Seleccionamos específicamente el checkbox de es_extra
+        var extraSwitch = document.querySelector('input[name="es_extra"]');
+        
+        if(extraSwitch) {
+            // Le agregamos la clase de Bootstrap para que se vea como switch
+            extraSwitch.classList.add('form-check-input');
+            
+            // Ajustes manuales de tamaño para que se vea bien visible
+            extraSwitch.style.width = "3em";
+            extraSwitch.style.height = "1.5em";
+            extraSwitch.style.cursor = "pointer";
+            
+            // Quitamos el width: 100% que tienen los otros inputs por CSS global
+            extraSwitch.style.width = "3em"; 
+        }
+
+        // Aplicar estilos generales a los otros inputs (si no lo hace Django automáticamente)
+        var inputs = document.querySelectorAll('input:not([type="checkbox"]), select');
+        inputs.forEach(function(input) {
+            input.classList.add('form-input');
+        });
+    });
+</script>
+
 {% endblock %}

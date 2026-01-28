@@ -35,7 +35,7 @@ class InsumoForm(forms.ModelForm):
     class Meta:
         model = Insumo
         # AQUI AGREGAMOS 'peso_standar' y 'precio_mercado'
-        fields = ['nombre', 'categoria', 'unidad', 'stock_minimo', 'precio_mercado', 'peso_standar', 'merma_porcentaje', 'es_insumo_compuesto']
+        fields = ['nombre', 'categoria', 'unidad', 'stock_minimo', 'precio_mercado', 'peso_standar', 'merma_porcentaje', 'es_insumo_compuesto', 'es_extra']
         
         widgets = {
             'nombre': forms.TextInput(attrs={'class': 'form-input'}),

@@ -363,11 +363,17 @@ class PrecioExtra(models.Model):
     insumo = models.ForeignKey(Insumo, on_delete=models.CASCADE, related_name='precios_extra')
     tamano = models.CharField(max_length=3, choices=TAMANOS)
     precio = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    cantidad = models.DecimalField(
+        max_digits=10, 
+        decimal_places=4, # 4 decimales para precisión en Kilos (ej: 0.050 kg)
+        default=0.0000,
+        verbose_name="Peso de Porción"
+    )
 
     class Meta:
         unique_together = ('insumo', 'tamano') 
-        verbose_name = "Precio de Extra"
-        verbose_name_plural = "Precios de Extras"
+        verbose_name = "Precio y Porción de Extra"
+        verbose_name_plural = "Precios y Porciones de Extras"
 
     def __str__(self):
         return f"{self.insumo.nombre} ({self.tamano}) - ${self.precio}"

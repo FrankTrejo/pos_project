@@ -5,7 +5,7 @@ class MaestroInsumoForm(forms.ModelForm):
     class Meta:
         model = Insumo
         # Aquí pedimos TODO lo necesario para una compra
-        fields = ['nombre', 'categoria', 'unidad', 'stock_minimo', 'precio_mercado', 'peso_standar', 'merma_porcentaje']
+        fields = ['nombre', 'categoria', 'unidad', 'stock_minimo', 'precio_mercado', 'peso_standar', 'merma_porcentaje', 'es_extra']
         
         widgets = {
             'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Harina de Trigo'}),

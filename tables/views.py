@@ -740,38 +740,68 @@ def anular_venta(request, venta_id):
 
 @staff_member_required
 def gestion_precios_extras(request):
-    # Traemos todos los insumos ordenados
-    insumos = Insumo.objects.all().order_by('nombre')
+    insumos = Insumo.objects.filter(es_extra=True).order_by('nombre')
     tamanos = ['IND', 'MED', 'FAM'] 
 
     if request.method == 'POST':
         try:
+            # Iteramos sobre los datos recibidos
             for key, value in request.POST.items():
-                # Buscamos inputs con nombre tipo: precio_15_IND
+                
+                # CASO 1: Guardar PRECIO (name="precio_ID_TAM")
                 if key.startswith('precio_'):
                     parts = key.split('_')
                     insumo_id = parts[1]
                     tamano_code = parts[2]
                     
-                    if value: # Si hay un valor, lo guardamos
-                        PrecioExtra.objects.update_or_create(
-                            insumo_id=insumo_id,
-                            tamano=tamano_code,
-                            defaults={'precio': value}
-                        )
-            messages.success(request, "Precios actualizados.")
-            return redirect('manage_extras') # Redirige a la misma página
-        except Exception as e:
-            messages.error(request, f"Error: {str(e)}")
+                    # Convertimos vacío a 0
+                    val_precio = value if value else 0
+                    
+                    # Buscamos o creamos el registro y actualizamos SOLO el precio
+                    obj, created = PrecioExtra.objects.get_or_create(
+                        insumo_id=insumo_id,
+                        tamano=tamano_code
+                    )
+                    obj.precio = val_precio
+                    obj.save()
 
-    # Crear diccionario para pintar los precios actuales en los inputs
-    precios_existentes = PrecioExtra.objects.all()
-    diccionario_precios = {}
-    for p in precios_existentes:
-        diccionario_precios[f"{p.insumo.id}_{p.tamano}"] = p.precio
+                # CASO 2: Guardar CANTIDAD/PESO (name="cantidad_ID_TAM")
+                elif key.startswith('cantidad_'):
+                    parts = key.split('_')
+                    insumo_id = parts[1]
+                    tamano_code = parts[2]
+                    
+                    val_cantidad = value if value else 0
+                    
+                    obj, created = PrecioExtra.objects.get_or_create(
+                        insumo_id=insumo_id,
+                        tamano=tamano_code
+                    )
+                    obj.cantidad = val_cantidad
+                    obj.save()
+
+            messages.success(request, "Precios y porciones actualizados correctamente.")
+            return redirect('manage_extras')
+            
+        except Exception as e:
+            messages.error(request, f"Error al guardar: {str(e)}")
+
+    # Preparamos los datos para pintar en el HTML
+    precios_data = PrecioExtra.objects.all()
+    diccionario_datos = {}
+    
+    for p in precios_data:
+        diccionario_datos[f"precio_{p.insumo.id}_{p.tamano}"] = p.precio
+        diccionario_datos[f"cantidad_{p.insumo.id}_{p.tamano}"] = p.cantidad
+
+    # === TRUCO PARA QUE EL TEMPLATE FUNCIONE BIEN ===
+    # Agregamos un atributo temporal 'id_str' a cada insumo
+    # Esto ayuda a que el filtro de búsqueda en el HTML no se rompa
+    for insumo in insumos:
+        insumo.id_str = str(insumo.id)
 
     return render(request, 'products/manage_extras.html', {
         'insumos': insumos,
         'tamanos': tamanos,
-        'precios': diccionario_precios
+        'datos': diccionario_datos
     })

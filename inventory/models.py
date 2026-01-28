@@ -20,8 +20,6 @@ class Insumo(models.Model):
     nombre = models.CharField(max_length=200)
     categoria = models.ForeignKey(CategoriaInsumo, on_delete=models.SET_NULL, null=True)
     unidad = models.ForeignKey(UnidadMedida, on_delete=models.PROTECT, verbose_name="Unidad Base")
-
-    es_extra = models.BooleanField(default=False, verbose_name="¿Se vende como Extra?")
     precio_venta_extra = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Precio de Venta Extra ($)")
     cantidad_porcion_extra = models.DecimalField(max_digits=10, decimal_places=4, default=0.00, help_text="Cantidad a descontar por cada extra vendido (Ej: 0.050 para 50g)")
 
@@ -248,6 +246,12 @@ class Insumo(models.Model):
         # Si ES receta, recalculamos después de guardar por seguridad
         if self.es_insumo_compuesto:
             self.calcular_costo_desde_subreceta()
+
+    es_extra = models.BooleanField(
+        default=False, 
+        verbose_name="¿Se vende como Extra?",
+        help_text="Marca esta casilla si este ingrediente puede ser agregado como extra en un producto."
+    )
 
 class IngredienteCompuesto(models.Model):
     insumo_padre = models.ForeignKey(Insumo, on_delete=models.CASCADE, related_name='componentes')

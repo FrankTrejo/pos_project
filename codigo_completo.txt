@@ -1,6 +1,3 @@
 TAREAS POR CONTINUAR:
 
-    1. Debo realizar la implementación de los extras del sistema en base a la configuración que posee el sistema
-    en los productos, según la selección de ingredientes que pueden ser extras deben ir aparaciendo en la lista
-    de ingredientes EXTRAS. También debo colocar el campo de cuánto lleva ese extra de xs ingrediente.
-        1.a Validar que si descuente el inventario el extra
+    1. 
