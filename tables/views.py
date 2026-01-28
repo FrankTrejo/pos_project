@@ -143,7 +143,13 @@ def table_order_view(request, table_id):
 
 @staff_member_required
 def product_list(request):
-    productos = Producto.objects.all().order_by('nombre')
+    # Usamos prefetch_related para traer los datos relacionados en una sola consulta
+    # 'costos_adicionales' es necesario para calcular el Costo Total
+    productos = Producto.objects.all().prefetch_related(
+        'ingredientes__insumo', 
+        'costos_adicionales'
+    ).order_by('nombre')
+    
     return render(request, 'products/product_list.html', {'productos': productos})
 
 @staff_member_required
