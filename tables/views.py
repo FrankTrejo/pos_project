@@ -12,12 +12,13 @@ from django.db import transaction
 from django.utils import timezone
 from django.core.serializers.json import DjangoJSONEncoder
 from xhtml2pdf import pisa
+from inventory.models import Insumo
 
 # --- IMPORTACIONES DE MODELOS CORRECTAS ---
 from .models import (
     Table, Categoria, Producto, TasaBCV, IngredienteProducto, 
     Venta, DetalleVenta, Pago, Orden, DetalleOrden, 
-    DetalleOrdenExtra, CostoAdicional, CostoAsignadoProducto, DetalleVentaExtra
+    DetalleOrdenExtra, CostoAdicional, CostoAsignadoProducto, DetalleVentaExtra, PrecioExtra
 )
 from .forms import (
     ProductoBasicForm, RecetaProductoForm, ProductoPriceForm, 
@@ -736,3 +737,41 @@ def anular_venta(request, venta_id):
             messages.error(request, f"Error al anular: {e}")
 
     return redirect('reporte_ventas_detalle')
+
+@staff_member_required
+def gestion_precios_extras(request):
+    # Traemos todos los insumos ordenados
+    insumos = Insumo.objects.all().order_by('nombre')
+    tamanos = ['IND', 'MED', 'FAM'] 
+
+    if request.method == 'POST':
+        try:
+            for key, value in request.POST.items():
+                # Buscamos inputs con nombre tipo: precio_15_IND
+                if key.startswith('precio_'):
+                    parts = key.split('_')
+                    insumo_id = parts[1]
+                    tamano_code = parts[2]
+                    
+                    if value: # Si hay un valor, lo guardamos
+                        PrecioExtra.objects.update_or_create(
+                            insumo_id=insumo_id,
+                            tamano=tamano_code,
+                            defaults={'precio': value}
+                        )
+            messages.success(request, "Precios actualizados.")
+            return redirect('manage_extras') # Redirige a la misma página
+        except Exception as e:
+            messages.error(request, f"Error: {str(e)}")
+
+    # Crear diccionario para pintar los precios actuales en los inputs
+    precios_existentes = PrecioExtra.objects.all()
+    diccionario_precios = {}
+    for p in precios_existentes:
+        diccionario_precios[f"{p.insumo.id}_{p.tamano}"] = p.precio
+
+    return render(request, 'products/manage_extras.html', {
+        'insumos': insumos,
+        'tamanos': tamanos,
+        'precios': diccionario_precios
+    })

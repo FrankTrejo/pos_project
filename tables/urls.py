@@ -31,4 +31,5 @@ urlpatterns = [
     path('mesa/<int:table_id>/facturar/', views.facturar_mesa_ajax, name='facturar_mesa'),
     path('factura/<int:venta_id>/pdf/', views.generar_factura_pdf, name='generar_factura_pdf'),
     path('venta/anular/<int:venta_id>/', views.anular_venta, name='anular_venta'),
+    path('productos/extras/precios/', views.gestion_precios_extras, name='manage_extras'),
 ]

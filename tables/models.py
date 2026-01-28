@@ -6,6 +6,8 @@ from inventory.models import Insumo
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.contrib.auth.models import User
+from inventory.models import Insumo 
+from django.db import models
 
 # 1. Modelo para optimizar el BCV (Punto 1)
 class TasaBCV(models.Model):
@@ -349,3 +351,23 @@ class DetalleVentaExtra(models.Model):
 
     def __str__(self):
         return f"Extra {self.nombre_extra} en venta {self.detalle_venta.id}"
+    
+
+class PrecioExtra(models.Model):
+    TAMANOS = [
+        ('IND', 'Individual'),
+        ('MED', 'Mediana'),
+        ('FAM', 'Familiar'),
+    ]
+
+    insumo = models.ForeignKey(Insumo, on_delete=models.CASCADE, related_name='precios_extra')
+    tamano = models.CharField(max_length=3, choices=TAMANOS)
+    precio = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+
+    class Meta:
+        unique_together = ('insumo', 'tamano') 
+        verbose_name = "Precio de Extra"
+        verbose_name_plural = "Precios de Extras"
+
+    def __str__(self):
+        return f"{self.insumo.nombre} ({self.tamano}) - ${self.precio}"

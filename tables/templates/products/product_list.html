@@ -11,6 +11,9 @@
             <h2 class="fw-bold text-dark mb-1">Catálogo de Productos</h2>
             <p class="text-secondary m-0">Gestiona precios, recetas y costos de tus platos.</p>
         </div>
+        <a href="{% url 'manage_extras' %}" class="btn btn-warning shadow-sm me-2">
+            <i class="bi bi-tag-fill me-2"></i>Precios Extras
+        </a>
         <a href="{% url 'product_create' %}" class="btn btn-primary shadow-sm">
             <i class="bi bi-plus-lg me-2"></i>Nuevo Producto
         </a>
