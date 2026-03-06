@@ -1,6 +1,11 @@
 {% extends 'base.html' %}
 {% block content %}
 <div style="padding: 20px; max-width: 1000px; margin: 0 auto;">
+    <div style="margin-bottom: 15px;">
+         <a href="{% url 'reportes_index' %}" style="text-decoration: none; color: #666; font-weight: bold; display: inline-flex; align-items: center; gap: 5px;">
+            <i class="fas fa-arrow-left"></i> Volver a Reportes
+        </a>
+    </div>
     <h2 style="color: #d32f2f;"><i class="fas fa-user-secret"></i> Auditoría de Eliminaciones</h2>
 
     <div class="card-style">

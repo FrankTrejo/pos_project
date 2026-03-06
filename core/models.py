@@ -24,6 +24,11 @@ class Configuracion(models.Model):
     costo_caja_grande = models.DecimalField(max_digits=10, decimal_places=2, default=0.80, verbose_name="Costo Caja Grande ($)")
     gastos_operativos_porcentaje = models.DecimalField(max_digits=5, decimal_places=2, default=10.00, help_text="% estimado de Luz, Gas, Alquiler por producto", verbose_name="% Gastos Operativos")
 
+    # --- 4. CONFIGURACIÓN DE IMPRESIÓN (NUEVO) ---
+    impresora_ticket = models.CharField(max_length=100, blank=True, default="", verbose_name="Nombre Impresora (Referencia)", help_text="Nombre de la impresora predeterminada en el sistema operativo")
+    ancho_papel = models.IntegerField(default=80, verbose_name="Ancho Papel (mm)", help_text="Estándar: 80mm o 58mm")
+    auto_imprimir = models.BooleanField(default=True, verbose_name="¿Impresión Automática?", help_text="Si se marca, el sistema intentará imprimir sin preguntar al cerrar la venta.")
+    
     def __str__(self):
         return "Configuración General"
 

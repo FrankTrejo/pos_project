@@ -1,0 +1,16 @@
+# --- Core del Sistema ---
+Django>=4.2,<5.1  # Framework principal (Usamos LTS para estabilidad)
+pytz              # Manejo de zonas horarias (Crucial para facturas)
+
+# --- Manejo de Imágenes y Archivos ---
+Pillow            # Necesario para los ImageField (fotos de productos)
+
+# --- Generación de PDFs (Tickets y Facturas) ---
+# NOTA: Basado en tus vistas de PDF. Si usas WeasyPrint, cambia esta línea.
+xhtml2pdf         # Librería común para convertir HTML a PDF en Django
+
+# --- Utilidades ---
+django-mathfilters # (Opcional) Si usas filtros matemáticos en los templates
+
+# --- Servidor de Producción Local (Windows) ---
+waitress          # Servidor HTTP robusto para Windows (Mejor que runserver)

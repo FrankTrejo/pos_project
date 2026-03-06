@@ -11,22 +11,20 @@ class ConfigIdentidadForm(forms.ModelForm):
             'direccion': forms.Textarea(attrs={'rows': 3}),
         }
 
-# 2. FORMULARIO DE ECONOMÍA (CORREGIDO)
+# 2. FORMULARIO DE ECONOMÍA
 class ConfigEconomiaForm(forms.ModelForm):
     class Meta:
         model = Configuracion
-        # AQUI ESTABA EL ERROR: Ahora usamos los nombres reales de tu models.py
         fields = [
-            'tasa_dolar',           # Antes decía tasa_cambio
-            'iva_porcentaje',       # Antes decía iva
-            'igtf_porcentaje',      # Antes decía igtf
+            'tasa_dolar',           
+            'iva_porcentaje',       
+            'igtf_porcentaje',      
             'servicio_porcentaje',
             'monto_delivery_fijo',
             'costo_caja_pequena',
             'costo_caja_grande',
             'gastos_operativos_porcentaje'
         ]
-        # Etiquetas para que se vea bonito en la pantalla
         labels = {
             'tasa_dolar': 'Tasa del Dólar (BCV)',
             'iva_porcentaje': 'IVA (%)',
@@ -37,11 +35,24 @@ class ConfigEconomiaForm(forms.ModelForm):
             'costo_caja_grande': 'Costo Caja Grande ($)',
         }
 
-# 3. FORMULARIO VISUAL
+# 3. FORMULARIO VISUAL Y TÉCNICO (AQUÍ AGREGUÉ LA CONFIGURACIÓN DE IMPRESIÓN)
 class ConfigVisualForm(forms.ModelForm):
     class Meta:
         model = Configuracion
-        fields = ['logo', 'mensaje_ticket']
+        # Agregamos: impresora_ticket, ancho_papel, auto_imprimir
+        fields = ['logo', 'mensaje_ticket', 'impresora_ticket', 'ancho_papel', 'auto_imprimir']
+        
+        widgets = {
+            'mensaje_ticket': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Mensaje al pie del ticket'}),
+            'impresora_ticket': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nombre exacto de la impresora'}),
+            'ancho_papel': forms.NumberInput(attrs={'class': 'form-control'}),
+            'auto_imprimir': forms.CheckboxInput(attrs={'class': 'form-check-input', 'style': 'width: 20px; height: 20px;'}),
+        }
+        labels = {
+            'impresora_ticket': 'Nombre de Impresora (PC)',
+            'ancho_papel': 'Ancho del Papel (mm)',
+            'auto_imprimir': '¿Imprimir Automáticamente?'
+        }
 
 class CostoAdicionalForm(forms.ModelForm):
     class Meta:

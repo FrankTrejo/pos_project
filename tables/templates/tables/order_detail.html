@@ -140,19 +140,14 @@
 
     <div id="modalExtras" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; justify-content:center; align-items:center;">
         <div style="background:white; width: 90%; max-width: 500px; border-radius:10px; overflow:hidden; display:flex; flex-direction:column; max-height: 90vh;">
-            
             <div style="background: var(--primary-blue, #0d6efd); color:white; padding:15px; display:flex; justify-content:space-between; align-items:center;">
                 <h3 style="margin:0; font-size:1.2em;"><i class="fas fa-layer-group"></i> Agrega Extras</h3>
                 <button onclick="cerrarModalExtras()" style="background:none; border:none; color:white; font-size:1.5em; cursor:pointer;">&times;</button>
             </div>
-    
             <div style="padding:20px; overflow-y:auto; flex:1;">
                 <p id="tituloProductoExtra" style="color:#666; margin-bottom:15px; font-style:italic;">Selecciona para agregar:</p>
-                
-                <div id="contenedorBotonesExtras" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap:10px;">
-                    </div>
+                <div id="contenedorBotonesExtras" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap:10px;"></div>
             </div>
-    
             <div style="padding:15px; background:#f8f9fa; border-top:1px solid #ddd; text-align:right;">
                 <button onclick="guardarSeleccionExtras()" class="add-btn" style="width:100%; font-size:1.1em; padding:12px;">
                     <i class="fas fa-check"></i> Confirmar Extras
@@ -161,68 +156,210 @@
         </div>
     </div>
 
+    <div id="payment-modal-overlay" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2 class="total-title">Total a Pagar: <span id="display-total-usd">$0.00</span></h2>
+                <div class="total-bs-subtitle" id="display-total-bs">(Bs. 0,00)</div>
+            </div>
+
+            <div class="payment-accordion">
+                <div class="payment-item" id="item-efectivo-usd">
+                    <div class="payment-item-header" onclick="togglePaymentMethod('efectivo-usd')">
+                        <div class="icon-label">
+                            <i class="fas fa-money-bill-wave text-success"></i>
+                            <span>Efectivo (USD)</span>
+                        </div>
+                        <span class="entered-badge" id="badge-efectivo-usd" style="display:none;">$0.00</span>
+                    </div>
+                    <div class="payment-item-body">
+                        <input type="number" id="input-efectivo-usd" class="payment-input" placeholder="Monto en USD" step="0.01">
+                    </div>
+                </div>
+
+                <div class="payment-item" id="item-zelle">
+                    <div class="payment-item-header" onclick="togglePaymentMethod('zelle')">
+                        <div class="icon-label">
+                            <i class="fas fa-university text-primary"></i>
+                            <span>Zelle (USD)</span>
+                        </div>
+                        <span class="entered-badge" id="badge-zelle" style="display:none;">$0.00</span>
+                    </div>
+                    <div class="payment-item-body">
+                        <input type="number" id="input-zelle" class="payment-input" placeholder="Monto en USD" step="0.01">
+                    </div>
+                </div>
+
+                <div class="payment-item" id="item-pm">
+                    <div class="payment-item-header" onclick="togglePaymentMethod('pm')">
+                        <div class="icon-label">
+                            <i class="fas fa-mobile-alt text-info"></i>
+                            <span>Pago Móvil (Bs)</span>
+                        </div>
+                        <span class="entered-badge" id="badge-pm" style="display:none;">$0.00</span>
+                    </div>
+                    <div class="payment-item-body">
+                        <div class="input-row">
+                            <input type="number" id="input-pm-bs" class="payment-input bs-input" placeholder="Monto en Bolívares" step="0.01">
+                            <div class="conversion-hint" id="hint-pm-usd">USD: $0.00</div>
+                        </div>
+                        <input type="text" id="ref-pm" class="ref-input" placeholder="Referencia (Opcional)">
+                    </div>
+                </div>
+
+                <div class="payment-item" id="item-punto">
+                    <div class="payment-item-header" onclick="togglePaymentMethod('punto')">
+                        <div class="icon-label">
+                            <i class="fas fa-credit-card text-warning"></i>
+                            <span>Punto Venta (Bs)</span>
+                        </div>
+                        <span class="entered-badge" id="badge-punto" style="display:none;">$0.00</span>
+                    </div>
+                    <div class="payment-item-body">
+                        <div class="input-row">
+                            <input type="number" id="input-punto-bs" class="payment-input bs-input" placeholder="Monto en Bolívares" step="0.01">
+                            <div class="conversion-hint" id="hint-punto-usd">USD: $0.00</div>
+                        </div>
+                        <input type="text" id="ref-punto" class="ref-input" placeholder="Referencia (Opcional)">
+                    </div>
+                </div>
+
+                <div class="payment-item" id="item-efectivo-bs">
+                    <div class="payment-item-header" onclick="togglePaymentMethod('efectivo-bs')">
+                        <div class="icon-label">
+                            <i class="fas fa-money-bill text-secondary"></i>
+                            <span>Efectivo (Bs)</span>
+                        </div>
+                        <span class="entered-badge" id="badge-efectivo-bs" style="display:none;">$0.00</span>
+                    </div>
+                    <div class="payment-item-body">
+                        <div class="input-row">
+                            <input type="number" id="input-efectivo-bs" class="payment-input bs-input" placeholder="Monto en Bolívares" step="0.01">
+                            <div class="conversion-hint" id="hint-efectivo-bs-usd">USD: $0.00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <div class="summary-line">
+                    <span class="summary-label">Pagado (Equivalente):</span>
+                    <span class="summary-value text-success" id="summary-pagado">$0.00</span>
+                </div>
+                <div class="summary-line" style="align-items: flex-start;"> <span class="summary-label" style="margin-top: 5px;">Restante:</span>
+                    <div style="text-align: right;">
+                        <div class="summary-value text-danger" id="summary-restante">$0.00</div>
+                        <div id="summary-restante-bs" style="font-size: 0.9em; color: #666; font-weight: normal; margin-top: 2px;">
+                            (Faltan Bs. 0,00)
+                        </div>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button class="btn-cancel" onclick="cerrarModalPago()">Cancelar</button>
+                    <button class="btn-process" id="btn-procesar-pago" disabled onclick="confirmarPago()">Procesar Pago</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <style>
+        /* Estilos generales existentes */
         .btn-extra-item {
-            padding: 15px;
-            border: 2px solid #eee;
-            border-radius: 8px;
-            background: white;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-align: center;
-            font-weight: bold;
-            color: #555;
+            padding: 15px; border: 2px solid #eee; border-radius: 8px; background: white;
+            cursor: pointer; transition: all 0.2s; text-align: center; font-weight: bold; color: #555;
         }
-        .btn-extra-item:hover {
-            border-color: #bbb;
-            background: #f9f9f9;
-        }
+        .btn-extra-item:hover { border-color: #bbb; background: #f9f9f9; }
         .btn-extra-item.selected {
-            border-color: #198754;
-            background-color: #e8f5e9;
-            color: #198754;
-            box-shadow: 0 0 5px rgba(25, 135, 84, 0.3);
+            border-color: #198754; background-color: #e8f5e9; color: #198754; box-shadow: 0 0 5px rgba(25, 135, 84, 0.3);
         }
-        .badge-precio {
-            display: block;
-            font-size: 0.85em;
-            color: #888;
-            margin-top: 5px;
+        .badge-precio { display: block; font-size: 0.85em; color: #888; margin-top: 5px; }
+        .btn-extra-item.selected .badge-precio { color: #198754; }
+
+        /* --- NUEVOS ESTILOS PARA EL MODAL DE PAGO (ACORDEÓN) --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: none; justify-content: center; align-items: center;
+            z-index: 2000; backdrop-filter: blur(3px);
         }
-        .btn-extra-item.selected .badge-precio {
-            color: #198754;
+        .modal-card {
+            background: white; width: 90%; max-width: 480px;
+            border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            overflow: hidden; display: flex; flex-direction: column;
+            max-height: 90vh;
         }
+        .modal-header { text-align: center; padding: 25px 20px 15px; border-bottom: 1px solid #eee; }
+        .total-title { font-size: 1.8em; color: #333; margin: 0; font-weight: 700; }
+        .total-title span { color: var(--primary-blue, #0d6efd); }
+        .total-bs-subtitle { color: #666; font-size: 1.1em; margin-top: 5px; }
+
+        .payment-accordion { padding: 15px; overflow-y: auto; flex: 1; }
+        
+        .payment-item { border: 1px solid #ddd; border-radius: 12px; margin-bottom: 10px; overflow: hidden; transition: all 0.2s ease; }
+        .payment-item.active { border-color: var(--primary-blue, #0d6efd); box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1); }
+        .payment-item.active .payment-item-header { background-color: #e3f2fd; }
+
+        .payment-item-header {
+            padding: 15px; background: #fff; cursor: pointer;
+            display: flex; justify-content: space-between; align-items: center;
+            font-weight: 500; font-size: 1.05em; transition: background 0.2s;
+        }
+        .payment-item-header:hover { background: #f8f9fa; }
+        
+        .icon-label { display: flex; align-items: center; gap: 10px; }
+        .icon-label i { width: 20px; text-align: center; font-size: 1.1em; }
+
+        .entered-badge {
+            background: #28a745; color: white; font-size: 0.85em; padding: 2px 8px; border-radius: 10px; font-weight: bold;
+        }
+
+        .payment-item-body { display: none; padding: 15px; background: #fdfdfd; border-top: 1px solid #eee; }
+        .payment-item.active .payment-item-body { display: block; }
+
+        .payment-input { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 1.1em; outline: none; }
+        .payment-input:focus { border-color: var(--primary-blue, #0d6efd); background: #fff; }
+        .input-row { display: flex; align-items: center; gap: 10px; }
+        .conversion-hint { white-space: nowrap; font-size: 0.9em; color: #666; font-weight: 500; }
+        .ref-input { width: 100%; margin-top: 8px; padding: 8px; font-size: 0.9em; border: 1px solid #eee; border-radius: 6px; background: #f9f9f9; }
+
+        .modal-footer { padding: 20px; background: white; border-top: 1px solid #eee; }
+        .summary-line { display: flex; justify-content: space-between; margin-bottom: 5px; font-weight: 700; font-size: 1.1em; }
+        .text-success { color: #198754; }
+        .text-danger { color: #dc3545; }
+
+        .action-buttons { display: flex; gap: 15px; margin-top: 20px; }
+        .action-buttons button { flex: 1; padding: 12px; border: none; border-radius: 25px; font-size: 1em; font-weight: bold; cursor: pointer; transition: transform 0.1s; }
+        .action-buttons button:active { transform: scale(0.98); }
+        .btn-cancel { background: #6c757d; color: white; }
+        .btn-process { background: var(--primary-blue, #0d6efd); color: white; opacity: 0.5; pointer-events: none; }
+        .btn-process.ready { opacity: 1; pointer-events: auto; }
     </style>
 
     <script>
         // --- CONFIGURACIÓN INICIAL ---
         const TASA_CAMBIO = parseFloat("{{ tasa_valor|stringformat:'f' }}");
-        // Recuperamos el carrito guardado (si existe)
         let carrito = {{ carrito_json|safe|default:"[]" }};
-        
-        // --- NUEVO: RECUPERAR LISTA DE EXTRAS DEL BACKEND ---
-        // Usamos escapejs para evitar errores de sintaxis si viene vacío
         const LISTA_EXTRAS_DISPONIBLES = JSON.parse('{{ extras_json|escapejs }}' || '[]');
 
-        // Variables para modal extras
         let indexProductoEditando = null;
         let seleccionTemporal = [];
 
-        // Al cargar la página
+        // VARIABLES GLOBALES PARA PAGO
+        let totalMesaFacturacion = 0;
+        let montosPagos = {}; 
+
         document.addEventListener("DOMContentLoaded", function() {
             renderizarCarrito();
             actualizarReloj();
         });
 
         // ==========================================
-        //  NUEVAS FUNCIONES PARA EXTRAS
+        //  FUNCIONES EXTRAS (MODAL)
         // ==========================================
-
         function abrirModalExtras(index) {
             indexProductoEditando = index;
             const item = carrito[index];
-            
-            // Si el item ya tenía extras, los cargamos. Si no, array vacío.
             seleccionTemporal = item.extras ? [...item.extras] : [];
             
             document.getElementById('tituloProductoExtra').innerText = "Extras para: " + item.nombre;
@@ -236,21 +373,18 @@
             LISTA_EXTRAS_DISPONIBLES.forEach(extra => {
                 const btn = document.createElement('div');
                 btn.className = 'btn-extra-item';
+                if (seleccionTemporal.includes(extra.id)) { btn.classList.add('selected'); }
+                btn.onclick = function() { toggleExtraSelection(extra.id, btn); };
                 
-                // Si ya estaba seleccionado, le ponemos la clase activa
-                if (seleccionTemporal.includes(extra.id)) {
-                    btn.classList.add('selected');
+                // CORRECCIÓN: Calcular precio a mostrar según el tamaño del producto actual
+                let precioMostrar = parseFloat(extra.precio_venta_extra);
+                if (extra.precios_por_tamano && extra.precios_por_tamano[item.tamano_codigo] !== undefined) {
+                    precioMostrar = parseFloat(extra.precios_por_tamano[item.tamano_codigo]);
                 }
 
-                btn.onclick = function() { toggleExtraSelection(extra.id, btn); };
-
-                btn.innerHTML = `
-                    ${extra.nombre}
-                    <span class="badge-precio">+$${parseFloat(extra.precio_venta_extra).toFixed(2)}</span>
-                `;
+                btn.innerHTML = `${extra.nombre} <span class="badge-precio">+$${precioMostrar.toFixed(2)}</span>`;
                 contenedor.appendChild(btn);
             });
-
             document.getElementById('modalExtras').style.display = 'flex';
         }
 
@@ -264,12 +398,10 @@
                 btnElement.classList.add('selected');
             }
         }
-
         function cerrarModalExtras() {
             document.getElementById('modalExtras').style.display = 'none';
             indexProductoEditando = null;
         }
-
         function guardarSeleccionExtras() {
             if (indexProductoEditando !== null) {
                 carrito[indexProductoEditando].extras = [...seleccionTemporal];
@@ -278,26 +410,16 @@
             }
         }
 
-        // --- FUNCIONES DEL CARRITO MODIFICADAS ---
-        
+        // --- FUNCIONES DEL CARRITO ---
         function agregarAlCarrito(id, nombre, precio, tamano) {
             let precioFloat = parseFloat(precio);
             let nombreDisplay = nombre;
             if(tamano !== 'UNI') nombreDisplay += ` (${tamano})`;
-
             let existente = carrito.find(item => item.id == id && item.nombre == nombreDisplay);
-            
-            if (existente) {
-                existente.cantidad++;
-            } else {
+            if (existente) { existente.cantidad++; } else {
                 carrito.push({
-                    id: id,
-                    nombre: nombreDisplay,
-                    precio: precioFloat,
-                    cantidad: 1,
-                    tamano_codigo: tamano, 
-                    para_llevar: false,
-                    extras: [] // Array inicial vacío de extras
+                    id: id, nombre: nombreDisplay, precio: precioFloat, cantidad: 1,
+                    tamano_codigo: tamano, para_llevar: false, extras: [] 
                 });
             }
             renderizarCarrito();
@@ -307,168 +429,279 @@
             const contenedor = document.querySelector('.cart-items-list');
             const totalUsdEl = document.getElementById('total-usd');
             const totalBsEl = document.getElementById('total-bs');
-            
             contenedor.innerHTML = '';
             let sumaUsd = 0;
 
             carrito.forEach((item, index) => {
-                
-                // 1. Calcular precio de extras
                 let costoExtras = 0;
                 let htmlExtras = '';
-
+                
                 if (item.extras && item.extras.length > 0) {
                     item.extras.forEach(extraId => {
-                        const info = LISTA_EXTRAS_DISPONIBLES.find(e => e.id === extraId);
+                        const info = LISTA_EXTRAS_DISPONIBLES.find(e => e.id == extraId);
                         if (info) {
-                            let precioEx = parseFloat(info.precio_venta_extra);
+                            // 1. Precio Base por defecto
+                            let precioCrudo = String(info.precio_venta_extra).replace(',', '.');
+                            let precioEx = parseFloat(precioCrudo) || 0; 
+                            
+                            // 2. CORRECCIÓN: Verificar si hay precio específico para este tamaño
+                            if (info.precios_por_tamano && info.precios_por_tamano[item.tamano_codigo] !== undefined) {
+                                precioEx = parseFloat(info.precios_por_tamano[item.tamano_codigo]);
+                            }
+
                             costoExtras += precioEx;
                             htmlExtras += `<div style="font-size:0.75em; color:#198754; margin-left:5px;">+ ${info.nombre} ($${precioEx.toFixed(2)})</div>`;
+                        } else {
+                            console.warn("No se encontró información para el extra con ID:", extraId);
                         }
                     });
                 }
-
-                // 2. Calcular subtotales
+                
                 const precioTotalUnitario = item.precio + costoExtras;
                 const subtotalItem = precioTotalUnitario * item.cantidad;
                 sumaUsd += subtotalItem;
                 
                 const fila = document.createElement('div');
                 fila.style.cssText = "display: grid; grid-template-columns: 2fr 0.5fr 1fr 0.5fr 30px; padding: 8px 0; border-bottom: 1px solid #eee; font-size: 0.9em; align-items: center;";
-                
                 const checked = item.para_llevar ? 'checked' : '';
                 const etiquetaLlevar = item.para_llevar ? '<div style="font-size:0.7em; color:#e67e22; font-weight:bold;"><i class="fas fa-box"></i> Para Llevar</div>' : '';
 
                 fila.innerHTML = `
                     <div style="display:flex; flex-direction:column; padding-right:5px;">
                         <span style="font-weight:500;">${item.nombre}</span>
-                        ${htmlExtras}
-                        ${etiquetaLlevar}
-                        
-                        <button onclick="abrirModalExtras(${index})" style="margin-top:4px; align-self:start; background:#f0f2f5; border:1px solid #ccc; border-radius:10px; font-size:0.75em; cursor:pointer; padding:2px 8px; color:#555;">
-                            <i class="fas fa-plus-circle" style="color:#d63384;"></i> Extras
-                        </button>
+                        ${htmlExtras} ${etiquetaLlevar}
+                        <button onclick="abrirModalExtras(${index})" style="margin-top:4px; align-self:start; background:#f0f2f5; border:1px solid #ccc; border-radius:10px; font-size:0.75em; cursor:pointer; padding:2px 8px; color:#555;"><i class="fas fa-plus-circle" style="color:#d63384;"></i> Extras</button>
                     </div>
-                    
                     <span style="text-align: center;">x${item.cantidad}</span>
-                    
                     <span style="text-align: right; font-weight:bold;">$${subtotalItem.toFixed(2)}</span>
-                    
                     <div style="text-align: center;" title="Marcar para llevar">
                         <input type="checkbox" onchange="toggleParaLlevar(${index})" ${checked} style="transform: scale(1.3); cursor: pointer; accent-color: #e67e22;">
                     </div>
-
-                    <button onclick="eliminarDelCarrito(${index})" style="background:none; border:none; color:#dc3545; cursor:pointer; font-size: 1.1em;">
-                        <i class="fas fa-times"></i>
-                    </button>
+                    <button onclick="eliminarDelCarrito(${index})" style="background:none; border:none; color:#dc3545; cursor:pointer; font-size: 1.1em;"><i class="fas fa-times"></i></button>
                 `;
                 contenedor.appendChild(fila);
             });
-
-            // Totales
+            
             let sumaBs = sumaUsd * TASA_CAMBIO;
             totalUsdEl.innerText = sumaUsd.toFixed(2);
             totalBsEl.innerText = sumaBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             
-            if(carrito.length === 0) {
-                contenedor.innerHTML = '<p style="text-align: center; color: #aaa; padding-top: 50px;">Carrito vacío</p>';
+            if(carrito.length === 0) { 
+                contenedor.innerHTML = '<p style="text-align: center; color: #aaa; padding-top: 50px;">Carrito vacío</p>'; 
             }
         }
 
-        function toggleParaLlevar(index) {
-            carrito[index].para_llevar = !carrito[index].para_llevar;
-            renderizarCarrito(); 
+        function toggleParaLlevar(index) { carrito[index].para_llevar = !carrito[index].para_llevar; renderizarCarrito(); }
+        function eliminarDelCarrito(index) { carrito.splice(index, 1); renderizarCarrito(); }
+
+        // --- FUNCIÓN GLOBAL DE IMPRESIÓN ---
+        function imprimirTicket(url) {
+            const printWindow = window.open(url, '_blank');
+            if (printWindow) { printWindow.focus(); } else { Swal.fire('Aviso', 'El navegador bloqueó la ventana emergente del ticket.', 'warning'); }
         }
 
-        function eliminarDelCarrito(index) {
-            carrito.splice(index, 1);
-            renderizarCarrito();
-        }
-
-        // --- FUNCIÓN GRABAR MESA ---
+        // --- FUNCIONES DE GRABAR Y FACTURAR ---
         function grabarMesa() {
-            if (carrito.length === 0) {
-                Swal.fire('Mesa Vacía', 'Agrega productos antes de grabar.', 'warning');
-                return;
-            }
-
+            if (carrito.length === 0) { Swal.fire('Mesa Vacía', 'Agrega productos antes de grabar.', 'warning'); return; }
             const meseroNombre = document.getElementById('input-mesero').value;
             if (!meseroNombre || meseroNombre.trim() === "") {
                 Swal.fire({
-                    title: 'Falta Mesero',
-                    text: '⚠️ No puedes grabar la mesa sin asignar un mesero responsable.',
-                    icon: 'warning',
-                    confirmButtonText: 'Seleccionar Mesero Ahora',
-                    confirmButtonColor: '#3085d6'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        abrirModalMeseros();
-                    }
-                });
+                    title: 'Falta Mesero', text: '⚠️ No puedes grabar la mesa sin asignar un mesero responsable.', icon: 'warning',
+                    confirmButtonText: 'Seleccionar Mesero Ahora', confirmButtonColor: '#3085d6'
+                }).then((result) => { if (result.isConfirmed) { abrirModalMeseros(); } });
                 return;
             }
-
-            const data = {
-                carrito: carrito,
-                mesero: meseroNombre
-            };
+            const data = { carrito: carrito, mesero: meseroNombre };
+            Swal.fire({ title: 'Guardando...', didOpen: () => Swal.showLoading(), timerProgressBar: true, allowOutsideClick: false });
 
             fetch("{% url 'grabar_mesa' table.id %}", {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token }}'
-                },
-                body: JSON.stringify(data)
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }, body: JSON.stringify(data)
             })
             .then(response => response.json())
             .then(result => {
                 if(result.status === 'ok') {
-                    Swal.fire({
-                        title: '¡Mesa Guardada!',
-                        text: 'La orden se ha registrado correctamente.',
-                        icon: 'success',
-                        showCancelButton: true,
-                        confirmButtonColor: '#3085d6',
-                        cancelButtonColor: '#d33',
-                        confirmButtonText: '🖨️ Imprimir Ticket',
-                        cancelButtonText: 'Seguir Editando'
-                    }).then((alertResult) => {
-                        if (alertResult.isConfirmed) {
-                            const urlPDF = `/orden/${result.orden_id}/pdf/`; 
-                            window.open(urlPDF, '_blank');
-                            setTimeout(() => {
-                                window.location.href = "{% url 'index' %}";
-                            }, 500);
-                        }
-                    });
-                } else {
-                    Swal.fire('Error', 'El servidor respondió: ' + result.message, 'error');
-                }
+                    Swal.fire({ icon: 'success', title: '¡Mesa Guardada!', text: 'Imprimiendo ticket...', showConfirmButton: false, timer: 1000 });
+                    const urlPDF = `/orden/${result.orden_id}/pdf/`; 
+                    imprimirTicket(urlPDF);
+                    setTimeout(() => { window.location.href = "{% url 'index' %}"; }, 800); 
+                } else { Swal.fire('Error', 'El servidor respondió: ' + result.message, 'error'); }
             })
-            .catch(error => {
-                console.error('Error:', error);
-                Swal.fire('Error Técnico', 'No se pudo conectar con el servidor.', 'error');
+            .catch(error => { console.error('Error:', error); Swal.fire('Error Técnico', 'No se pudo conectar con el servidor.', 'error'); });
+        }
+
+        // =============================================
+        // === NUEVA LÓGICA DE FACTURACIÓN (MODAL) ===
+        // =============================================
+
+        function iniciarFacturacion() {
+            const totalTexto = document.getElementById('total-usd').innerText;
+            totalMesaFacturacion = parseFloat(totalTexto);
+
+            if (!TASA_CAMBIO || TASA_CAMBIO <= 0) { Swal.fire('Error', 'Sin Tasa de Cambio', 'error'); return; }
+            if (totalMesaFacturacion <= 0) { Swal.fire('Error', 'Monto en 0', 'error'); return; }
+
+            // Setear textos iniciales
+            document.getElementById('display-total-usd').innerText = `$${totalMesaFacturacion.toFixed(2)}`;
+            document.getElementById('display-total-bs').innerText = `(Bs. ${(totalMesaFacturacion * TASA_CAMBIO).toLocaleString('es-VE', {minimumFractionDigits: 2})})`;
+
+            // Limpiar inputs previos
+            document.querySelectorAll('.payment-input, .ref-input').forEach(i => i.value = '');
+            document.querySelectorAll('.entered-badge').forEach(b => b.style.display = 'none');
+            
+            // Resetear estado
+            montosPagos = {};
+            document.querySelectorAll('.payment-item').forEach(item => item.classList.remove('active'));
+            
+            // Abrir modal
+            document.getElementById('payment-modal-overlay').style.display = 'flex';
+            
+            // Activar listeners
+            activarListenersPagos();
+            calcularResumenPago();
+        }
+
+        function cerrarModalPago() { document.getElementById('payment-modal-overlay').style.display = 'none'; }
+
+        function togglePaymentMethod(tipo) {
+            // Cerrar todos primero (Acordeón)
+            document.querySelectorAll('.payment-item').forEach(i => i.classList.remove('active'));
+            // Activar seleccionado
+            const item = document.getElementById(`item-${tipo}`);
+            item.classList.add('active');
+            // Enfocar input
+            setTimeout(() => { const input = item.querySelector('.payment-input'); if(input) input.focus(); }, 100);
+        }
+
+        function activarListenersPagos() {
+            document.querySelectorAll('.payment-input').forEach(input => {
+                input.oninput = () => { calcularResumenPago(); actualizarBadge(input); };
             });
         }
 
-        // --- RELOJ Y MESEROS ---
+        function actualizarBadge(input) {
+            const item = input.closest('.payment-item');
+            const badge = item.querySelector('.entered-badge');
+            let val = parseFloat(input.value) || 0;
+            
+            if (val > 0) {
+                badge.style.display = 'block';
+                if(input.classList.contains('bs-input')) { badge.innerText = `Bs. ${val.toFixed(2)}`; } 
+                else { badge.innerText = `$${val.toFixed(2)}`; }
+            } else { badge.style.display = 'none'; }
+        }
+
+        function calcularResumenPago() {
+            const efecUsd = parseFloat(document.getElementById('input-efectivo-usd').value) || 0;
+            const zelle = parseFloat(document.getElementById('input-zelle').value) || 0;
+            const pmBs = parseFloat(document.getElementById('input-pm-bs').value) || 0;
+            const puntoBs = parseFloat(document.getElementById('input-punto-bs').value) || 0;
+            const efecBs = parseFloat(document.getElementById('input-efectivo-bs').value) || 0;
+
+            // Hints de conversión (UI)
+            document.getElementById('hint-pm-usd').innerText = `USD: $${(pmBs / TASA_CAMBIO).toFixed(2)}`;
+            document.getElementById('hint-punto-usd').innerText = `USD: $${(puntoBs / TASA_CAMBIO).toFixed(2)}`;
+            document.getElementById('hint-efectivo-bs-usd').innerText = `USD: $${(efecBs / TASA_CAMBIO).toFixed(2)}`;
+
+            // Totales en USD
+            const totalPagadoUsd = efecUsd + zelle + (pmBs/TASA_CAMBIO) + (puntoBs/TASA_CAMBIO) + (efecBs/TASA_CAMBIO);
+            const restante = totalMesaFacturacion - totalPagadoUsd;
+
+            // Elementos del DOM
+            const elPagado = document.getElementById('summary-pagado');
+            const elRestante = document.getElementById('summary-restante');
+            const elRestanteBs = document.getElementById('summary-restante-bs'); // EL NUEVO ELEMENTO
+            const btn = document.getElementById('btn-procesar-pago');
+
+            // Actualizar Pagado
+            elPagado.innerText = `$${totalPagadoUsd.toFixed(2)}`;
+
+            if (restante > 0.009) {
+                // --- CASO: FALTA DINERO ---
+                elRestante.innerText = `$${restante.toFixed(2)}`;
+                elRestante.classList.remove('text-success'); 
+                elRestante.classList.add('text-danger');
+                
+                // CÁLCULO DE RESTANTE EN BS
+                const restanteEnBs = restante * TASA_CAMBIO;
+                elRestanteBs.style.display = 'block';
+                elRestanteBs.innerText = `(Faltan Bs. ${restanteEnBs.toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2})})`;
+                elRestanteBs.style.color = '#dc3545'; // Rojo suave
+
+                btn.classList.remove('ready'); 
+                btn.disabled = true;
+            } else {
+                // --- CASO: PAGADO O SOBRA ---
+                const sobra = Math.abs(restante);
+                
+                // Ocultamos el texto de "Faltan Bs" porque ya está pagado
+                elRestanteBs.style.display = 'none';
+
+                elRestante.innerText = (restante < -0.009) ? `+$${sobra.toFixed(2)} (Sobra)` : "$0.00";
+                elRestante.classList.remove('text-danger'); 
+                elRestante.classList.add('text-success');
+                
+                btn.classList.add('ready'); 
+                btn.disabled = false;
+            }
+
+            montosPagos = { efecUsd, zelle, pmBs, puntoBs, efecBs, totalPagadoUsd, restante };
+        }
+
+        async function confirmarPago() {
+            const btn = document.getElementById('btn-procesar-pago');
+            if(btn.disabled) return;
+
+            let esPropina = false;
+            const sobra = Math.abs(montosPagos.restante);
+
+            if (sobra > 0.01) {
+                document.getElementById('payment-modal-overlay').style.display = 'none';
+                const { isConfirmed, isDismissed } = await Swal.fire({
+                    title: `Excedente: $${sobra.toFixed(2)}`, text: "¿Cómo desea registrar este sobrante?", icon: 'question',
+                    showCancelButton: true, confirmButtonText: 'Es Propina 🎁', cancelButtonText: 'Es Vuelto 💵',
+                    confirmButtonColor: '#28a745', cancelButtonColor: '#3085d6'
+                });
+                if (isDismissed) { document.getElementById('payment-modal-overlay').style.display = 'flex'; return; }
+                esPropina = isConfirmed;
+            }
+
+            let lista = [];
+            if(montosPagos.efecUsd > 0) lista.push({ metodo: 'EFECTIVO_USD', monto: montosPagos.efecUsd });
+            if(montosPagos.zelle > 0) lista.push({ metodo: 'ZELLE', monto: montosPagos.zelle });
+            if(montosPagos.pmBs > 0) lista.push({ metodo: 'PAGO_MOVIL', monto: montosPagos.pmBs / TASA_CAMBIO, referencia: document.getElementById('ref-pm').value });
+            if(montosPagos.puntoBs > 0) lista.push({ metodo: 'PUNTO', monto: montosPagos.puntoBs / TASA_CAMBIO, referencia: document.getElementById('ref-punto').value });
+            if(montosPagos.efecBs > 0) lista.push({ metodo: 'EFECTIVO_BS', monto: montosPagos.efecBs / TASA_CAMBIO });
+
+            Swal.fire({ title: 'Procesando...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+            fetch("{% url 'facturar_mesa' table.id %}", {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                body: JSON.stringify({ lista_pagos: lista, monto_recibido_total: montosPagos.totalPagadoUsd, es_propina: esPropina })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'ok') {
+                    const urlPDF = `/factura/${data.venta_id}/pdf/`;
+                    imprimirTicket(urlPDF);
+                    Swal.fire({ icon: 'success', title: '¡Pago Exitoso!', showConfirmButton: false, timer: 1500 })
+                    .then(() => { window.location.href = "{% url 'index' %}"; });
+                } else {
+                    Swal.fire('Error', data.message, 'error');
+                    document.getElementById('payment-modal-overlay').style.display = 'flex';
+                }
+            });
+        }
+
+        // --- FUNCIONES UTILITARIAS ---
         function abrirModalMeseros() { document.getElementById('modal-meseros').style.display = 'flex'; }
         function cerrarModalMeseros() { document.getElementById('modal-meseros').style.display = 'none'; }
         
         function seleccionarMesero(userId, userName) {
             fetch("{% url 'asignar_mesero' table.id %}", {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-                body: JSON.stringify({ user_id: userId })
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }, body: JSON.stringify({ user_id: userId })
             })
             .then(r => r.json())
-            .then(d => {
-                if(d.status === 'ok') {
-                    document.getElementById('input-mesero').value = userName;
-                    cerrarModalMeseros();
-                }
-            });
+            .then(d => { if(d.status === 'ok') { document.getElementById('input-mesero').value = userName; cerrarModalMeseros(); } });
         }
 
         function actualizarReloj() {
@@ -479,7 +712,7 @@
             if(el) el.value = str;
         }
 
-        // --- FILTROS ---
+        // --- FILTROS Y OTROS ---
         let filtroCategoriaActivo = 'todas';
         let filtroTamanoActivo = 'todos';
 
@@ -495,277 +728,46 @@
         function resetearFiltros(btn) {
             filtroCategoriaActivo = 'todas'; filtroTamanoActivo = 'todos';
             document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            actualizarVisibilidad();
+            btn.classList.add('active'); actualizarVisibilidad();
         }
         function filtrarPorTamano(tam, btn) {
             filtroTamanoActivo = tam; filtroCategoriaActivo = 'todas';
             document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            actualizarVisibilidad();
+            btn.classList.add('active'); actualizarVisibilidad();
         }
         function filtrarPorTexto() {
             const txt = document.getElementById('buscador-productos').value.toLowerCase();
-            document.querySelectorAll('.producto-card').forEach(p => {
-                p.style.display = p.getAttribute('data-nombre').includes(txt) ? 'flex' : 'none';
-            });
+            document.querySelectorAll('.producto-card').forEach(p => { p.style.display = p.getAttribute('data-nombre').includes(txt) ? 'flex' : 'none'; });
         }
         function eliminarMesa() {
             Swal.fire({
-                title: '¿Eliminar Mesa?',
-                text: "Esta acción quedará registrada en auditoría. Escribe el motivo:",
-                icon: 'warning',
-                input: 'text',
-                inputPlaceholder: 'Ej: Cliente se retiró / Error de mesero',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                confirmButtonText: 'Sí, Eliminar',
-                cancelButtonText: 'Cancelar',
-                preConfirm: (motivo) => {
-                    if (!motivo) {
-                        Swal.showValidationMessage('Debes escribir un motivo obligatoriamente')
-                    }
-                    return motivo
-                }
+                title: '¿Eliminar Mesa?', text: "Esta acción quedará registrada en auditoría. Escribe el motivo:", icon: 'warning',
+                input: 'text', inputPlaceholder: 'Ej: Cliente se retiró / Error de mesero', showCancelButton: true,
+                confirmButtonColor: '#d33', confirmButtonText: 'Sí, Eliminar', cancelButtonText: 'Cancelar',
+                preConfirm: (motivo) => { if (!motivo) { Swal.showValidationMessage('Debes escribir un motivo obligatoriamente') } return motivo }
             }).then((result) => {
                 if (result.isConfirmed) {
-                    const motivoIngresado = result.value;
-
                     fetch("{% url 'eliminar_mesa' table.id %}", {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': '{{ csrf_token }}'
-                        },
-                        body: JSON.stringify({ motivo: motivoIngresado })
+                        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }, body: JSON.stringify({ motivo: result.value })
                     })
-                    .then(r => r.json())
-                    .then(data => {
-                        if(data.status === 'ok') {
-                            Swal.fire('Eliminado', 'La mesa ha sido liberada.', 'success')
-                            .then(() => {
-                                window.location.href = "{% url 'index' %}"; 
-                            });
-                        } else {
-                            Swal.fire('Error', data.message, 'error');
-                        }
+                    .then(r => r.json()).then(data => {
+                        if(data.status === 'ok') { Swal.fire('Eliminado', 'La mesa ha sido liberada.', 'success').then(() => { window.location.href = "{% url 'index' %}"; }); } 
+                        else { Swal.fire('Error', data.message, 'error'); }
                     });
                 }
             });
         }
         function pedirCuenta() {
             Swal.fire({
-                title: '¿Emitir Cuenta?',
-                text: "La mesa cambiará a estado 'En proceso de pago' (Amarillo).",
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonColor: '#ffc107', 
-                confirmButtonText: 'Sí, Imprimir Cuenta',
-                cancelButtonText: 'Cancelar'
+                title: '¿Emitir Cuenta?', text: "La mesa cambiará a estado 'En proceso de pago' (Amarillo).", icon: 'question',
+                showCancelButton: true, confirmButtonColor: '#ffc107', confirmButtonText: 'Sí, Imprimir Cuenta', cancelButtonText: 'Cancelar'
             }).then((result) => {
                 if (result.isConfirmed) {
                     const url = "{% url 'generar_cuenta_pdf' table.id %}";
-                    window.open(url, '_blank');
-                    setTimeout(() => {
-                        window.location.href = "{% url 'index' %}"; 
-                    }, 1000);
+                    imprimirTicket(url);
+                    setTimeout(() => { window.location.href = "{% url 'index' %}"; }, 1000);
                 }
             });
-        }
-
-        async function iniciarFacturacion() {
-            const totalTexto = document.getElementById('total-usd').innerText;
-            const totalMesa = parseFloat(totalTexto);
-
-            if (!TASA_CAMBIO || TASA_CAMBIO <= 0) {
-                Swal.fire('Error', 'No hay Tasa de Cambio cargada.', 'error');
-                return;
-            }
-
-            if (totalMesa <= 0) { Swal.fire('Error', 'Monto 0', 'error'); return; }
-
-            // HTML DEL FORMULARIO MIXTO
-            const htmlForm = `
-                <div style="text-align: left; font-size: 0.9em;">
-                    <div style="margin-bottom: 15px; font-weight: bold; color: #444; text-align: center; border-bottom: 1px solid #eee; padding-bottom: 10px;">
-                        Total a Pagar: <span style="font-size: 1.5em; color: var(--primary-blue);">$${totalMesa.toFixed(2)}</span>
-                        <br>
-                        <small style="color: #666; font-weight: normal;">(Bs. ${(totalMesa * TASA_CAMBIO).toLocaleString('es-VE', {minimumFractionDigits: 2})})</small>
-                    </div>
-                    
-                    <div style="background: #e3f2fd; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
-                        <div class="pago-row" style="margin-bottom: 5px;">
-                            <label>💵 Efectivo (USD):</label>
-                            <input type="number" id="pago-efectivo-usd" class="swal2-input" placeholder="0.00" style="margin: 0; width: 100%; height: 35px;" oninput="calcularRestante()">
-                        </div>
-                        <div class="pago-row">
-                            <label>🏦 Zelle (USD):</label>
-                            <input type="number" id="pago-zelle" class="swal2-input" placeholder="0.00" style="margin: 0; width: 100%; height: 35px;" oninput="calcularRestante()">
-                        </div>
-                    </div>
-
-                    <div style="background: #fff3cd; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
-                        <div style="font-size: 0.8em; color: #856404; margin-bottom: 5px; text-align: right;">Tasa: Bs. ${TASA_CAMBIO.toFixed(2)}</div>
-                        
-                        <div class="pago-row" style="margin-bottom: 8px;">
-                            <label>📱 Pago Móvil (Bs):</label>
-                            <div style="display: flex; gap: 5px;">
-                                <input type="number" id="pago-pm" class="swal2-input" placeholder="Bolívares" style="margin: 0; flex-grow: 1; height: 35px;" oninput="calcularRestante()">
-                                <input type="text" id="ref-pm-usd" readonly style="width: 80px; border: none; background: transparent; color: #666; font-size: 0.9em; text-align: right;" value="$0.00">
-                            </div>
-                        </div>
-
-                        <div class="pago-row" style="margin-bottom: 8px;">
-                            <label>💳 Punto Venta (Bs):</label>
-                            <div style="display: flex; gap: 5px;">
-                                <input type="number" id="pago-punto" class="swal2-input" placeholder="Bolívares" style="margin: 0; flex-grow: 1; height: 35px;" oninput="calcularRestante()">
-                                <input type="text" id="ref-punto-usd" readonly style="width: 80px; border: none; background: transparent; color: #666; font-size: 0.9em; text-align: right;" value="$0.00">
-                            </div>
-                        </div>
-
-                        <div class="pago-row">
-                            <label>🇻🇪 Efectivo (Bs):</label>
-                            <div style="display: flex; gap: 5px;">
-                                <input type="number" id="pago-efectivo-bs" class="swal2-input" placeholder="Bolívares" style="margin: 0; flex-grow: 1; height: 35px;" oninput="calcularRestante()">
-                                <input type="text" id="ref-efec-bs-usd" readonly style="width: 80px; border: none; background: transparent; color: #666; font-size: 0.9em; text-align: right;" value="$0.00">
-                            </div>
-                        </div>
-                    </div>
-
-                    <hr style="margin: 15px 0;">
-                    
-                    <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 1.1em;">
-                        <span>Pagado (Equivalente):</span>
-                        <span id="label-pagado" style="color: green;">$0.00</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 1.1em;">
-                        <span>Restante:</span>
-                        <span id="label-restante" style="color: red;">$${totalMesa.toFixed(2)}</span>
-                    </div>
-                </div>
-            `;
-
-            const { value: formValues } = await Swal.fire({
-                title: 'Facturación / Pago Mixto',
-                html: htmlForm,
-                focusConfirm: false,
-                width: '550px',
-                allowOutsideClick: false, 
-                allowEscapeKey: false,    
-                showCloseButton: true,    
-                showCancelButton: true,
-                confirmButtonText: 'Procesar Pago',
-                cancelButtonText: 'Cancelar',
-                preConfirm: () => {
-                    const efecUsd = parseFloat(document.getElementById('pago-efectivo-usd').value) || 0;
-                    const zelle = parseFloat(document.getElementById('pago-zelle').value) || 0;
-                    
-                    const pmBs = parseFloat(document.getElementById('pago-pm').value) || 0;
-                    const puntoBs = parseFloat(document.getElementById('pago-punto').value) || 0;
-                    const efecBs = parseFloat(document.getElementById('pago-efectivo-bs').value) || 0;
-
-                    const pmUsd = pmBs / TASA_CAMBIO;
-                    const puntoUsd = puntoBs / TASA_CAMBIO;
-                    const efecBsUsd = efecBs / TASA_CAMBIO;
-
-                    const totalIngresadoUsd = efecUsd + zelle + pmUsd + puntoUsd + efecBsUsd;
-
-                    if (totalIngresadoUsd < (totalMesa - 0.01)) {
-                        Swal.showValidationMessage(`Faltan $${(totalMesa - totalIngresadoUsd).toFixed(2)} por cobrar`);
-                        return false;
-                    }
-
-                    let lista = [];
-                    if(efecUsd > 0) lista.push({ metodo: 'EFECTIVO_USD', monto: efecUsd });
-                    if(zelle > 0) lista.push({ metodo: 'ZELLE', monto: zelle });
-                    if(pmUsd > 0) lista.push({ metodo: 'PAGO_MOVIL', monto: pmUsd });
-                    if(puntoUsd > 0) lista.push({ metodo: 'PUNTO', monto: puntoUsd });
-                    if(efecBsUsd > 0) lista.push({ metodo: 'EFECTIVO_BS', monto: efecBsUsd });
-
-                    return {
-                        lista_pagos: lista,
-                        total_ingresado: totalIngresadoUsd
-                    };
-                }
-            });
-
-            if (!formValues) return; 
-
-            // LOGICA DE PROPINA / VUELTO
-            const diferencia = formValues.total_ingresado - totalMesa;
-            let esPropina = false;
-
-            if (diferencia > 0.01) { 
-                const { isConfirmed } = await Swal.fire({
-                    title: `Sobra: $${diferencia.toFixed(2)}`,
-                    text: "¿Cómo registrar el excedente?",
-                    icon: 'question',
-                    allowOutsideClick: false, 
-                    showCancelButton: true,
-                    confirmButtonText: 'Es Propina 🎁',
-                    cancelButtonText: 'Es Vuelto 💵',
-                    confirmButtonColor: '#28a745',
-                    cancelButtonColor: '#3085d6'
-                });
-                esPropina = isConfirmed;
-            }
-
-            Swal.fire({ title: 'Procesando...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-
-            fetch("{% url 'facturar_mesa' table.id %}", {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-                body: JSON.stringify({
-                    lista_pagos: formValues.lista_pagos,
-                    monto_recibido_total: formValues.total_ingresado,
-                    es_propina: esPropina
-                })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.status === 'ok') {
-                    Swal.fire('¡Éxito!', 'Factura generada', 'success').then(() => {
-                        window.open(`/factura/${data.venta_id}/pdf/`, '_blank');
-                        window.location.href = "{% url 'index' %}";
-                    });
-                } else {
-                    Swal.fire('Error', data.message, 'error');
-                }
-            });
-        }
-
-        window.calcularRestante = function() {
-            const total = parseFloat(document.getElementById('total-usd').innerText);
-            
-            const efecUsd = parseFloat(document.getElementById('pago-efectivo-usd').value) || 0;
-            const zelle = parseFloat(document.getElementById('pago-zelle').value) || 0;
-            const pmBs = parseFloat(document.getElementById('pago-pm').value) || 0;
-            const puntoBs = parseFloat(document.getElementById('pago-punto').value) || 0;
-            const efecBs = parseFloat(document.getElementById('pago-efectivo-bs').value) || 0;
-
-            const pmUsd = pmBs / TASA_CAMBIO;
-            const puntoUsd = puntoBs / TASA_CAMBIO;
-            const efecBsUsd = efecBs / TASA_CAMBIO;
-
-            document.getElementById('ref-pm-usd').value = `$${pmUsd.toFixed(2)}`;
-            document.getElementById('ref-punto-usd').value = `$${puntoUsd.toFixed(2)}`;
-            document.getElementById('ref-efec-bs-usd').value = `$${efecBsUsd.toFixed(2)}`;
-
-            const totalPagado = efecUsd + zelle + pmUsd + puntoUsd + efecBsUsd;
-            const restante = total - totalPagado;
-
-            document.getElementById('label-pagado').innerText = `$${totalPagado.toFixed(2)}`;
-            const elRestante = document.getElementById('label-restante');
-            
-            if (restante > 0.009) {
-                elRestante.innerText = `$${restante.toFixed(2)}`;
-                elRestante.style.color = 'red';
-                elRestante.innerText += " (Falta)";
-            } else {
-                elRestante.innerText = `$${Math.abs(restante).toFixed(2)}`;
-                elRestante.style.color = 'green';
-                elRestante.innerText += " (Sobra)";
-            }
         }
     </script>
 </body>

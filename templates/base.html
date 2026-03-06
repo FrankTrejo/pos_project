@@ -66,6 +66,40 @@
 
         </div> 
     </div>
+    <script>
+    // Esta función recibe la URL del PDF (ej: /ventas/factura/50/pdf/)
+    function imprimirTicket(urlPdf) {
+        // Verificamos si la configuración global permite auto-imprimir
+        // (Este valor viene de tu context_processor 'config')
+        const autoImprimir = "{{ config.auto_imprimir|yesno:'true,false' }}";
 
+        if (autoImprimir === 'true') {
+            console.log("Iniciando impresión automática de:", urlPdf);
+            
+            // 1. Crear un iframe invisible si no existe
+            let iframe = document.getElementById('print-iframe');
+            if (!iframe) {
+                iframe = document.createElement('iframe');
+                iframe.id = 'print-iframe';
+                iframe.style.display = 'none';
+                document.body.appendChild(iframe);
+            }
+
+            // 2. Cargar el PDF
+            iframe.src = urlPdf;
+
+            // 3. Esperar a que cargue e imprimir
+            iframe.onload = function() {
+                setTimeout(function() {
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
+                }, 500); // Pequeña pausa para asegurar carga
+            };
+        } else {
+            // Si está desactivado, solo abrimos el PDF en otra pestaña
+            window.open(urlPdf, '_blank');
+        }
+    }
+</script>
 </body>
 </html>

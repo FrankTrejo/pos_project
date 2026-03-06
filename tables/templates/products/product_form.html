@@ -1,6 +1,11 @@
 {% extends 'base.html' %}
 {% block content %}
 <div style="max-width: 500px; margin: 40px auto; padding: 20px;" class="card-style">
+    <div style="margin-bottom: 15px;">
+         <a href="{% url 'product_list' %}" style="text-decoration: none; color: #666; font-weight: bold; display: inline-flex; align-items: center; gap: 5px;">
+            <i class="fas fa-arrow-left"></i> Volver al Catálogo
+        </a>
+    </div>
     <h2 style="color: var(--primary-blue); text-align: center;">{{ titulo }}</h2>
     <form method="POST">
         {% csrf_token %}

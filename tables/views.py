@@ -118,10 +118,23 @@ def table_order_view(request, table_id):
     carrito_json = json.dumps(carrito_recuperado, cls=DjangoJSONEncoder)
     
     # 3. EXTRAS DISPONIBLES
-    lista_extras = Insumo.objects.filter(es_extra=True, stock_actual__gt=0).values(
-        'id', 'nombre', 'precio_venta_extra', 'unidad__codigo'
-    )
-    extras_json = json.dumps(list(lista_extras), cls=DjangoJSONEncoder)
+    # MODIFICADO: Traemos los precios específicos por tamaño
+    insumos_extras = Insumo.objects.filter(es_extra=True, stock_actual__gt=0).prefetch_related('precios_extra')
+    lista_extras_procesada = []
+    
+    for insumo in insumos_extras:
+        # Convertimos la relación inversa a un diccionario { 'IND': 1.50, 'MED': 2.00 }
+        precios_dict = {pe.tamano: float(pe.precio) for pe in insumo.precios_extra.all()}
+        
+        lista_extras_procesada.append({
+            'id': insumo.id,
+            'nombre': insumo.nombre,
+            'precio_venta_extra': float(insumo.precio_venta_extra), # Precio base por si acaso
+            'unidad__codigo': insumo.unidad.codigo,
+            'precios_por_tamano': precios_dict 
+        })
+
+    extras_json = json.dumps(lista_extras_procesada, cls=DjangoJSONEncoder)
     
     context = {
         'table': table,
@@ -321,10 +334,23 @@ def grabar_mesa_ajax(request, table_id):
                     for extra_id in ids_extras:
                         try:
                             insumo = Insumo.objects.get(id=extra_id)
+                            
+                            # LÓGICA CORREGIDA: Buscar precio según tamaño del producto
+                            precio_final = insumo.precio_venta_extra # Valor por defecto
+                            
+                            # Buscamos si existe un precio configurado para este tamaño
+                            precio_obj = PrecioExtra.objects.filter(
+                                insumo=insumo, 
+                                tamano=prod_obj.tamano
+                            ).first()
+                            
+                            if precio_obj:
+                                precio_final = precio_obj.precio
+
                             DetalleOrdenExtra.objects.create(
                                 detalle_orden=nuevo_detalle,
                                 insumo=insumo,
-                                precio=insumo.precio_venta_extra
+                                precio=precio_final
                             )
                         except Insumo.DoesNotExist:
                             print(f"Error: Insumo ID {extra_id} no existe.")
@@ -642,10 +668,22 @@ def facturar_mesa_ajax(request, table_id):
                     
                     # Descuento Inventario (Extras)
                     for extra in det.extras_elegidos.all():
-                        if extra.insumo.cantidad_porcion_extra > 0:
+                        # LÓGICA CORREGIDA: Usar porción específica por tamaño si existe
+                        cantidad_a_descontar = extra.insumo.cantidad_porcion_extra # Default
+                        
+                        tamano_producto = det.producto.tamano
+                        precio_obj = PrecioExtra.objects.filter(
+                            insumo=extra.insumo,
+                            tamano=tamano_producto
+                        ).first()
+                        
+                        if precio_obj and precio_obj.cantidad > 0:
+                            cantidad_a_descontar = precio_obj.cantidad
+
+                        if cantidad_a_descontar > 0:
                             MovimientoInventario.objects.create(
                                 insumo=extra.insumo, tipo='SALIDA', 
-                                cantidad=extra.insumo.cantidad_porcion_extra,
+                                cantidad=cantidad_a_descontar,
                                 unidad_movimiento=extra.insumo.unidad, usuario=request.user,
                                 nota=f"Fac: {codigo} - Extra {extra.insumo.nombre}"
                             )
