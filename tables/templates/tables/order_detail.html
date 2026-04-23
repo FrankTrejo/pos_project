@@ -534,31 +534,92 @@
         // =============================================
 
         function iniciarFacturacion() {
-            const totalTexto = document.getElementById('total-usd').innerText;
-            totalMesaFacturacion = parseFloat(totalTexto);
-
-            if (!TASA_CAMBIO || TASA_CAMBIO <= 0) { Swal.fire('Error', 'Sin Tasa de Cambio', 'error'); return; }
-            if (totalMesaFacturacion <= 0) { Swal.fire('Error', 'Monto en 0', 'error'); return; }
-
-            // Setear textos iniciales
-            document.getElementById('display-total-usd').innerText = `$${totalMesaFacturacion.toFixed(2)}`;
-            document.getElementById('display-total-bs').innerText = `(Bs. ${(totalMesaFacturacion * TASA_CAMBIO).toLocaleString('es-VE', {minimumFractionDigits: 2})})`;
-
-            // Limpiar inputs previos
-            document.querySelectorAll('.payment-input, .ref-input').forEach(i => i.value = '');
-            document.querySelectorAll('.entered-badge').forEach(b => b.style.display = 'none');
-            
-            // Resetear estado
-            montosPagos = {};
-            document.querySelectorAll('.payment-item').forEach(item => item.classList.remove('active'));
-            
-            // Abrir modal
-            document.getElementById('payment-modal-overlay').style.display = 'flex';
-            
-            // Activar listeners
-            activarListenersPagos();
-            calcularResumenPago();
+        // 1. Validar que el carrito no esté vacío
+        if (carrito.length === 0) {
+            Swal.fire('Mesa Vacía', 'Agrega productos antes de facturar.', 'warning');
+            return;
         }
+        
+        // 2. Validar mesero
+        const meseroNombre = document.getElementById('input-mesero').value;
+        if (!meseroNombre || meseroNombre.trim() === "") {
+            Swal.fire({
+                title: 'Falta Mesero',
+                text: '⚠️ No puedes facturar sin asignar un mesero responsable.',
+                icon: 'warning',
+                confirmButtonText: 'Seleccionar Mesero Ahora',
+                confirmButtonColor: '#3085d6'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    abrirModalMeseros();
+                }
+            });
+            return;
+        }
+
+        // 3. ¡NUEVO! PRIMERO GUARDAMOS EL CARRITO ACTUALIZADO EN LA BASE DE DATOS
+        Swal.fire({ 
+            title: 'Sincronizando mesa...', 
+            didOpen: () => Swal.showLoading(), 
+            allowOutsideClick: false 
+        });
+
+        const data = { carrito: carrito, mesero: meseroNombre };
+
+        // Hacemos el llamado a la vista grabar_mesa_ajax
+        fetch("{% url 'grabar_mesa' table.id %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            Swal.close(); // Cerramos el cuadro de carga
+            
+            if (result.status === 'ok') {
+                // 4. AHORA SÍ, ABRIMOS EL MODAL DE PAGO
+                const totalTexto = document.getElementById('total-usd').innerText;
+                totalMesaFacturacion = parseFloat(totalTexto);
+                
+                if (!TASA_CAMBIO || TASA_CAMBIO <= 0) {
+                    Swal.fire('Error', 'Sin Tasa de Cambio', 'error');
+                    return;
+                }
+                if (totalMesaFacturacion <= 0) {
+                    Swal.fire('Error', 'Monto en 0', 'error');
+                    return;
+                }
+
+                // Setear textos iniciales en el modal
+                document.getElementById('display-total-usd').innerText = `$${totalMesaFacturacion.toFixed(2)}`;
+                document.getElementById('display-total-bs').innerText = `(Bs. ${(totalMesaFacturacion * TASA_CAMBIO).toLocaleString('es-VE', {minimumFractionDigits: 2})})`;
+
+                // Limpiar inputs previos del modal
+                document.querySelectorAll('.payment-input, .ref-input').forEach(i => i.value = '');
+                document.querySelectorAll('.entered-badge').forEach(b => b.style.display = 'none');
+                
+                // Resetear estado de pagos
+                montosPagos = {};
+                document.querySelectorAll('.payment-item').forEach(item => item.classList.remove('active'));
+
+                // Abrir modal de pagos visualmente
+                document.getElementById('payment-modal-overlay').style.display = 'flex';
+                
+                // Activar cálculos
+                activarListenersPagos();
+                calcularResumenPago();
+            } else {
+                Swal.fire('Error', 'No se pudo actualizar la mesa: ' + result.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            Swal.fire('Error Técnico', 'No se pudo conectar con el servidor.', 'error');
+        });
+    }
 
         function cerrarModalPago() { document.getElementById('payment-modal-overlay').style.display = 'none'; }
 
@@ -648,49 +709,66 @@
         }
 
         async function confirmarPago() {
-            const btn = document.getElementById('btn-procesar-pago');
-            if(btn.disabled) return;
+        const btn = document.getElementById('btn-procesar-pago');
+        if(btn.disabled) return;
 
-            let esPropina = false;
-            const sobra = Math.abs(montosPagos.restante);
+        let esPropina = false;
+        const sobra = Math.abs(montosPagos.restante);
 
-            if (sobra > 0.01) {
-                document.getElementById('payment-modal-overlay').style.display = 'none';
-                const { isConfirmed, isDismissed } = await Swal.fire({
-                    title: `Excedente: $${sobra.toFixed(2)}`, text: "¿Cómo desea registrar este sobrante?", icon: 'question',
-                    showCancelButton: true, confirmButtonText: 'Es Propina 🎁', cancelButtonText: 'Es Vuelto 💵',
-                    confirmButtonColor: '#28a745', cancelButtonColor: '#3085d6'
-                });
-                if (isDismissed) { document.getElementById('payment-modal-overlay').style.display = 'flex'; return; }
-                esPropina = isConfirmed;
-            }
-
-            let lista = [];
-            if(montosPagos.efecUsd > 0) lista.push({ metodo: 'EFECTIVO_USD', monto: montosPagos.efecUsd });
-            if(montosPagos.zelle > 0) lista.push({ metodo: 'ZELLE', monto: montosPagos.zelle });
-            if(montosPagos.pmBs > 0) lista.push({ metodo: 'PAGO_MOVIL', monto: montosPagos.pmBs / TASA_CAMBIO, referencia: document.getElementById('ref-pm').value });
-            if(montosPagos.puntoBs > 0) lista.push({ metodo: 'PUNTO', monto: montosPagos.puntoBs / TASA_CAMBIO, referencia: document.getElementById('ref-punto').value });
-            if(montosPagos.efecBs > 0) lista.push({ metodo: 'EFECTIVO_BS', monto: montosPagos.efecBs / TASA_CAMBIO });
-
-            Swal.fire({ title: 'Procesando...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-
-            fetch("{% url 'facturar_mesa' table.id %}", {
-                method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-                body: JSON.stringify({ lista_pagos: lista, monto_recibido_total: montosPagos.totalPagadoUsd, es_propina: esPropina })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.status === 'ok') {
-                    const urlPDF = `/factura/${data.venta_id}/pdf/`;
-                    imprimirTicket(urlPDF);
-                    Swal.fire({ icon: 'success', title: '¡Pago Exitoso!', showConfirmButton: false, timer: 1500 })
-                    .then(() => { window.location.href = "{% url 'index' %}"; });
-                } else {
-                    Swal.fire('Error', data.message, 'error');
-                    document.getElementById('payment-modal-overlay').style.display = 'flex';
-                }
+        if (sobra > 0.01) {
+            document.getElementById('payment-modal-overlay').style.display = 'none';
+            
+            // CORRECCIÓN: Usamos DenyButton para el vuelto y dejamos Cancelar para abortar
+            const result = await Swal.fire({
+                title: `Excedente: $${sobra.toFixed(2)}`, 
+                text: "¿Cómo desea registrar este sobrante?", 
+                icon: 'question',
+                showDenyButton: true,
+                showCancelButton: true, 
+                confirmButtonText: 'Es Propina 🎁', 
+                denyButtonText: 'Es Vuelto 💵',
+                cancelButtonText: 'Cancelar Pago',
+                confirmButtonColor: '#28a745', 
+                denyButtonColor: '#17a2b8', // Color azul verdoso para el vuelto
+                cancelButtonColor: '#6c757d'
             });
+
+            // Si cerró la alerta o le dio a Cancelar Pago, abortamos
+            if (result.isDismissed) { 
+                document.getElementById('payment-modal-overlay').style.display = 'flex'; 
+                return; 
+            }
+            
+            // Si confirmó es propina (true). Si le dio a vuelto (deny) es false.
+            esPropina = result.isConfirmed; 
         }
+
+        let lista = [];
+        if(montosPagos.efecUsd > 0) lista.push({ metodo: 'EFECTIVO_USD', monto: montosPagos.efecUsd });
+        if(montosPagos.zelle > 0) lista.push({ metodo: 'ZELLE', monto: montosPagos.zelle });
+        if(montosPagos.pmBs > 0) lista.push({ metodo: 'PAGO_MOVIL', monto: montosPagos.pmBs / TASA_CAMBIO, referencia: document.getElementById('ref-pm').value });
+        if(montosPagos.puntoBs > 0) lista.push({ metodo: 'PUNTO', monto: montosPagos.puntoBs / TASA_CAMBIO, referencia: document.getElementById('ref-punto').value });
+        if(montosPagos.efecBs > 0) lista.push({ metodo: 'EFECTIVO_BS', monto: montosPagos.efecBs / TASA_CAMBIO });
+
+        Swal.fire({ title: 'Procesando...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+        fetch("{% url 'facturar_mesa' table.id %}", {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({ lista_pagos: lista, monto_recibido_total: montosPagos.totalPagadoUsd, es_propina: esPropina })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'ok') {
+                const urlPDF = `/factura/${data.venta_id}/pdf/`;
+                imprimirTicket(urlPDF);
+                Swal.fire({ icon: 'success', title: '¡Pago Exitoso!', showConfirmButton: false, timer: 1500 })
+                .then(() => { window.location.href = "{% url 'index' %}"; });
+            } else {
+                Swal.fire('Error', data.message, 'error');
+                document.getElementById('payment-modal-overlay').style.display = 'flex';
+            }
+        });
+    }
 
         // --- FUNCIONES UTILITARIAS ---
         function abrirModalMeseros() { document.getElementById('modal-meseros').style.display = 'flex'; }

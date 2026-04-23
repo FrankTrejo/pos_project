@@ -22,9 +22,14 @@
 </head>
 <body>
     <div class="center">
-        <div style="font-size: 16px; font-weight: bold;">DI CATIA PIZZA</div>
-        <div>Rif: J-12345678-9</div>
-        <div>Caracas, Venezuela</div>
+        <div style="font-size: 16px; font-weight: bold;">{{ config.nombre_empresa|upper }}</div>
+        <div>Rif: {{ config.rif }}</div>
+        <div>{{ config.direccion }}</div>
+        
+        {% if config.telefono %}
+            <div>Tel: {{ config.telefono }}</div>
+        {% endif %}
+        
         <div class="line"></div>
         <div class="bold">FACTURA: {{ venta.codigo_factura }}</div>
         <div>Fecha: {{ venta.fecha|date:"d/m/Y H:i" }}</div>
@@ -96,7 +101,7 @@
     </div>
 
     <div class="center" style="margin-top: 20px;">
-        ¡GRACIAS POR SU COMPRA!
+        {{ config.mensaje_ticket }}
     </div>
 </body>
 </html>

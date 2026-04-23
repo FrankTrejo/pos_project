@@ -1,48 +1,34 @@
-import os
+from pathlib import Path
 
-# CONFIGURACIÓN
-# Nombre del archivo de salida
-output_file = "codigo_completo.txt"
+def consolidar_codigo(ruta_base, archivo_salida='codigo_completo.txt'):
+    ruta = Path(ruta_base)
+    extensiones_codigo = ['.py', '.html', '.js', '.css']
+    carpetas_ignoradas = ['venv', 'env', '__pycache__', 'migrations', '.git']
 
-# Carpetas y archivos que NO queremos leer (para no llenar de basura)
-ignore_dirs = ['__pycache__', 'migrations', 'venv', 'env', '.git', '.idea', 'static', 'media']
-ignore_files = ['db.sqlite3', 'escanear_proyecto.py', 'codigo_completo.txt', '.DS_Store']
-accepted_extensions = ['.py', '.html', '.css', '.js']
+    # Abrimos el archivo de salida para empezar a escribir
+    with open(archivo_salida, 'w', encoding='utf-8') as salida:
+        salida.write("=== CÓDIGO DEL SISTEMA DE FACTURACIÓN ===\n\n")
 
-def is_ignored(path, names):
-    return [n for n in names if n in ignore_dirs or n in ignore_files]
-
-def scan_project():
-    with open(output_file, 'w', encoding='utf-8') as outfile:
-        # Recorremos todas las carpetas
-        for root, dirs, files in os.walk("."):
-            # Filtramos carpetas ignoradas
-            dirs[:] = [d for d in dirs if d not in ignore_dirs]
-            
-            for file in files:
-                if file in ignore_files:
-                    continue
-                
-                # Solo leemos archivos de código
-                if not any(file.endswith(ext) for ext in accepted_extensions):
-                    continue
-
-                file_path = os.path.join(root, file)
-                
-                # Escribimos el nombre del archivo para saber cuál es
-                outfile.write(f"\n{'='*50}\n")
-                outfile.write(f"ARCHIVO: {file_path}\n")
-                outfile.write(f"{'='*50}\n")
-                
-                # Escribimos el contenido del archivo
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as infile:
-                        outfile.write(infile.read())
-                except Exception as e:
-                    outfile.write(f"[No se pudo leer el archivo: {e}]\n")
-
-    print(f"¡Listo! Todo tu código se guardó en '{output_file}'.")
-    print("Ahora sube ese archivo al chat o copia su contenido.")
+        for archivo in ruta.rglob('*'):
+            if archivo.is_file() and archivo.suffix in extensiones_codigo:
+                if not any(carpeta in archivo.parts for carpeta in carpetas_ignoradas):
+                    try:
+                        with open(archivo, 'r', encoding='utf-8') as f:
+                            contenido = f.read()
+                        
+                        # Escribimos un encabezado visible para cada archivo
+                        salida.write(f"\n{'='*50}\n")
+                        salida.write(f"📁 ARCHIVO: {archivo.relative_to(ruta)}\n")
+                        salida.write(f"{'='*50}\n\n")
+                        
+                        # Pegamos el código
+                        salida.write(contenido)
+                        salida.write("\n")
+                        
+                    except Exception as e:
+                        salida.write(f"\n[No se pudo leer {archivo.name}: {e}]\n")
+    
+    print(f"✅ ¡Listo! Todo el código se ha guardado en: {archivo_salida}")
 
 if __name__ == "__main__":
-    scan_project()
+    consolidar_codigo('.')

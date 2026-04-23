@@ -13,6 +13,7 @@ from django.utils import timezone
 from django.core.serializers.json import DjangoJSONEncoder
 from xhtml2pdf import pisa
 from inventory.models import Insumo
+from core.models import Configuracion
 
 # --- IMPORTACIONES DE MODELOS CORRECTAS ---
 from .models import (
@@ -720,13 +721,15 @@ def generar_factura_pdf(request, venta_id):
     tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
     tasa_valor = float(tasa_obj.precio) if tasa_obj else 0
     total_bs = float(venta.total) * tasa_valor
+    config_negocio = Configuracion.get_solo()
 
     context = {
         'venta': venta,
         'detalles': venta.detalles.all(),
         'tasa': tasa_valor,
         'total_bs': total_bs,
-        'vuelto': float(venta.monto_recibido) - float(venta.total) - float(venta.propina)
+        'vuelto': float(venta.monto_recibido) - float(venta.total) - float(venta.propina),
+        'config': config_negocio
     }
     
     template_path = 'tables/factura_final_pdf.html'

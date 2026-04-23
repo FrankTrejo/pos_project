@@ -1,0 +1,60 @@
+=========================================================
+INSTRUCCIONES DE INSTALACIÓN - SISTEMA DE FACTURACIÓN POS
+=========================================================
+
+REQUISITOS PREVIOS:
+- Tener Python instalado en la máquina (se recomienda versión 3.10 o superior).
+- Tener el código fuente del sistema en una carpeta local.
+- Tener el archivo "requirements.txt" en la raíz del proyecto con el siguiente contenido:
+  Django>=5.0
+  requests
+  beautifulsoup4
+  xhtml2pdf
+
+---------------------------------------------------------
+PASO A PASO
+---------------------------------------------------------
+
+PASO 1: ABRIR LA TERMINAL
+Abre la consola de comandos (CMD o PowerShell en Windows, Terminal en Linux/Mac) y navega hasta la carpeta raíz del proyecto (donde se encuentra el archivo manage.py).
+Ejemplo: cd C:\Ruta\A\Tu\Proyecto
+
+PASO 2: CREAR EL ENTORNO VIRTUAL
+Es una buena práctica para no mezclar las librerías de este sistema con otros programas en la máquina. Ejecuta:
+> python -m venv venv
+
+PASO 3: ACTIVAR EL ENTORNO VIRTUAL
+Dependiendo de tu sistema operativo, el comando cambia:
+- En Windows (CMD): venv\Scripts\activate.bat
+- En Windows (PowerShell): venv\Scripts\Activate.ps1
+- En Mac / Linux: source venv/bin/activate
+
+(Sabrás que está activo porque verás la palabra "(venv)" al inicio de la línea en tu consola).
+
+PASO 4: INSTALAR DEPENDENCIAS
+Con el entorno activado, instala todas las librerías necesarias ejecutando:
+> pip install -r requirements.txt
+
+PASO 5: PREPARAR LA BASE DE DATOS
+Aplica las migraciones para que el sistema cree todas las tablas (productos, mesas, facturas, etc.) en el archivo db.sqlite3:
+> python manage.py migrate
+
+PASO 6: CREAR EL USUARIO ADMINISTRADOR (SUPERUSUARIO)
+Necesitas una cuenta maestra para acceder al sistema por primera vez y crear a los demás meseros/cajeros. Ejecuta el siguiente comando y sigue las instrucciones en pantalla (te pedirá usuario, correo y contraseña):
+> python manage.py createsuperuser
+
+PASO 7: INICIAR EL SERVIDOR
+Arranca el sistema ejecutando:
+> python manage.py runserver
+
+PASO 8: ACCEDER AL SISTEMA
+Abre tu navegador web (Chrome, Firefox, etc.) y ve a la siguiente dirección:
+http://127.0.0.1:8000/login/
+
+Ingresa con el usuario y contraseña que creaste en el PASO 6.
+
+---------------------------------------------------------
+NOTAS IMPORTANTES:
+- Recuerda que el sistema hace scraping a la página del BCV para actualizar la tasa del dólar. La máquina donde se instale debe tener conexión a internet, al menos al abrir la caja o consultar la tasa del día, para que no genere errores de conexión.
+- Los PDFs de facturas y reportes se generarán automáticamente gracias a xhtml2pdf sin necesidad de software adicional.
+=========================================================
