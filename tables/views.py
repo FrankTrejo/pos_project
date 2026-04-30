@@ -14,6 +14,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from xhtml2pdf import pisa
 from inventory.models import Insumo
 from core.models import Configuracion
+from .utils_impresora import mandar_a_tickera, imprimir_comanda, imprimir_precuenta
 
 # --- IMPORTACIONES DE MODELOS CORRECTAS ---
 from .models import (
@@ -297,6 +298,7 @@ def grabar_mesa_ajax(request, table_id):
             data = json.loads(request.body)
             items = data.get('carrito', [])
             mesero_nombre = data.get('mesero', '')
+            debe_imprimir = data.get('imprimir', True)
             
             table = Table.objects.get(id=table_id)
             
@@ -362,7 +364,13 @@ def grabar_mesa_ajax(request, table_id):
             table.is_occupied = True
             table.mesero = mesero_obj
             table.save()
-            
+            if debe_imprimir:
+                from .utils_impresora import imprimir_comanda
+                exito_comanda = imprimir_comanda(orden)
+                if exito_comanda:
+                    orden.impreso = True  # Marcamos que ya pasó por cocina
+                    orden.save()
+
             return JsonResponse({'status': 'ok', 'orden_id': orden.id})
             
         except Exception as e:
@@ -483,6 +491,7 @@ def generar_cuenta_pdf(request, table_id):
 
     # Calculamos el total en Bs basado en el nuevo total USD
     total_acumulado_bs = total_acumulado_usd * tasa_valor
+    imprimir_precuenta(orden, tasa_valor)
 
     context = {
         'orden': orden,
@@ -572,8 +581,11 @@ def facturar_mesa_ajax(request, table_id):
             if not orden:
                 return JsonResponse({'status': 'error', 'message': 'No hay orden.'})
 
+            if not orden.impreso:
+                from .utils_impresora import imprimir_comanda
+                imprimir_comanda(orden)
+
             # --- 1. RECALCULAR TOTALES REALES (Base + Extras) ---
-            # No confiamos solo en el total guardado, lo recalculamos para estar seguros
             total_venta_real = 0
             for det in orden.detalles.all():
                 precio_base = float(det.precio_unitario)
@@ -581,11 +593,10 @@ def facturar_mesa_ajax(request, table_id):
                 subtotal_linea = (precio_base + costo_extras) * det.cantidad
                 total_venta_real += subtotal_linea
             
-            # Ajustamos la diferencia y propina con el nuevo total real
             diferencia = monto_total_recibido - total_venta_real
             propina_calc = diferencia if (diferencia > 0 and es_propina) else 0
 
-            # --- 2. VALIDACIÓN DE STOCK (Intacta) ---
+            # --- 2. VALIDACIÓN DE STOCK ---
             insumos_requeridos = {} 
             for detalle in orden.detalles.all():
                 # Ingredientes
@@ -621,7 +632,7 @@ def facturar_mesa_ajax(request, table_id):
                 # Crear Venta con el TOTAL REAL RECALCULADO
                 venta = Venta.objects.create(
                     codigo_factura=codigo,
-                    total=total_venta_real, # <--- USAMOS EL RECALCULADO
+                    total=total_venta_real,
                     metodo_pago=metodo_general,
                     mesero=orden.mesero,
                     mesa_numero=table.number,
@@ -635,29 +646,26 @@ def facturar_mesa_ajax(request, table_id):
 
                 # Procesar Detalles
                 for det in orden.detalles.all():
-                    # Calculamos subtotal individual para este item
                     precio_base = float(det.precio_unitario)
                     costo_extras = sum(float(e.precio) for e in det.extras_elegidos.all())
                     subtotal_real = (precio_base + costo_extras) * det.cantidad
 
-                    # Crear DetalleVenta
                     dv = DetalleVenta.objects.create(
                         venta=venta, 
                         producto=det.producto, 
                         nombre_producto=det.producto.nombre,
                         cantidad=det.cantidad, 
-                        precio_unitario=det.precio_unitario, # Precio base visual
-                        subtotal=subtotal_real # Subtotal con extras incluidos
+                        precio_unitario=det.precio_unitario, 
+                        subtotal=subtotal_real 
                     )
                     
-                    # === AQUÍ GUARDAMOS LOS EXTRAS EN EL HISTÓRICO ===
+                    # Guardamos los extras en el histórico
                     for extra_orden in det.extras_elegidos.all():
                         DetalleVentaExtra.objects.create(
                             detalle_venta=dv,
                             nombre_extra=extra_orden.insumo.nombre,
                             precio=extra_orden.precio
                         )
-                    # =================================================
 
                     # Descuento Inventario (Receta)
                     for ing in det.producto.ingredientes.all():
@@ -669,9 +677,7 @@ def facturar_mesa_ajax(request, table_id):
                     
                     # Descuento Inventario (Extras)
                     for extra in det.extras_elegidos.all():
-                        # LÓGICA CORREGIDA: Usar porción específica por tamaño si existe
-                        cantidad_a_descontar = extra.insumo.cantidad_porcion_extra # Default
-                        
+                        cantidad_a_descontar = extra.insumo.cantidad_porcion_extra 
                         tamano_producto = det.producto.tamano
                         precio_obj = PrecioExtra.objects.filter(
                             insumo=extra.insumo,
@@ -709,12 +715,21 @@ def facturar_mesa_ajax(request, table_id):
                 table.mesero = None
                 table.save()
 
-            return JsonResponse({'status': 'ok', 'venta_id': venta.id})
+            # =========================================================
+            # IMPRESIÓN FÍSICA DIRECTA A LA TICKERA
+            # =========================================================
+            impreso_ok, mensaje_print = mandar_a_tickera(venta)
+
+            return JsonResponse({
+                'status': 'ok', 
+                'venta_id': venta.id,
+                'impreso_fisico': impreso_ok,
+                'mensaje_impresion': mensaje_print
+            })
 
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
     return JsonResponse({'status': 'error'}, status=400)
-
 @staff_member_required
 def generar_factura_pdf(request, venta_id):
     venta = get_object_or_404(Venta, id=venta_id)

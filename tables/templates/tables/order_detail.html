@@ -281,7 +281,7 @@
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.6);
             display: none; justify-content: center; align-items: center;
-            z-index: 2000; backdrop-filter: blur(3px);
+            z-index: 9999 !important; backdrop-filter: blur(3px);
         }
         .modal-card {
             background: white; width: 90%; max-width: 480px;
@@ -511,7 +511,7 @@
                 }).then((result) => { if (result.isConfirmed) { abrirModalMeseros(); } });
                 return;
             }
-            const data = { carrito: carrito, mesero: meseroNombre };
+            const data = { carrito: carrito, mesero: meseroNombre, imprimir: true };
             Swal.fire({ title: 'Guardando...', didOpen: () => Swal.showLoading(), timerProgressBar: true, allowOutsideClick: false });
 
             fetch("{% url 'grabar_mesa' table.id %}", {
@@ -564,7 +564,7 @@
             allowOutsideClick: false 
         });
 
-        const data = { carrito: carrito, mesero: meseroNombre };
+        const data = { carrito: carrito, mesero: meseroNombre, imprimir: false };
 
         // Hacemos el llamado a la vista grabar_mesa_ajax
         fetch("{% url 'grabar_mesa' table.id %}", {
@@ -718,7 +718,6 @@
         if (sobra > 0.01) {
             document.getElementById('payment-modal-overlay').style.display = 'none';
             
-            // CORRECCIÓN: Usamos DenyButton para el vuelto y dejamos Cancelar para abortar
             const result = await Swal.fire({
                 title: `Excedente: $${sobra.toFixed(2)}`, 
                 text: "¿Cómo desea registrar este sobrante?", 
@@ -729,17 +728,15 @@
                 denyButtonText: 'Es Vuelto 💵',
                 cancelButtonText: 'Cancelar Pago',
                 confirmButtonColor: '#28a745', 
-                denyButtonColor: '#17a2b8', // Color azul verdoso para el vuelto
+                denyButtonColor: '#17a2b8', 
                 cancelButtonColor: '#6c757d'
             });
 
-            // Si cerró la alerta o le dio a Cancelar Pago, abortamos
             if (result.isDismissed) { 
                 document.getElementById('payment-modal-overlay').style.display = 'flex'; 
                 return; 
             }
             
-            // Si confirmó es propina (true). Si le dio a vuelto (deny) es false.
             esPropina = result.isConfirmed; 
         }
 
@@ -759,14 +756,34 @@
         .then(r => r.json())
         .then(data => {
             if (data.status === 'ok') {
+                // Generamos la URL del PDF como respaldo en caso de que quieran guardarlo digital
                 const urlPDF = `/factura/${data.venta_id}/pdf/`;
-                imprimirTicket(urlPDF);
-                Swal.fire({ icon: 'success', title: '¡Pago Exitoso!', showConfirmButton: false, timer: 1500 })
-                .then(() => { window.location.href = "{% url 'index' %}"; });
+                
+                // Si quieres que SIGA abriendo el PDF en otra pestaña, descomenta esta línea:
+                // window.open(urlPDF, '_blank'); 
+
+                let msgExito = '¡Pago Exitoso!';
+                // Alertamos al usuario si la tickera física no respondió
+                if (!data.impreso_fisico) {
+                    msgExito += ' (Nota: La tickera no imprimió o está apagada)';
+                }
+
+                Swal.fire({ 
+                    icon: 'success', 
+                    title: msgExito, 
+                    showConfirmButton: false, 
+                    timer: 2000 
+                }).then(() => { 
+                    window.location.href = "{% url 'index' %}"; 
+                });
             } else {
                 Swal.fire('Error', data.message, 'error');
                 document.getElementById('payment-modal-overlay').style.display = 'flex';
             }
+        })
+        .catch(error => { 
+            console.error('Error:', error); 
+            Swal.fire('Error Técnico', 'No se pudo conectar con el servidor.', 'error'); 
         });
     }
 
