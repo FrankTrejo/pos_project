@@ -136,6 +136,25 @@
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
+        // --- NUEVA LÓGICA: Limpieza de ceros decimales en los inputs ---
+        const inputsNumericos = document.querySelectorAll('input[type="number"]');
+        
+        inputsNumericos.forEach(function(input) {
+            if (input.value) {
+                // Parsea el valor (ej: "14,000" o "14.000") a un número real de Javascript
+                // parseFloat quitará automáticamente todos los ceros inútiles de la derecha
+                // Luego lo volvemos a poner en el input como cadena limpia ("14")
+                
+                let valorLimpio = input.value.replace(',', '.'); // Por si viene con coma
+                let numero = parseFloat(valorLimpio);
+                
+                if (!isNaN(numero)) {
+                    input.value = numero; 
+                }
+            }
+        });
+        // ---------------------------------------------------------------
+
         // Seleccionamos específicamente el checkbox de es_extra
         var extraSwitch = document.querySelector('input[name="es_extra"]');
         
@@ -147,9 +166,6 @@
             extraSwitch.style.width = "3em";
             extraSwitch.style.height = "1.5em";
             extraSwitch.style.cursor = "pointer";
-            
-            // Quitamos el width: 100% que tienen los otros inputs por CSS global
-            extraSwitch.style.width = "3em"; 
         }
 
         // Aplicar estilos generales a los otros inputs (si no lo hace Django automáticamente)

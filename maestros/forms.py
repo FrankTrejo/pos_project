@@ -6,6 +6,24 @@ class MaestroInsumoForm(forms.ModelForm):
         model = Insumo
         # Aquí pedimos TODO lo necesario para una compra
         fields = ['nombre', 'categoria', 'unidad', 'stock_minimo', 'precio_mercado', 'peso_standar', 'merma_porcentaje', 'es_extra']
+        # ======================================================================
+        # --- NUEVO: Interceptar y limpiar los valores al cargar el formulario ---
+        # ======================================================================
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            
+            # Solo aplicamos la limpieza si estamos editando una instancia que ya existe
+            if self.instance and self.instance.pk:
+                campos_numericos = ['precio_mercado', 'peso_standar', 'stock_minimo', 'merma_porcentaje']
+                
+                for campo in campos_numericos:
+                    valor = getattr(self.instance, campo)
+                    if valor is not None:
+                        valor_float = float(valor)
+                        # Si es un número exacto (ej: 14.00), lo inyectamos como entero (14)
+                        # Si tiene decimales (ej: 14.50), lo inyectamos limpio (14.5)
+                        self.initial[campo] = int(valor_float) if valor_float.is_integer() else valor_float
+        # ======================================================================
         
         widgets = {
             'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Harina de Trigo'}),

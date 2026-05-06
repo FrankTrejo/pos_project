@@ -334,6 +334,11 @@
         .btn-cancel { background: #6c757d; color: white; }
         .btn-process { background: var(--primary-blue, #0d6efd); color: white; opacity: 0.5; pointer-events: none; }
         .btn-process.ready { opacity: 1; pointer-events: auto; }
+
+        /* --- CORRECCIÓN PARA ALERTAS DE SWEETALERT2 --- */
+        .swal2-container {
+            z-index: 10000 !important;
+        }
     </style>
 
     <script>
@@ -758,9 +763,9 @@
             if (data.status === 'ok') {
                 // Generamos la URL del PDF como respaldo en caso de que quieran guardarlo digital
                 const urlPDF = `/factura/${data.venta_id}/pdf/`;
-                
+                cerrarModalPago()
                 // Si quieres que SIGA abriendo el PDF en otra pestaña, descomenta esta línea:
-                // window.open(urlPDF, '_blank'); 
+                //window.open(urlPDF, '_blank'); 
 
                 let msgExito = '¡Pago Exitoso!';
                 // Alertamos al usuario si la tickera física no respondió

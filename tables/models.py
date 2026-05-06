@@ -32,11 +32,27 @@ class Producto(models.Model):
         ('UNI', 'Único/Bebida'),
     ]
 
+    # --- NUEVO: DEFINIMOS LAS ALÍCUOTAS DE IVA DE VENEZUELA ---
+    OPCIONES_IVA = [
+        ('16.00', 'General (16%)'),
+        ('8.00', 'Reducido (8%)'),
+        ('31.00', 'Lujo (31%)'),
+        ('0.00', 'Exento (0%)'),
+    ]
+
     nombre = models.CharField(max_length=100)
     precio = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Precio Venta ($)")
     tamano = models.CharField(max_length=3, choices=OPCIONES_TAMANO, default='UNI')
     categoria = models.ForeignKey(Categoria, on_delete=models.CASCADE, related_name='productos')
     
+    # --- CAMPO CORREGIDO: Lista desplegable ---
+    tasa_iva = models.DecimalField(
+        max_digits=5, 
+        decimal_places=2, 
+        choices=OPCIONES_IVA, 
+        default='16.00', 
+        verbose_name="Alícuota IVA"
+    )
     # OPCIONAL: Imagen del producto
     # imagen = models.ImageField(upload_to='productos/', blank=True, null=True)
 

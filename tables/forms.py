@@ -34,9 +34,11 @@ class RecetaProductoForm(forms.ModelForm): # O el nombre que tenga tu formulario
 class ProductoPriceForm(forms.ModelForm):
     class Meta:
         model = Producto
-        fields = ['precio']
+        fields = ['precio', 'tasa_iva']
         widgets = {
             'precio': forms.NumberInput(attrs={'class': 'form-input', 'step': '0.01', 'id': 'input-precio'}),
+            # Un select bonito para las opciones
+            'tasa_iva': forms.Select(attrs={'class': 'form-input', 'style': 'font-weight: bold; color: #084298;'}),
         }
 
     # --- NUEVA VALIDACIÓN ---

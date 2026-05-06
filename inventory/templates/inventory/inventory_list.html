@@ -16,7 +16,7 @@
         display: flex;
         align-items: center;
         gap: 15px;
-        border-left: 5px solid var(--primary-blue);
+        border-left: 5px solid var(--primary-blue, #0d6efd);
     }
     .badge-tipo {
         padding: 5px 10px;
@@ -59,8 +59,48 @@
         cursor: pointer;
     }
     .filter-select:focus, .search-input:focus {
-        border-color: var(--primary-blue);
+        border-color: var(--primary-blue, #0d6efd);
         outline: none;
+    }
+
+    /* --- NUEVO: Estilos de la Paginación --- */
+    .pagination-container {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        padding: 15px 20px;
+        gap: 5px;
+        background: #fff;
+        border-top: 1px solid #eee;
+        border-radius: 0 0 12px 12px;
+    }
+    .page-btn {
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        background: white;
+        border-radius: 6px;
+        cursor: pointer;
+        color: #555;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+    .page-btn:hover:not(:disabled) {
+        background: #f8f9fa;
+        border-color: #ccc;
+    }
+    .page-btn.active {
+        background: var(--primary-blue, #0d6efd);
+        color: white;
+        border-color: var(--primary-blue, #0d6efd);
+    }
+    .page-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .page-info {
+        margin-right: auto;
+        color: #666;
+        font-size: 0.9em;
     }
 </style>
 
@@ -102,7 +142,7 @@
     </div>
 
     <div class="filter-container">
-        <input type="text" id="searchInput" onkeyup="filtrarTabla()" placeholder="🔍 Buscar por nombre..." class="search-input">
+        <input type="text" id="searchInput" oninput="filtrarTabla()" placeholder="🔍 Buscar por nombre..." class="search-input">
         
         <select id="estadoFilter" onchange="filtrarTabla()" class="filter-select">
             <option value="todos">📦 Todos los Estados</option>
@@ -118,7 +158,7 @@
         </select>
     </div>
 
-    <div class="card-style" style="overflow-x: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+    <div class="card-style" style="overflow-x: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.05); padding: 0;">
         <table style="width: 100%; border-collapse: separate; border-spacing: 0;" id="tablaInventario">
             <thead>
                 <tr style="background: #f8f9fa; text-align: left;">
@@ -131,14 +171,13 @@
                 </tr>
             </thead>
             <tbody>
-                
                 {% for insumo in insumos %}
                 
                 <tr style="border-bottom: 1px solid #f1f1f1;" 
                     class="fila-producto"
                     data-nombre="{{ insumo.nombre|lower }}"
                     data-tipo="{% if insumo.es_insumo_compuesto %}receta{% else %}insumo{% endif %}"
-                    data-estado="{% if insumo.stock_actual == 0 %}cero{% elif insumo.stock_actual <= insumo.stock_minimo %}bajo{% else %}ok{% endif %}">
+                    data-estado="{% if insumo.stock_actual <= 0 %}cero{% elif insumo.stock_actual <= insumo.stock_minimo %}bajo{% else %}ok{% endif %}">
                     
                     <td style="padding: 15px;">
                         {% if insumo.es_insumo_compuesto %}
@@ -180,7 +219,6 @@
                     </td>
 
                     <td style="padding: 15px; text-align: center; white-space: nowrap;">
-                        
                         <a href="{% url 'maestro_edit' insumo.id %}" title="Editar Configuración" style="color: #6c757d; margin-right: 10px; font-size: 1.1em;">
                             <i class="fas fa-cog"></i>
                         </a>
@@ -190,15 +228,12 @@
                         </button>
 
                         {% if insumo.es_insumo_compuesto %}
-                            
                             <a href="{% url 'insumo_composition' insumo.id %}" title="Ver/Editar Ingredientes" style="color: #6610f2; font-size: 1.1em; margin-right: 10px;">
                                 <i class="fas fa-scroll"></i>
                             </a>
-                            
                             <a href="{% url 'insumo_produccion' insumo.id %}" title="Cocinar (Descontar Ingredientes)" style="color: #d63384; font-size: 1.1em; margin-right: 10px;">
                                 <i class="fas fa-blender"></i>
                             </a>
-
                         {% else %}
                             <span style="display:inline-block; width: 2.2em; margin-right:10px;"></span>
                         {% endif %}
@@ -212,13 +247,25 @@
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="6" style="text-align:center; padding: 40px;">No hay datos.</td></tr>
+                <tr id="fila-vacia-db"><td colspan="6" style="text-align:center; padding: 40px;">Tu inventario está vacío.</td></tr>
                 {% endfor %}
+                
+                <!-- Fila dinámica si la búsqueda no arroja resultados -->
+                <tr id="fila-sin-resultados" style="display: none;">
+                    <td colspan="6" style="text-align:center; padding: 40px; color: #666;">
+                        <i class="fas fa-search" style="font-size: 2em; color: #ddd; margin-bottom: 10px;"></i><br>
+                        No se encontraron productos con esos filtros.
+                    </td>
+                </tr>
             </tbody>
         </table>
+        
+        <!-- CONTROLES DE PAGINACIÓN -->
+        <div id="pagination-controls" class="pagination-container"></div>
     </div>
 </div>
 
+<!-- MODAL DE MOVIMIENTOS -->
 <div id="modal-movimiento" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1000; justify-content:center; align-items:center; backdrop-filter: blur(2px);">
     <div style="background:white; padding:30px; border-radius:12px; width:500px; max-width: 95%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -260,29 +307,34 @@
 </div>
 
 <script>
-    // --- LÓGICA DE FILTRADO COMBINADO ---
+    // --- VARIABLES GLOBALES PARA LA PAGINACIÓN ---
+    const rowsPerPage = 10; // <--- Cambia este número si deseas ver más (ej. 15)
+    let currentPage = 1;
+    let filteredRows = [];
+
+    // --- LÓGICA DE FILTRADO COMBINADO CON PAGINACIÓN ---
     function filtrarTabla() {
-        // 1. Obtener valores de los 3 inputs
         const texto = document.getElementById("searchInput").value.toLowerCase();
         const estado = document.getElementById("estadoFilter").value;
         const tipo = document.getElementById("tipoFilter").value;
+        
+        // Convertimos el NodeList a Array para poder filtrarlo
+        const todasLasFilas = Array.from(document.querySelectorAll(".fila-producto"));
 
-        // 2. Obtener todas las filas de productos
-        const filas = document.querySelectorAll(".fila-producto");
+        // 1. Ocultar todas las filas primero para limpiar la pantalla
+        todasLasFilas.forEach(fila => fila.style.display = "none");
 
-        filas.forEach(fila => {
-            // Leer los datos de la fila (data-attributes)
+        // 2. Determinar cuáles filas cumplen con TODOS los filtros
+        filteredRows = todasLasFilas.filter(fila => {
             const nombreFila = fila.getAttribute("data-nombre");
             const estadoFila = fila.getAttribute("data-estado");
             const tipoFila = fila.getAttribute("data-tipo");
 
-            // 3. Aplicar lógica (Coincide Texto? Y Coincide Estado? Y Coincide Tipo?)
             let coincideTexto = nombreFila.includes(texto);
             
             let coincideEstado = true;
             if (estado !== "todos") {
                 if (estado === "bajo") {
-                    // "Bajo" incluye Stock Bajo Y Cero
                     coincideEstado = (estadoFila === "bajo" || estadoFila === "cero");
                 } else {
                     coincideEstado = (estadoFila === estado);
@@ -294,17 +346,88 @@
                 coincideTipo = (tipoFila === tipo);
             }
 
-            // 4. Mostrar u Ocultar
-            if (coincideTexto && coincideEstado && coincideTipo) {
-                fila.style.display = "";
-            } else {
-                fila.style.display = "none";
-            }
+            return coincideTexto && coincideEstado && coincideTipo;
         });
+
+        // 3. Reiniciar a la página 1 cada vez que el usuario busca/filtra
+        currentPage = 1;
+        
+        // Mostrar mensaje de "No hay resultados" si el filtro no devuelve nada
+        document.getElementById("fila-sin-resultados").style.display = (filteredRows.length === 0 && todasLasFilas.length > 0) ? "" : "none";
+
+        // 4. Renderizar controles y mostrar la página correspondiente
+        renderizarPaginacion();
+        mostrarPagina();
+    }
+
+    function mostrarPagina() {
+        // Asegurarnos de ocultar el array filtrado antes de mostrar los 10 correspondientes
+        filteredRows.forEach(fila => fila.style.display = "none");
+
+        // Calcular qué porción de filas toca mostrar (Ej: De la 0 a la 9 para Pagina 1)
+        const inicio = (currentPage - 1) * rowsPerPage;
+        const fin = inicio + rowsPerPage;
+
+        for (let i = inicio; i < fin && i < filteredRows.length; i++) {
+            filteredRows[i].style.display = "";
+        }
+    }
+
+    function renderizarPaginacion() {
+        const totalPages = Math.ceil(filteredRows.length / rowsPerPage);
+        const container = document.getElementById("pagination-controls");
+        container.innerHTML = ""; // Limpiar controles anteriores
+
+        // Ocultar barra de paginación si no hay datos o solo hay 1 página
+        if (totalPages <= 1) {
+            container.style.display = "none";
+            return;
+        }
+        
+        container.style.display = "flex";
+
+        // Info de resultados (Opcional, se ve muy profesional)
+        const totalResultados = document.createElement("div");
+        totalResultados.className = "page-info";
+        totalResultados.innerText = `Mostrando ${filteredRows.length} resultados`;
+        container.appendChild(totalResultados);
+
+        // Botón Anterior
+        const btnPrev = document.createElement("button");
+        btnPrev.innerHTML = "&laquo; Ant";
+        btnPrev.disabled = currentPage === 1;
+        btnPrev.className = "page-btn";
+        btnPrev.onclick = () => { if(currentPage > 1) { currentPage--; actualizarVista(); } };
+        container.appendChild(btnPrev);
+
+        // Botones de número de página
+        for (let i = 1; i <= totalPages; i++) {
+            const btnPage = document.createElement("button");
+            btnPage.innerText = i;
+            btnPage.className = "page-btn " + (currentPage === i ? "active" : "");
+            btnPage.onclick = () => { currentPage = i; actualizarVista(); };
+            container.appendChild(btnPage);
+        }
+
+        // Botón Siguiente
+        const btnNext = document.createElement("button");
+        btnNext.innerHTML = "Sig &raquo;";
+        btnNext.disabled = currentPage === totalPages;
+        btnNext.className = "page-btn";
+        btnNext.onclick = () => { if(currentPage < totalPages) { currentPage++; actualizarVista(); } };
+        container.appendChild(btnNext);
+    }
+
+    function actualizarVista() {
+        mostrarPagina();
+        renderizarPaginacion();
     }
 
     // Modal y Alertas
     document.addEventListener('DOMContentLoaded', function() {
+        // Ejecutar el filtrado inicial para que se arme la paginación al cargar la página
+        filtrarTabla();
+
         {% if messages %}
             {% for message in messages %}
                 Swal.fire({
