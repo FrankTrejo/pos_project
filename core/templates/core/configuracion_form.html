@@ -55,5 +55,33 @@
             el.style.fontSize = '1em';
         }
     });
+
+    // --- LÓGICA DE SCRAPING DE TASA ---
+    const chkScraping = document.getElementById('id_usar_scraping_bcv');
+    const inputTasa = document.getElementById('id_tasa_dolar');
+    // Parseamos la tasa que envía Django reemplazando comas por si hay problemas de región
+    const tasaScraped = parseFloat("{{ tasa_scraped|default:'0' }}".replace(',', '.'));
+
+    if (chkScraping && inputTasa) {
+        function toggleTasaInput() {
+            if (chkScraping.checked) {
+                // Bloquear y mostrar la del scraping
+                inputTasa.readOnly = true;
+                inputTasa.style.backgroundColor = '#e9ecef';
+                inputTasa.style.color = '#6c757d';
+                inputTasa.style.cursor = 'not-allowed';
+                if (tasaScraped > 0) inputTasa.value = tasaScraped.toFixed(2);
+            } else {
+                // Desbloquear para permitir edición manual
+                inputTasa.readOnly = false;
+                inputTasa.style.backgroundColor = '#ffffff';
+                inputTasa.style.color = '#333';
+                inputTasa.style.cursor = 'text';
+            }
+        }
+        // Ejecutar al cargar la página y al hacer click
+        toggleTasaInput();
+        chkScraping.addEventListener('change', toggleTasaInput);
+    }
 </script>
 {% endblock %}

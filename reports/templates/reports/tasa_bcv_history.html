@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div style="padding: 20px; max-width: 800px; margin: 0 auto;">
+    
+    <div style="margin-bottom: 15px;">
+         <a href="{% url 'reportes_index' %}" style="text-decoration: none; color: #666; font-weight: bold; display: inline-flex; align-items: center; gap: 5px;">
+            <i class="fas fa-arrow-left"></i> Volver a Reportes
+        </a>
+    </div>
+    
+    <h2 style="color: var(--primary-blue, #0d6efd);"><i class="fas fa-chart-line"></i> Historial de Tasas de Cambio</h2>
+    <p style="color: #666; margin-bottom: 20px;">Este registro es de <strong>solo lectura</strong>. Muestra todas las tasas del dólar (automáticas o manuales) que se han registrado y utilizado en el sistema, ordenadas desde la más reciente.</p>
+
+    <div class="card-style">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead style="background: var(--primary-blue, #0d6efd); color: white;">
+                <tr>
+                    <th style="padding: 12px; text-align: left;">Fecha y Hora de Actualización</th>
+                    <th style="padding: 12px; text-align: right;">Tasa Registrada (Bs / $)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tasa in tasas %}
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 12px; color: #555;">{{ tasa.fecha_actualizacion|date:"d/m/Y h:i A" }}</td>
+                    <td style="padding: 12px; text-align: right; font-weight: bold; color: #28a745; font-size: 1.1em;">{{ tasa.precio }} Bs</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="2" style="padding: 20px; text-align: center; color: #777;">No hay tasas registradas en el sistema aún.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Controles de Paginación -->
+    {% if tasas.has_other_pages %}
+    <div style="margin-top: 20px; display: flex; justify-content: center; gap: 10px; align-items: center;">
+        {% if tasas.has_previous %}
+            <a href="?page={{ tasas.previous_page_number }}" style="padding: 8px 15px; background: var(--primary-blue, #0d6efd); color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">&laquo; Anterior</a>
+        {% else %}
+            <span style="padding: 8px 15px; background: #ccc; color: white; border-radius: 5px; font-weight: bold; cursor: not-allowed;">&laquo; Anterior</span>
+        {% endif %}
+        
+        <span style="color: #555; font-weight: bold; padding: 0 10px;">
+            Página {{ tasas.number }} de {{ tasas.paginator.num_pages }}
+        </span>
+        
+        {% if tasas.has_next %}
+            <a href="?page={{ tasas.next_page_number }}" style="padding: 8px 15px; background: var(--primary-blue, #0d6efd); color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Siguiente &raquo;</a>
+        {% else %}
+            <span style="padding: 8px 15px; background: #ccc; color: white; border-radius: 5px; font-weight: bold; cursor: not-allowed;">Siguiente &raquo;</span>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

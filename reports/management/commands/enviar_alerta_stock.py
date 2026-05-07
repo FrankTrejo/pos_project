@@ -4,6 +4,7 @@ from django.template.loader import render_to_string
 from django.conf import settings
 from django.db.models import F, ExpressionWrapper, DecimalField
 from inventory.models import Insumo
+from core.models import Configuracion
 import datetime
 from io import BytesIO
 from xhtml2pdf import pisa
@@ -12,6 +13,12 @@ class Command(BaseCommand):
     help = 'Genera PDF de alertas de stock y lo envía por correo'
 
     def handle(self, *args, **options):
+        config = Configuracion.get_solo()
+        
+        if not config.enviar_alerta_stock_correo or not config.correo_destino_alertas:
+            self.stdout.write(self.style.WARNING('Las alertas automáticas por correo están desactivadas o no hay correo configurado.'))
+            return
+
         self.stdout.write("Analizando inventario...")
 
         # 1. Obtener datos (Calculando déficit igual que en la vista)
@@ -47,7 +54,7 @@ class Command(BaseCommand):
             subject = f'🚨 REPORTE PDF: Insumos Agotados ({fecha_str})'
             body = 'Adjunto encontrarás el reporte detallado de los insumos que requieren compra inmediata.'
             email_from = settings.EMAIL_HOST_USER
-            recipient_list = ['frankdtg2004@hotmail.com'] # <--- REVISA TU CORREO AQUÍ
+            recipient_list = [config.correo_destino_alertas] # Usa el correo del panel
 
             email = EmailMessage(
                 subject,

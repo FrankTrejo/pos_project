@@ -13,16 +13,10 @@ class Configuracion(models.Model):
     tasa_dolar = models.DecimalField(max_digits=10, decimal_places=2, default=40.00, verbose_name="Tasa BCV ($)")
     iva_porcentaje = models.DecimalField(max_digits=5, decimal_places=2, default=16.00, verbose_name="% IVA")
     
-    # --- 3. COSTOS ADICIONALES (LO QUE PEDISTE) ---
-    # Cargos al Cliente
-    igtf_porcentaje = models.DecimalField(max_digits=5, decimal_places=2, default=3.00, verbose_name="% IGTF (Divisas)")
-    servicio_porcentaje = models.DecimalField(max_digits=5, decimal_places=2, default=10.00, verbose_name="% Servicio / Propina")
-    monto_delivery_fijo = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Costo Delivery Estándar ($)")
-    
-    # Costos Operativos (Para cálculo de ganancia real)
-    costo_caja_pequena = models.DecimalField(max_digits=10, decimal_places=2, default=0.50, verbose_name="Costo Caja Pequeña ($)")
-    costo_caja_grande = models.DecimalField(max_digits=10, decimal_places=2, default=0.80, verbose_name="Costo Caja Grande ($)")
-    gastos_operativos_porcentaje = models.DecimalField(max_digits=5, decimal_places=2, default=10.00, help_text="% estimado de Luz, Gas, Alquiler por producto", verbose_name="% Gastos Operativos")
+    # --- 3. AUTOMATIZACIÓN Y PROCESOS ---
+    usar_scraping_bcv = models.BooleanField(default=True, verbose_name="¿Actualizar Tasa BCV automáticamente?", help_text="Si se desactiva, el sistema utilizará la tasa manual ingresada arriba.")
+    enviar_alerta_stock_correo = models.BooleanField(default=False, verbose_name="¿Enviar alerta de stock por correo?")
+    correo_destino_alertas = models.EmailField(blank=True, null=True, verbose_name="Correo para alertas", help_text="Correo donde llegará el PDF de insumos agotados.")
 
     # --- 4. CONFIGURACIÓN DE IMPRESIÓN (NUEVO) ---
     impresora_ticket = models.CharField(max_length=100, blank=True, default="", verbose_name="Nombre Impresora (Referencia)", help_text="Nombre de la impresora predeterminada en el sistema operativo")

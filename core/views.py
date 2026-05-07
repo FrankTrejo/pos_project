@@ -3,6 +3,8 @@ from django.contrib import messages
 from .models import Configuracion
 # Importamos los formularios que arreglamos antes
 from .forms import ConfigIdentidadForm, ConfigEconomiaForm, ConfigVisualForm
+from tables.models import TasaBCV
+from reports.models import AuditoriaConfiguracion
 
 # 1. MENÚ PRINCIPAL
 def configuracion_menu(request):
@@ -16,7 +18,7 @@ def conf_identidad(request):
         if form.is_valid():
             form.save()
             messages.success(request, "Datos de Identidad actualizados.")
-            return redirect('conf_identidad')
+            return redirect('configuracion_menu')
     else:
         form = ConfigIdentidadForm(instance=config)
     
@@ -27,17 +29,48 @@ def conf_identidad(request):
 # 3. VISTA DE ECONOMÍA (La que te daba error)
 def conf_economia(request):
     config, created = Configuracion.objects.get_or_create(id=1)
+    
+    # Guardar valores anteriores para la auditoría
+    old_scraping = config.usar_scraping_bcv
+    old_tasa = config.tasa_dolar
+    
     if request.method == 'POST':
         form = ConfigEconomiaForm(request.POST, instance=config)
         if form.is_valid():
-            form.save()
+            nuevo_config = form.save(commit=False)
+            
+            # Detectar cambios
+            cambios = []
+            if old_scraping != nuevo_config.usar_scraping_bcv:
+                estado = "Activado" if nuevo_config.usar_scraping_bcv else "Desactivado"
+                cambios.append(f"Scraping automático {estado}")
+            
+            if old_tasa != nuevo_config.tasa_dolar:
+                cambios.append(f"Tasa manual cambiada de {old_tasa} a {nuevo_config.tasa_dolar}")
+            
+            nuevo_config.save()
+            
+            # Registrar auditoría si hubo cambios
+            if cambios:
+                AuditoriaConfiguracion.objects.create(
+                    usuario=request.user if request.user.is_authenticated else None,
+                    accion="Actualización de Configuración Económica",
+                    detalles=" | ".join(cambios)
+                )
+            
             messages.success(request, "Datos Económicos actualizados.")
-            return redirect('conf_economia')
+            return redirect('configuracion_menu')
     else:
         form = ConfigEconomiaForm(instance=config)
     
+    # Obtener última tasa escrapeada para enviarla al JavaScript
+    tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
+    tasa_scraped = float(tasa_obj.precio) if tasa_obj else float(config.tasa_dolar)
+    
     return render(request, 'core/configuracion_form.html', {
-        'form': form, 'titulo': 'Configuración Económica'
+        'form': form, 
+        'titulo': 'Configuración Económica',
+        'tasa_scraped': tasa_scraped
     })
 
 # 4. VISTA VISUAL / IMPRESIÓN
@@ -48,7 +81,7 @@ def conf_visual(request):
         if form.is_valid():
             form.save()
             messages.success(request, "Configuración Visual e Impresión actualizada.")
-            return redirect('conf_visual')
+            return redirect('configuracion_menu')
     else:
         form = ConfigVisualForm(instance=config)
     

@@ -18,21 +18,23 @@ class ConfigEconomiaForm(forms.ModelForm):
         fields = [
             'tasa_dolar',           
             'iva_porcentaje',       
-            'igtf_porcentaje',      
-            'servicio_porcentaje',
-            'monto_delivery_fijo',
-            'costo_caja_pequena',
-            'costo_caja_grande',
-            'gastos_operativos_porcentaje'
+            'usar_scraping_bcv',
+            'enviar_alerta_stock_correo',
+            'correo_destino_alertas'
         ]
         labels = {
-            'tasa_dolar': 'Tasa del Dólar (BCV)',
+            'tasa_dolar': 'Tasa del Dólar (Manual/Fallback)',
             'iva_porcentaje': 'IVA (%)',
-            'igtf_porcentaje': 'IGTF (%)',
-            'servicio_porcentaje': 'Propina / Servicio (%)',
-            'monto_delivery_fijo': 'Costo Delivery ($)',
-            'costo_caja_pequena': 'Costo Caja Pequeña ($)',
-            'costo_caja_grande': 'Costo Caja Grande ($)',
+            'usar_scraping_bcv': '¿Scrapear Tasa BCV automáticamente?',
+            'enviar_alerta_stock_correo': '¿Activar Alertas de Stock por correo?',
+            'correo_destino_alertas': 'Correo Destino de Alertas',
+        }
+        widgets = {
+            'tasa_dolar': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'iva_porcentaje': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'usar_scraping_bcv': forms.CheckboxInput(attrs={'class': 'form-check-input', 'style': 'width: 20px; height: 20px;'}),
+            'enviar_alerta_stock_correo': forms.CheckboxInput(attrs={'class': 'form-check-input', 'style': 'width: 20px; height: 20px;'}),
+            'correo_destino_alertas': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'ejemplo@correo.com'}),
         }
 
 # 3. FORMULARIO VISUAL Y TÉCNICO (AQUÍ AGREGUÉ LA CONFIGURACIÓN DE IMPRESIÓN)

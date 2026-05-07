@@ -17,3 +17,12 @@ class AuditoriaEliminacion(models.Model):
 
     def __str__(self):
         return f"Eliminación Mesa {self.mesa_numero} - ${self.total_eliminado}"
+
+class AuditoriaConfiguracion(models.Model):
+    fecha = models.DateTimeField(auto_now_add=True)
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="Usuario responsable")
+    accion = models.CharField(max_length=255, verbose_name="Acción Realizada")
+    detalles = models.TextField(verbose_name="Detalles del Cambio")
+
+    def __str__(self):
+        return f"{self.fecha.strftime('%d/%m/%Y %H:%M')} - {self.accion}"

@@ -6,9 +6,9 @@
             <i class="fas fa-arrow-left"></i> Volver a Reportes
         </a>
     </div>
-    <h2 style="color: #d32f2f;"><i class="fas fa-user-secret"></i> Auditoría de Eliminaciones</h2>
+    <h2 style="color: #d32f2f;"><i class="fas fa-user-secret"></i> Auditoría de Eliminaciones (Mesas)</h2>
 
-    <div class="card-style">
+    <div class="card-style" style="margin-bottom: 30px;">
         <table style="width: 100%; border-collapse: collapse;">
             <thead style="background: #333; color: white;">
                 <tr>
@@ -32,6 +32,32 @@
                 </tr>
                 {% empty %}
                 <tr><td colspan="6" style="padding: 20px; text-align: center;">Sin registros sospechosos.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <h2 style="color: #0d6efd;"><i class="fas fa-cogs"></i> Auditoría de Configuración</h2>
+    <div class="card-style">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead style="background: #0d6efd; color: white;">
+                <tr>
+                    <th style="padding: 10px; text-align: left;">Fecha</th>
+                    <th style="padding: 10px; text-align: left;">Usuario</th>
+                    <th style="padding: 10px; text-align: left;">Acción</th>
+                    <th style="padding: 10px; text-align: left;">Detalles del Cambio</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs_config %}
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 10px;">{{ log.fecha|date:"d/m/Y H:i" }}</td>
+                    <td style="padding: 10px;">{{ log.usuario.username|default:"Sistema" }}</td>
+                    <td style="padding: 10px; font-weight: bold;">{{ log.accion }}</td>
+                    <td style="padding: 10px; font-size: 0.9em; color: #555;">{{ log.detalles }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" style="padding: 20px; text-align: center;">Sin cambios registrados en la configuración.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

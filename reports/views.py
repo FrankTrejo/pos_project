@@ -3,11 +3,12 @@ from django.db.models import Sum, Count, F
 from django.utils import timezone
 from datetime import timedelta
 from django.contrib.admin.views.decorators import staff_member_required
-from .models import AuditoriaEliminacion
+from django.core.paginator import Paginator
+from .models import AuditoriaEliminacion, AuditoriaConfiguracion
 
 # Importamos modelos de ambas aplicaciones (Inventario y Ventas)
 from inventory.models import Insumo, MovimientoInventario
-from tables.models import Venta, DetalleVenta, DetalleVenta
+from tables.models import Venta, DetalleVenta, TasaBCV
 
 # 1. MENÚ PRINCIPAL DE REPORTES (Centro de Mando)
 @staff_member_required
@@ -147,7 +148,23 @@ def ventas_pago(request):
 @staff_member_required
 def auditoria_eliminaciones(request):
     logs = AuditoriaEliminacion.objects.all().order_by('-fecha')
-    return render(request, 'reports/auditoria_list.html', {'logs': logs})
+    logs_config = AuditoriaConfiguracion.objects.all().order_by('-fecha')
+    return render(request, 'reports/auditoria_list.html', {
+        'logs': logs,
+        'logs_config': logs_config
+    })
+
+# 7. HISTORIAL DE TASAS DE CAMBIO
+@staff_member_required
+def historial_tasas_bcv(request):
+    tasas_list = TasaBCV.objects.all().order_by('-fecha_actualizacion')
+    
+    # Interceptamos la lista y la paginamos de a 20 registros
+    paginator = Paginator(tasas_list, 8) 
+    page_number = request.GET.get('page')
+    tasas = paginator.get_page(page_number)
+    
+    return render(request, 'reports/tasa_bcv_history.html', {'tasas': tasas})
 
 # reports/views.py
 
