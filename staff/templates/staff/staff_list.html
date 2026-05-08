@@ -112,6 +112,27 @@
                 </table>
             </div>
         </div>
+        {% if usuarios.has_other_pages %}
+        <div class="card-footer bg-white border-top">
+            <nav>
+                <ul class="pagination pagination-sm m-0 justify-content-center" style="display:flex; list-style:none; padding:10px; gap:5px;">
+                    {% if usuarios.has_previous %}
+                    <li class="page-item"><a class="page-link" href="?page={{ usuarios.previous_page_number }}" style="padding:5px 10px; text-decoration:none; border:1px solid #ddd;">&laquo;</a></li>
+                    {% endif %}
+                    {% for i in usuarios.paginator.page_range %}
+                        {% if usuarios.number == i %}
+                        <li class="page-item active"><span class="page-link" style="padding:5px 10px; background:#0d6efd; color:white; border-radius:4px;">{{ i }}</span></li>
+                        {% else %}
+                        <li class="page-item"><a class="page-link" href="?page={{ i }}" style="padding:5px 10px; text-decoration:none; border:1px solid #ddd;">{{ i }}</a></li>
+                        {% endif %}
+                    {% endfor %}
+                    {% if usuarios.has_next %}
+                    <li class="page-item"><a class="page-link" href="?page={{ usuarios.next_page_number }}" style="padding:5px 10px; text-decoration:none; border:1px solid #ddd;">&raquo;</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
     </div>
 </div>
 

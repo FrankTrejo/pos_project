@@ -5,6 +5,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponse
 from django.db.models import Max
 from django.contrib import messages
+from django.core.paginator import Paginator
 from django.contrib.auth.models import User
 from django.contrib.admin.views.decorators import staff_member_required
 from django.template.loader import get_template
@@ -44,6 +45,10 @@ def initialize_tables_if_empty():
 
 def index(request):
     initialize_tables_if_empty()
+    
+    # Actualizamos la tasa al cargar el mapa de mesas (inicio del POS)
+    obtener_tasa_bcv()
+    
     tables = Table.objects.all()
     return render(request, 'tables/index.html', {'tables': tables})
 
@@ -86,9 +91,9 @@ def table_order_view(request, table_id):
     table = get_object_or_404(Table, id=table_id)
     
     # 1. Recuperamos la Tasa y Productos
-    tasa_actual_texto = obtener_tasa_bcv()
     tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
     tasa_numerica = float(tasa_obj.precio) if tasa_obj else 0
+    tasa_actual_texto = f"{tasa_numerica:.2f} Bs/S" if tasa_obj else "0.00 Bs/S"
     
     categorias = Categoria.objects.all()
     productos = Producto.objects.filter(precio__gt=0).select_related('categoria').order_by('nombre')
@@ -161,11 +166,15 @@ def table_order_view(request, table_id):
 def product_list(request):
     # Usamos prefetch_related para traer los datos relacionados en una sola consulta
     # 'costos_adicionales' es necesario para calcular el Costo Total
-    productos = Producto.objects.all().prefetch_related(
+    productos_list = Producto.objects.all().prefetch_related(
         'ingredientes__insumo', 
         'costos_adicionales'
     ).order_by('nombre')
     
+    paginator = Paginator(productos_list, 10)
+    page_number = request.GET.get('page')
+    productos = paginator.get_page(page_number)
+
     return render(request, 'products/product_list.html', {'productos': productos})
 
 @staff_member_required
@@ -796,7 +805,7 @@ def anular_venta(request, venta_id):
 
 @staff_member_required
 def gestion_precios_extras(request):
-    insumos = Insumo.objects.filter(es_extra=True).order_by('nombre')
+    insumos_list = Insumo.objects.filter(es_extra=True).order_by('nombre')
     tamanos = ['IND', 'MED', 'FAM'] 
 
     if request.method == 'POST':
@@ -853,8 +862,12 @@ def gestion_precios_extras(request):
     # === TRUCO PARA QUE EL TEMPLATE FUNCIONE BIEN ===
     # Agregamos un atributo temporal 'id_str' a cada insumo
     # Esto ayuda a que el filtro de búsqueda en el HTML no se rompa
-    for insumo in insumos:
+    for insumo in insumos_list:
         insumo.id_str = str(insumo.id)
+        
+    paginator = Paginator(insumos_list, 10)
+    page_number = request.GET.get('page')
+    insumos = paginator.get_page(page_number)
 
     return render(request, 'products/manage_extras.html', {
         'insumos': insumos,

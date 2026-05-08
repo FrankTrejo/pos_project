@@ -7,6 +7,7 @@ from django.db import models
 import re
 from decimal import Decimal  # <--- IMPORTANTE: Importamos el tipo de dato correcto
 from django.db.models import ProtectedError 
+from django.core.paginator import Paginator
 from django.db import transaction # Importante para que no descuente uno si falla el otro
 from .forms import ProduccionForm
 from django.db import transaction
@@ -15,21 +16,49 @@ from django.http import HttpResponseRedirect, HttpResponse
 
 def inventory_index(request):
     """Muestra el listado de insumos con alertas de stock bajo"""
-    insumos = Insumo.objects.all().order_by('nombre')
+    insumos_list = Insumo.objects.all().order_by('nombre')
     categorias = CategoriaInsumo.objects.all()
     
-    alertas_stock = insumos.filter(stock_actual__lte=models.F('stock_minimo')).count()
+    # KPIs globales (Independientes del filtro)
+    alertas_stock = Insumo.objects.filter(stock_actual__lte=models.F('stock_minimo')).count()
     
     valor_inventario = 0
-    for i in insumos:
+    for i in Insumo.objects.all():
         # Ahora multiplicamos Decimal con Decimal, todo compatible
         valor_inventario += (i.stock_actual * i.costo_unitario)
+
+    # Filtros de búsqueda (Backend)
+    query = request.GET.get('q', '')
+    estado = request.GET.get('estado', 'todos')
+    tipo = request.GET.get('tipo', 'todos')
+
+    if query:
+        insumos_list = insumos_list.filter(nombre__icontains=query)
+
+    if estado == 'bajo':
+        insumos_list = insumos_list.filter(stock_actual__lte=models.F('stock_minimo'))
+    elif estado == 'ok':
+        insumos_list = insumos_list.filter(stock_actual__gt=models.F('stock_minimo'))
+    elif estado == 'cero':
+        insumos_list = insumos_list.filter(stock_actual__lte=0)
+
+    if tipo == 'insumo':
+        insumos_list = insumos_list.filter(es_insumo_compuesto=False)
+    elif tipo == 'receta':
+        insumos_list = insumos_list.filter(es_insumo_compuesto=True)
+        
+    paginator = Paginator(insumos_list, 10)
+    page_number = request.GET.get('page')
+    insumos = paginator.get_page(page_number)
 
     context = {
         'insumos': insumos,
         'categorias': categorias,
         'alertas_stock': alertas_stock,
         'valor_inventario': valor_inventario,
+        'q': query,
+        'estado': estado,
+        'tipo': tipo,
     }
     return render(request, 'inventory/inventory_list.html', context)
 
@@ -1031,8 +1060,14 @@ def salidas_especiales_view(request):
     })
 
     # --- AGREGAR ESTO AL FINAL ---
-    # Recuperamos los últimos 20 registros para mostrarlos en la tabla
-    historial = ConsumoInterno.objects.all().order_by('-fecha')[:20]
+    # Paginamos el historial para evitar que la página se rompa
+    from django.core.paginator import Paginator
+    
+    historial_list = ConsumoInterno.objects.all().order_by('-fecha')
+    historial = Paginator(historial_list, 10).get_page(request.GET.get('page'))
+    paginator = Paginator(historial_list, 10)
+    page_number = request.GET.get('page')
+    historial = paginator.get_page(page_number)
 
     return render(request, 'inventory/salidas_especiales.html', {
         'productos': productos,

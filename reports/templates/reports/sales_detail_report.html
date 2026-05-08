@@ -240,6 +240,27 @@
                 {% endfor %}
             </tbody>
         </table>
+        {% if ventas.has_other_pages %}
+        <div class="card-footer bg-white border-top">
+            <nav>
+                <ul class="pagination pagination-sm m-0 justify-content-center" style="display:flex; list-style:none; padding:10px; gap:5px;">
+                    {% if ventas.has_previous %}
+                    <li class="page-item"><a class="page-link" href="?page={{ ventas.previous_page_number }}&fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}&estado={{ estado_filtro }}" style="padding:5px 10px; text-decoration:none; border:1px solid #ddd;">&laquo;</a></li>
+                    {% endif %}
+                    {% for i in ventas.paginator.page_range %}
+                        {% if ventas.number == i %}
+                        <li class="page-item active"><span class="page-link" style="padding:5px 10px; background:#0d6efd; color:white; border-radius:4px;">{{ i }}</span></li>
+                        {% else %}
+                        <li class="page-item"><a class="page-link" href="?page={{ i }}&fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}&estado={{ estado_filtro }}" style="padding:5px 10px; text-decoration:none; border:1px solid #ddd;">{{ i }}</a></li>
+                        {% endif %}
+                    {% endfor %}
+                    {% if ventas.has_next %}
+                    <li class="page-item"><a class="page-link" href="?page={{ ventas.next_page_number }}&fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}&estado={{ estado_filtro }}" style="padding:5px 10px; text-decoration:none; border:1px solid #ddd;">&raquo;</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
     </div>
 </div>
 

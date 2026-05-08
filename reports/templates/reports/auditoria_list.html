@@ -35,6 +35,27 @@
                 {% endfor %}
             </tbody>
         </table>
+        {% if logs.has_other_pages %}
+        <div class="card-footer bg-white border-top">
+            <nav>
+                <ul class="pagination pagination-sm m-0 justify-content-center" style="display:flex; list-style:none; padding:10px; gap:5px;">
+                    {% if logs.has_previous %}
+                    <li class="page-item"><a class="page-link" href="?page_logs={{ logs.previous_page_number }}{% if request.GET.page_config %}&page_config={{ request.GET.page_config }}{% endif %}" style="padding:5px 10px; text-decoration:none; border:1px solid #ddd;">&laquo;</a></li>
+                    {% endif %}
+                    {% for i in logs.paginator.page_range %}
+                        {% if logs.number == i %}
+                        <li class="page-item active"><span class="page-link" style="padding:5px 10px; background:#0d6efd; color:white; border-radius:4px;">{{ i }}</span></li>
+                        {% else %}
+                        <li class="page-item"><a class="page-link" href="?page_logs={{ i }}{% if request.GET.page_config %}&page_config={{ request.GET.page_config }}{% endif %}" style="padding:5px 10px; text-decoration:none; border:1px solid #ddd;">{{ i }}</a></li>
+                        {% endif %}
+                    {% endfor %}
+                    {% if logs.has_next %}
+                    <li class="page-item"><a class="page-link" href="?page_logs={{ logs.next_page_number }}{% if request.GET.page_config %}&page_config={{ request.GET.page_config }}{% endif %}" style="padding:5px 10px; text-decoration:none; border:1px solid #ddd;">&raquo;</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
     </div>
 
     <h2 style="color: #0d6efd;"><i class="fas fa-cogs"></i> Auditoría de Configuración</h2>
@@ -61,6 +82,27 @@
                 {% endfor %}
             </tbody>
         </table>
+        {% if logs_config.has_other_pages %}
+        <div class="card-footer bg-white border-top">
+            <nav>
+                <ul class="pagination pagination-sm m-0 justify-content-center" style="display:flex; list-style:none; padding:10px; gap:5px;">
+                    {% if logs_config.has_previous %}
+                    <li class="page-item"><a class="page-link" href="?page_config={{ logs_config.previous_page_number }}{% if request.GET.page_logs %}&page_logs={{ request.GET.page_logs }}{% endif %}" style="padding:5px 10px; text-decoration:none; border:1px solid #ddd;">&laquo;</a></li>
+                    {% endif %}
+                    {% for i in logs_config.paginator.page_range %}
+                        {% if logs_config.number == i %}
+                        <li class="page-item active"><span class="page-link" style="padding:5px 10px; background:#0d6efd; color:white; border-radius:4px;">{{ i }}</span></li>
+                        {% else %}
+                        <li class="page-item"><a class="page-link" href="?page_config={{ i }}{% if request.GET.page_logs %}&page_logs={{ request.GET.page_logs }}{% endif %}" style="padding:5px 10px; text-decoration:none; border:1px solid #ddd;">{{ i }}</a></li>
+                        {% endif %}
+                    {% endfor %}
+                    {% if logs_config.has_next %}
+                    <li class="page-item"><a class="page-link" href="?page_config={{ logs_config.next_page_number }}{% if request.GET.page_logs %}&page_logs={{ request.GET.page_logs }}{% endif %}" style="padding:5px 10px; text-decoration:none; border:1px solid #ddd;">&raquo;</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

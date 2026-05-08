@@ -62,46 +62,12 @@
         border-color: var(--primary-blue, #0d6efd);
         outline: none;
     }
-
-    /* --- NUEVO: Estilos de la Paginación --- */
-    .pagination-container {
-        display: flex;
-        justify-content: flex-end;
-        align-items: center;
-        padding: 15px 20px;
-        gap: 5px;
-        background: #fff;
-        border-top: 1px solid #eee;
-        border-radius: 0 0 12px 12px;
-    }
-    .page-btn {
-        padding: 8px 12px;
-        border: 1px solid #ddd;
-        background: white;
-        border-radius: 6px;
-        cursor: pointer;
-        color: #555;
-        font-weight: 500;
-        transition: all 0.2s;
-    }
-    .page-btn:hover:not(:disabled) {
-        background: #f8f9fa;
-        border-color: #ccc;
-    }
-    .page-btn.active {
-        background: var(--primary-blue, #0d6efd);
-        color: white;
-        border-color: var(--primary-blue, #0d6efd);
-    }
-    .page-btn:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-    .page-info {
-        margin-right: auto;
-        color: #666;
-        font-size: 0.9em;
-    }
+    
+    /* Estilos de Paginación Custom */
+    .custom-pagination { display: flex; list-style: none; padding: 20px 0; margin: 0; justify-content: center; gap: 8px; }
+    .custom-pagination li a, .custom-pagination li span { display: block; padding: 8px 16px; text-decoration: none; border: 1px solid #dee2e6; border-radius: 6px; color: var(--primary-blue, #0d6efd); background: white; font-weight: 500; transition: all 0.2s ease; }
+    .custom-pagination li a:hover { background: #e9ecef; border-color: #dee2e6; color: #0a58ca; }
+    .custom-pagination li.active span { background: var(--primary-blue, #0d6efd); color: white; border-color: var(--primary-blue, #0d6efd); box-shadow: 0 2px 4px rgba(13, 110, 253, 0.2); }
 </style>
 
 <div style="padding: 20px; max-width: 1200px; margin: 0 auto;">
@@ -250,18 +216,31 @@
                 <tr id="fila-vacia-db"><td colspan="6" style="text-align:center; padding: 40px;">Tu inventario está vacío.</td></tr>
                 {% endfor %}
                 
-                <!-- Fila dinámica si la búsqueda no arroja resultados -->
-                <tr id="fila-sin-resultados" style="display: none;">
-                    <td colspan="6" style="text-align:center; padding: 40px; color: #666;">
-                        <i class="fas fa-search" style="font-size: 2em; color: #ddd; margin-bottom: 10px;"></i><br>
-                        No se encontraron productos con esos filtros.
-                    </td>
-                </tr>
             </tbody>
         </table>
         
         <!-- CONTROLES DE PAGINACIÓN -->
-        <div id="pagination-controls" class="pagination-container"></div>
+        {% if insumos.has_other_pages %}
+        <div class="card-footer bg-white border-top">
+            <nav>
+                <ul class="custom-pagination">
+                    {% if insumos.has_previous %}
+                    <li><a href="?page={{ insumos.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}{% if request.GET.tipo %}&tipo={{ request.GET.tipo }}{% endif %}">&laquo; Anterior</a></li>
+                    {% endif %}
+                    {% for i in insumos.paginator.page_range %}
+                        {% if insumos.number == i %}
+                        <li class="active"><span>{{ i }}</span></li>
+                        {% else %}
+                        <li><a href="?page={{ i }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}{% if request.GET.tipo %}&tipo={{ request.GET.tipo }}{% endif %}">{{ i }}</a></li>
+                        {% endif %}
+                    {% endfor %}
+                    {% if insumos.has_next %}
+                    <li><a href="?page={{ insumos.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}{% if request.GET.tipo %}&tipo={{ request.GET.tipo }}{% endif %}">Siguiente &raquo;</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
     </div>
 </div>
 
@@ -307,127 +286,8 @@
 </div>
 
 <script>
-    // --- VARIABLES GLOBALES PARA LA PAGINACIÓN ---
-    const rowsPerPage = 10; // <--- Cambia este número si deseas ver más (ej. 15)
-    let currentPage = 1;
-    let filteredRows = [];
-
-    // --- LÓGICA DE FILTRADO COMBINADO CON PAGINACIÓN ---
-    function filtrarTabla() {
-        const texto = document.getElementById("searchInput").value.toLowerCase();
-        const estado = document.getElementById("estadoFilter").value;
-        const tipo = document.getElementById("tipoFilter").value;
-        
-        // Convertimos el NodeList a Array para poder filtrarlo
-        const todasLasFilas = Array.from(document.querySelectorAll(".fila-producto"));
-
-        // 1. Ocultar todas las filas primero para limpiar la pantalla
-        todasLasFilas.forEach(fila => fila.style.display = "none");
-
-        // 2. Determinar cuáles filas cumplen con TODOS los filtros
-        filteredRows = todasLasFilas.filter(fila => {
-            const nombreFila = fila.getAttribute("data-nombre");
-            const estadoFila = fila.getAttribute("data-estado");
-            const tipoFila = fila.getAttribute("data-tipo");
-
-            let coincideTexto = nombreFila.includes(texto);
-            
-            let coincideEstado = true;
-            if (estado !== "todos") {
-                if (estado === "bajo") {
-                    coincideEstado = (estadoFila === "bajo" || estadoFila === "cero");
-                } else {
-                    coincideEstado = (estadoFila === estado);
-                }
-            }
-
-            let coincideTipo = true;
-            if (tipo !== "todos") {
-                coincideTipo = (tipoFila === tipo);
-            }
-
-            return coincideTexto && coincideEstado && coincideTipo;
-        });
-
-        // 3. Reiniciar a la página 1 cada vez que el usuario busca/filtra
-        currentPage = 1;
-        
-        // Mostrar mensaje de "No hay resultados" si el filtro no devuelve nada
-        document.getElementById("fila-sin-resultados").style.display = (filteredRows.length === 0 && todasLasFilas.length > 0) ? "" : "none";
-
-        // 4. Renderizar controles y mostrar la página correspondiente
-        renderizarPaginacion();
-        mostrarPagina();
-    }
-
-    function mostrarPagina() {
-        // Asegurarnos de ocultar el array filtrado antes de mostrar los 10 correspondientes
-        filteredRows.forEach(fila => fila.style.display = "none");
-
-        // Calcular qué porción de filas toca mostrar (Ej: De la 0 a la 9 para Pagina 1)
-        const inicio = (currentPage - 1) * rowsPerPage;
-        const fin = inicio + rowsPerPage;
-
-        for (let i = inicio; i < fin && i < filteredRows.length; i++) {
-            filteredRows[i].style.display = "";
-        }
-    }
-
-    function renderizarPaginacion() {
-        const totalPages = Math.ceil(filteredRows.length / rowsPerPage);
-        const container = document.getElementById("pagination-controls");
-        container.innerHTML = ""; // Limpiar controles anteriores
-
-        // Ocultar barra de paginación si no hay datos o solo hay 1 página
-        if (totalPages <= 1) {
-            container.style.display = "none";
-            return;
-        }
-        
-        container.style.display = "flex";
-
-        // Info de resultados (Opcional, se ve muy profesional)
-        const totalResultados = document.createElement("div");
-        totalResultados.className = "page-info";
-        totalResultados.innerText = `Mostrando ${filteredRows.length} resultados`;
-        container.appendChild(totalResultados);
-
-        // Botón Anterior
-        const btnPrev = document.createElement("button");
-        btnPrev.innerHTML = "&laquo; Ant";
-        btnPrev.disabled = currentPage === 1;
-        btnPrev.className = "page-btn";
-        btnPrev.onclick = () => { if(currentPage > 1) { currentPage--; actualizarVista(); } };
-        container.appendChild(btnPrev);
-
-        // Botones de número de página
-        for (let i = 1; i <= totalPages; i++) {
-            const btnPage = document.createElement("button");
-            btnPage.innerText = i;
-            btnPage.className = "page-btn " + (currentPage === i ? "active" : "");
-            btnPage.onclick = () => { currentPage = i; actualizarVista(); };
-            container.appendChild(btnPage);
-        }
-
-        // Botón Siguiente
-        const btnNext = document.createElement("button");
-        btnNext.innerHTML = "Sig &raquo;";
-        btnNext.disabled = currentPage === totalPages;
-        btnNext.className = "page-btn";
-        btnNext.onclick = () => { if(currentPage < totalPages) { currentPage++; actualizarVista(); } };
-        container.appendChild(btnNext);
-    }
-
-    function actualizarVista() {
-        mostrarPagina();
-        renderizarPaginacion();
-    }
-
     // Modal y Alertas
     document.addEventListener('DOMContentLoaded', function() {
-        // Ejecutar el filtrado inicial para que se arme la paginación al cargar la página
-        filtrarTabla();
-
         {% if messages %}
             {% for message in messages %}
                 Swal.fire({

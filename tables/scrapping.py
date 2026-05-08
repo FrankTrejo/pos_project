@@ -28,18 +28,25 @@ def obtener_tasa_bcv():
     ultima_tasa = TasaBCV.objects.order_by('-fecha_actualizacion').first()
     
     if ultima_tasa:
-        # Verificamos si es de hoy
-        hoy = timezone.now().date()
-        if ultima_tasa.fecha_actualizacion.date() == hoy:
-            # ¡Éxito! Devolvemos la de la BD y nos ahorramos la conexión lenta
-            return f"{ultima_tasa.precio}"
+        # Permitimos múltiples actualizaciones al día.
+        # En lugar de 1 por día, limitamos a 1 consulta cada HORA (3600 segundos).
+        # Esto evita que el BCV bloquee tu IP por exceso de peticiones.
+        tiempo_transcurrido = timezone.now() - ultima_tasa.fecha_actualizacion
+        if tiempo_transcurrido.total_seconds() < 3600:
+            # Excepción: Si el precio en BD es idéntico al manual, forzamos la actualización inmediata.
+            if ultima_tasa.precio != config.tasa_dolar:
+                return f"{ultima_tasa.precio}"
 
-    # --- 2. INTENTO DE SCRAPING (Solo si no hay datos de hoy) ---
+    # --- 2. INTENTO DE SCRAPING (Conexión a Internet) ---
     print("Actualizando tasa desde BCV (Internet)...")
     url = 'https://www.bcv.org.ve'
     
     try:
-        response = requests.get(url, verify=False, timeout=10)
+        # Agregamos cabeceras (User-Agent) porque el BCV bloquea peticiones de bots (HTTP 403)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+        response = requests.get(url, verify=False, headers=headers, timeout=10)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
         contenedor = soup.find(id='dolar')
@@ -52,7 +59,7 @@ def obtener_tasa_bcv():
                 valor_float = float(texto_punto)
 
                 # --- 3. GUARDAMOS EN BASE DE DATOS ---
-                # Creamos el registro nuevo para no volver a consultar hoy
+                # Guardamos siempre para mantener el historial (auditoría) solicitado
                 TasaBCV.objects.create(precio=valor_float)
 
                 return f"{valor_float:.2f} Bs/S"

@@ -52,6 +52,10 @@ def reporte_inventario(request):
     # Tabla detallada
     movimientos_tabla = movimientos_rango.select_related('insumo', 'usuario').order_by('-fecha')
 
+    paginator = Paginator(movimientos_tabla, 10)
+    page_number = request.GET.get('page')
+    movimientos = paginator.get_page(page_number)
+
     context = {
         'valor_total': valor_total_inventario,
         'bajo_stock': items_bajo_stock,
@@ -60,7 +64,7 @@ def reporte_inventario(request):
         'fecha_fin': fecha_fin,
         'labels_chart': labels_chart,
         'data_chart': data_chart,
-        'movimientos': movimientos_tabla,
+        'movimientos': movimientos,
     }
     
     return render(request, 'reports/inventory_report.html', context)
@@ -80,6 +84,7 @@ def ventas_mesero(request):
     # Preparamos datos para Chart.js
     labels = [item['mesero__username'] if item['mesero__username'] else 'Sin Asignar' for item in data]
     values = [float(item['total_vendido']) for item in data]
+    data = Paginator(data, 10).get_page(request.GET.get('page'))
 
     context = {
         'titulo': 'Ventas por Mesero',
@@ -106,6 +111,7 @@ def ventas_producto(request):
 
     labels = [item['nombre_producto'] for item in data]
     values = [float(item['cantidad_total']) for item in data] 
+    data = Paginator(data, 10).get_page(request.GET.get('page'))
 
     context = {
         'titulo': 'Top Productos Vendidos (Unidades)',
@@ -133,6 +139,7 @@ def ventas_pago(request):
 
     labels = [item['metodo_pago'] for item in data]
     values = [float(item['total_vendido']) for item in data]
+    data = Paginator(data, 10).get_page(request.GET.get('page'))
 
     context = {
         'titulo': 'Ventas por Método de Pago',
@@ -147,8 +154,15 @@ def ventas_pago(request):
 
 @staff_member_required
 def auditoria_eliminaciones(request):
-    logs = AuditoriaEliminacion.objects.all().order_by('-fecha')
-    logs_config = AuditoriaConfiguracion.objects.all().order_by('-fecha')
+    logs_list = AuditoriaEliminacion.objects.all().order_by('-fecha')
+    logs_config_list = AuditoriaConfiguracion.objects.all().order_by('-fecha')
+    
+    paginator_logs = Paginator(logs_list, 10)
+    logs = paginator_logs.get_page(request.GET.get('page_logs'))
+    
+    paginator_config = Paginator(logs_config_list, 10)
+    logs_config = paginator_config.get_page(request.GET.get('page_config'))
+
     return render(request, 'reports/auditoria_list.html', {
         'logs': logs,
         'logs_config': logs_config
@@ -160,7 +174,7 @@ def historial_tasas_bcv(request):
     tasas_list = TasaBCV.objects.all().order_by('-fecha_actualizacion')
     
     # Interceptamos la lista y la paginamos de a 20 registros
-    paginator = Paginator(tasas_list, 8) 
+    paginator = Paginator(tasas_list, 10) 
     page_number = request.GET.get('page')
     tasas = paginator.get_page(page_number)
     
@@ -178,7 +192,7 @@ def reporte_ventas_detalle(request):
     estado_filtro = request.GET.get('estado', 'todas') # Por defecto 'todas'
 
     # 3. Consulta Base (Por fecha)
-    ventas = Venta.objects.filter(
+    ventas_list = Venta.objects.filter(
         fecha__date__range=[fecha_inicio, fecha_fin]
     ).select_related('mesero').prefetch_related('detalles', 'pagos').order_by('-fecha')
 
@@ -187,19 +201,23 @@ def reporte_ventas_detalle(request):
 
     if estado_filtro == 'anuladas':
         # CASO A: Solo ver las canceladas
-        ventas = ventas.filter(anulada=True)
+        ventas_list = ventas_list.filter(anulada=True)
         # El total muestra cuánto dinero se "perdió" en anulaciones
-        total_periodo = ventas.aggregate(Sum('total'))['total__sum'] or 0
+        total_periodo = ventas_list.aggregate(Sum('total'))['total__sum'] or 0
 
     elif estado_filtro == 'validas':
         # CASO B: Solo ver las cobradas
-        ventas = ventas.filter(anulada=False)
-        total_periodo = ventas.aggregate(Sum('total'))['total__sum'] or 0
+        ventas_list = ventas_list.filter(anulada=False)
+        total_periodo = ventas_list.aggregate(Sum('total'))['total__sum'] or 0
 
     else:
         # CASO C: Ver todas (Mix)
         # Aquí mostramos la lista completa, pero el total SUMA SOLO LO REAL (No anulado)
-        total_periodo = ventas.filter(anulada=False).aggregate(Sum('total'))['total__sum'] or 0
+        total_periodo = ventas_list.filter(anulada=False).aggregate(Sum('total'))['total__sum'] or 0
+
+    paginator = Paginator(ventas_list, 10)
+    page_number = request.GET.get('page')
+    ventas = paginator.get_page(page_number)
 
     context = {
         'ventas': ventas,
@@ -266,7 +284,7 @@ from inventory.models import Insumo
 @login_required
 def reporte_insumos_agotados(request):
     # CORRECCIÓN: Usamos 'stock_actual' en lugar de 'cantidad'
-    insumos_criticos = Insumo.objects.filter(
+    insumos_criticos_list = Insumo.objects.filter(
         stock_actual__lte=F('stock_minimo')
     ).annotate(
         deficit=ExpressionWrapper(
@@ -274,6 +292,10 @@ def reporte_insumos_agotados(request):
             output_field=DecimalField()
         )
     ).order_by('stock_actual') 
+    
+    paginator = Paginator(insumos_criticos_list, 10)
+    page_number = request.GET.get('page')
+    insumos_criticos = paginator.get_page(page_number)
 
     return render(request, 'reports/insumos_agotados.html', {
         'insumos': insumos_criticos
