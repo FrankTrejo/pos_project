@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect
 from django.contrib import messages
 from .models import Configuracion
 # Importamos los formularios que arreglamos antes
-from .forms import ConfigIdentidadForm, ConfigEconomiaForm, ConfigVisualForm
+from .forms import ConfigIdentidadForm, ConfigEconomiaForm, ConfigVisualForm, ConfigProcesosForm
 from tables.models import TasaBCV
 from reports.models import AuditoriaConfiguracion
 
@@ -87,4 +87,20 @@ def conf_visual(request):
     
     return render(request, 'core/configuracion_form.html', {
         'form': form, 'titulo': 'Apariencia e Impresión'
+    })
+
+# 5. VISTA PROCESOS Y AUTOMATIZACIÓN
+def conf_procesos(request):
+    config, created = Configuracion.objects.get_or_create(id=1)
+    if request.method == 'POST':
+        form = ConfigProcesosForm(request.POST, instance=config)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Automatización y Procesos actualizados.")
+            return redirect('configuracion_menu')
+    else:
+        form = ConfigProcesosForm(instance=config)
+    
+    return render(request, 'core/configuracion_form.html', {
+        'form': form, 'titulo': 'Automatización y Procesos', 'icono': 'fas fa-cogs'
     })

@@ -34,6 +34,7 @@
                 <table class="table table-hover align-middle mb-0">
                     <thead class="bg-light text-secondary small text-uppercase">
                         <tr>
+                            <th class="ps-4 py-3">Código</th>
                             <th class="ps-4 py-3">Nombre</th>
                             <th class="py-3">Categoría</th>
                             <th class="py-3 text-info">IVA</th>
@@ -47,7 +48,10 @@
                     <tbody>
                         {% for p in productos %}
                         <tr>
-                            <td class="ps-4 fw-medium text-dark">
+                            <td class="ps-4 text-muted small fw-bold">
+                                {{ p.codigo|default:"N/A" }}
+                            </td>
+                            <td class="fw-medium text-dark">
                                 {{ p.nombre }}
                                 {% if p.tamano != 'UNI' %}
                                     <span class="badge bg-light text-secondary border ms-1">{{ p.get_tamano_display }}</span>
@@ -110,7 +114,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="7" class="text-center py-5 text-muted">
+                            <td colspan="9" class="text-center py-5 text-muted">
                                 <i class="bi bi-box-seam fs-1 d-block mb-3 opacity-50"></i>
                                 No hay productos registrados. ¡Crea el primero!
                             </td>

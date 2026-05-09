@@ -47,6 +47,11 @@
             <div class="left-panel product-selection-area card-style">
                 <h3 class="panel-title">Seleccione producto</h3>
                 
+                <div class="search-bar-container" style="margin-bottom: 10px;">
+                    <i class="fas fa-barcode search-icon"></i>
+                    <input type="text" id="input-codigo" class="search-input" placeholder="Escanear código o escribir y dar Enter..." {% if table.mesero %}autofocus{% endif %}>
+                </div>
+
                 <div class="search-bar-container">
                     <i class="fas fa-search search-icon"></i>
                     <input type="text" id="buscador-productos" class="search-input" placeholder="Buscar producto..." onkeyup="filtrarPorTexto()">
@@ -65,6 +70,7 @@
                             data-cat-id="{{ prod.categoria.id }}" 
                             data-tamano="{{ prod.tamano }}"  
                             data-nombre="{{ prod.nombre|lower }}"
+                            data-codigo="{{ prod.codigo|lower|default:'' }}"
                             style="cursor: pointer; padding: 5px; text-align: center; border: 1px solid #ddd; transition: transform 0.1s; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%;"
                             onclick="agregarAlCarrito('{{ prod.id }}', '{{ prod.nombre }}', '{{ prod.precio }}', '{{ prod.tamano }}')">
                             
@@ -89,13 +95,19 @@
             <div class="right-panel cart-area">
                 <div class="info-inputs">
                     <div class="input-group">
-                        <input type="text" value="TASA: {{ tasa_cambio|default:'Cargando...' }}" readonly class="readonly-field" style="background-color: #e9ecef; color: #495057; font-weight: bold;">
+                        <input type="text" value="TASA: {{ tasa_cambio|default:'Cargando...' }}" readonly class="readonly-field" style="text-align: center;">
                     </div>
                     <div class="input-group">
-                        <input type="text" id="fecha-hora-live" readonly class="readonly-field">
+                        <input type="text" id="fecha-hora-live" readonly class="readonly-field" style="text-align: center;">
                     </div>
                     <div class="input-group">
-                        <input type="text" id="input-mesero" placeholder="Sin mesero" value="{{ table.mesero.username|default:'' }}" readonly class="readonly-field" style="background-color: #e9ecef; color: #495057; font-weight: bold;">
+                        <input type="text" id="input-mesero" 
+                               {% if table.mesero %}
+                               value="{{ table.mesero.username }}" readonly class="readonly-field" style="text-align: center;"
+                               {% else %}
+                               value="" placeholder="ID Mesero (Enter)..." title="Escribe el ID y presiona Enter" style="background-color: #fff; color: #000; font-weight: bold; border: 2px dashed var(--primary-blue); text-align: center;" autofocus
+                               {% endif %}
+                        >
                     </div>
                 </div>
 
@@ -129,8 +141,9 @@
             <h3 style="color:var(--primary-blue); margin-bottom:15px;">Seleccionar Mesero</h3>
             <div style="display:grid; gap:10px; max-height:300px; overflow-y:auto;">
                 {% for mesero in meseros %}
-                <button onclick="seleccionarMesero('{{ mesero.id }}', '{{ mesero.username }}')" style="padding:10px; background:#f8f9fa; border:1px solid #ddd; border-radius:5px; cursor:pointer; font-size:16px;">
-                    <i class="fas fa-user-tie"></i> {{ mesero.username|title }}
+                <button onclick="seleccionarMesero('{{ mesero.id }}', '{{ mesero.username }}')" style="padding:10px; background:#f8f9fa; border:1px solid #ddd; border-radius:5px; cursor:pointer; font-size:16px; display: flex; justify-content: space-between; align-items: center;">
+                    <span><i class="fas fa-user-tie" style="color: #666; margin-right: 5px;"></i> {{ mesero.username|title }}</span>
+                    <span style="background: #e9ecef; color: #555; font-size: 0.8em; padding: 3px 8px; border-radius: 12px; font-weight: bold; border: 1px solid #ccc;" title="Usa este ID para asignarlo rápido">ID: {{ mesero.id }}</span>
                 </button>
                 {% endfor %}
             </div>
@@ -346,6 +359,12 @@
         const TASA_CAMBIO = parseFloat("{{ tasa_valor|stringformat:'f' }}");
         let carrito = {{ carrito_json|safe|default:"[]" }};
         const LISTA_EXTRAS_DISPONIBLES = JSON.parse('{{ extras_json|escapejs }}' || '[]');
+        
+        const MESEROS_DATA = {
+            {% for m in meseros %}
+            "{{ m.id }}": "{{ m.username }}",
+            {% endfor %}
+        };
 
         let indexProductoEditando = null;
         let seleccionTemporal = [];
@@ -357,6 +376,56 @@
         document.addEventListener("DOMContentLoaded", function() {
             renderizarCarrito();
             actualizarReloj();
+
+            // --- BÚSQUEDA POR CÓDIGO (TECLADO / ESCÁNER) ---
+            const inputCodigo = document.getElementById('input-codigo');
+            if (inputCodigo) {
+                inputCodigo.addEventListener('keypress', function(e) {
+                    // El lector de código de barras automáticamente presiona "Enter" al final
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const codigoBuscado = this.value.trim().toLowerCase();
+                        
+                        if (codigoBuscado !== '') {
+                            const productos = document.querySelectorAll('.producto-card');
+                            let productoEncontrado = null;
+                            
+                            for (let prod of productos) {
+                                if (prod.hasAttribute('data-codigo') && prod.getAttribute('data-codigo') === codigoBuscado) {
+                                    productoEncontrado = prod;
+                                    break;
+                                }
+                            }
+                            
+                            if (productoEncontrado) {
+                                productoEncontrado.click(); // Simulamos el click para agregarlo
+                            } else {
+                                Swal.fire({icon: 'warning', title: 'No encontrado', text: 'El código ingresado no existe.', timer: 1500, showConfirmButton: false});
+                            }
+                            this.value = ''; // Limpiamos el campo para el siguiente escaneo rápido
+                        }
+                    }
+                });
+            }
+
+            // --- BÚSQUEDA DE MESERO POR ID (TECLADO / ESCÁNER) ---
+            const inputMesero = document.getElementById('input-mesero');
+            if (inputMesero && !inputMesero.readOnly) {
+                inputMesero.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const codigoBuscado = this.value.trim();
+                        if (codigoBuscado !== '') {
+                            if (MESEROS_DATA[codigoBuscado]) {
+                                seleccionarMesero(codigoBuscado, MESEROS_DATA[codigoBuscado]);
+                            } else {
+                                Swal.fire({icon: 'warning', title: 'No encontrado', text: 'El ID de mesero no existe.', timer: 1500, showConfirmButton: false});
+                                this.value = ''; // Limpiamos para intentar de nuevo
+                            }
+                        }
+                    }
+                });
+            }
         });
 
         // ==========================================
@@ -797,11 +866,17 @@
         function cerrarModalMeseros() { document.getElementById('modal-meseros').style.display = 'none'; }
         
         function seleccionarMesero(userId, userName) {
-            fetch("{% url 'asignar_mesero' table.id %}", {
-                method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }, body: JSON.stringify({ user_id: userId })
-            })
-            .then(r => r.json())
-            .then(d => { if(d.status === 'ok') { document.getElementById('input-mesero').value = userName; cerrarModalMeseros(); } });
+            const inputMesero = document.getElementById('input-mesero');
+            inputMesero.value = userName; 
+            inputMesero.readOnly = true;
+            inputMesero.classList.add('readonly-field');
+            inputMesero.style.backgroundColor = '';
+            inputMesero.style.border = '';
+            inputMesero.style.color = '';
+            
+            cerrarModalMeseros(); 
+            const inputProd = document.getElementById('input-codigo');
+            if(inputProd) inputProd.focus();
         }
 
         function actualizarReloj() {

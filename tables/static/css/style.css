@@ -383,17 +383,19 @@ body.light-theme {
 
 /* Estilo para campos de solo lectura */
 .input-group .readonly-field {
-    background-color: #e9ecef; /* Un gris claro estándar para campos deshabilitados */
-    color: #495057; /* Un color de texto un poco más oscuro */
-    cursor: not-allowed; /* Muestra un icono de "prohibido" al pasar el mouse */
+    background-color: #e2e8f0; /* Gris-azulado para destacarse del fondo blanco y del fondo app */
+    color: #0f172a; /* Texto oscuro casi negro para alto contraste */
+    cursor: not-allowed;
     font-weight: bold;
-    border-color: #dce4ec; /* Un borde ligeramente diferente si se desea */
+    border: 1px solid #94a3b8 !important; /* Borde más marcado para que no se pierda */
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.05); /* Efecto de hundimiento */
 }
 
 /* Opcional: Si quieres que se vea aún más diferente en el tema claro */
 body.light-theme .input-group .readonly-field {
-     background-color: #dadde1; /* Un gris un poco más notable en el tema claro */
-     color: var(--primary-blue);
+     background-color: #e2e8f0;
+     color: #0f172a;
+     border-color: #94a3b8;
 }
 
 /* =========================================

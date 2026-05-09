@@ -17,21 +17,18 @@ class ConfigEconomiaForm(forms.ModelForm):
         model = Configuracion
         fields = [
             'tasa_dolar',           
-            'iva_porcentaje',       
             'usar_scraping_bcv',
             'enviar_alerta_stock_correo',
             'correo_destino_alertas'
         ]
         labels = {
             'tasa_dolar': 'Tasa del Dólar (Manual/Fallback)',
-            'iva_porcentaje': 'IVA (%)',
             'usar_scraping_bcv': '¿Scrapear Tasa BCV automáticamente?',
             'enviar_alerta_stock_correo': '¿Activar Alertas de Stock por correo?',
             'correo_destino_alertas': 'Correo Destino de Alertas',
         }
         widgets = {
             'tasa_dolar': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'iva_porcentaje': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'usar_scraping_bcv': forms.CheckboxInput(attrs={'class': 'form-check-input', 'style': 'width: 20px; height: 20px;'}),
             'enviar_alerta_stock_correo': forms.CheckboxInput(attrs={'class': 'form-check-input', 'style': 'width: 20px; height: 20px;'}),
             'correo_destino_alertas': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'ejemplo@correo.com'}),
@@ -67,4 +64,20 @@ class CostoAdicionalForm(forms.ModelForm):
         }
         labels = {
             'valor_defecto': 'Valor ($ o %)'
+        }
+
+class ConfigProcesosForm(forms.ModelForm):
+    class Meta:
+        model = Configuracion
+        fields = [
+            'usar_scraping_bcv',
+            'enviar_alerta_stock_correo',
+            'correo_destino_alertas',
+            'codigo_producto_automatico'
+        ]
+        widgets = {
+            'usar_scraping_bcv': forms.CheckboxInput(attrs={'class': 'form-check-input', 'style': 'width: 20px; height: 20px;'}),
+            'enviar_alerta_stock_correo': forms.CheckboxInput(attrs={'class': 'form-check-input', 'style': 'width: 20px; height: 20px;'}),
+            'correo_destino_alertas': forms.EmailInput(attrs={'class': 'form-control-card', 'placeholder': 'ejemplo@correo.com'}),
+            'codigo_producto_automatico': forms.CheckboxInput(attrs={'class': 'form-check-input', 'style': 'width: 20px; height: 20px;'}),
         }

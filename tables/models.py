@@ -34,12 +34,13 @@ class Producto(models.Model):
 
     # --- NUEVO: DEFINIMOS LAS ALÍCUOTAS DE IVA DE VENEZUELA ---
     OPCIONES_IVA = [
-        ('16.00', 'General (16%)'),
-        ('8.00', 'Reducido (8%)'),
-        ('31.00', 'Lujo (31%)'),
-        ('0.00', 'Exento (0%)'),
+        (Decimal('16.00'), 'General (16%)'),
+        (Decimal('8.00'), 'Reducido (8%)'),
+        (Decimal('31.00'), 'Lujo (31%)'),
+        (Decimal('0.00'), 'Exento (0%)'),
     ]
-
+    
+    codigo = models.CharField(max_length=50, blank=True, null=True, verbose_name="Código de Producto")
     nombre = models.CharField(max_length=100)
     precio = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Precio Venta ($)")
     tamano = models.CharField(max_length=3, choices=OPCIONES_TAMANO, default='UNI')
@@ -50,7 +51,7 @@ class Producto(models.Model):
         max_digits=5, 
         decimal_places=2, 
         choices=OPCIONES_IVA, 
-        default='16.00', 
+        default=Decimal('16.00'), 
         verbose_name="Alícuota IVA"
     )
     # OPCIONAL: Imagen del producto

@@ -190,8 +190,15 @@ def product_create(request, pk=None):
         form = ProductoBasicForm(request.POST, instance=producto)
         if form.is_valid():
             prod = form.save(commit=False)
+            config = Configuracion.get_solo()
             if not pk:
-                prod.precio = 0 
+                prod.precio = 0
+                prod.save()
+                if config.codigo_producto_automatico:
+                    prod.codigo = str(prod.id)
+            else:
+                if config.codigo_producto_automatico and not prod.codigo:
+                    prod.codigo = str(prod.id)
             prod.save()
             messages.success(request, "Datos básicos guardados.")
             return redirect('recipe_manager', pk=prod.pk)

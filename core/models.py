@@ -17,6 +17,11 @@ class Configuracion(models.Model):
     usar_scraping_bcv = models.BooleanField(default=True, verbose_name="¿Actualizar Tasa BCV automáticamente?", help_text="Si se desactiva, el sistema utilizará la tasa manual ingresada arriba.")
     enviar_alerta_stock_correo = models.BooleanField(default=False, verbose_name="¿Enviar alerta de stock por correo?")
     correo_destino_alertas = models.EmailField(blank=True, null=True, verbose_name="Correo para alertas", help_text="Correo donde llegará el PDF de insumos agotados.")
+    codigo_producto_automatico = models.BooleanField(
+        default=True,
+        verbose_name="¿Código de producto automático?",
+        help_text="Si está marcado, se generará un código autoincrementable. Si está desmarcado, podrás ingresarlo manualmente."
+    )
 
     # --- 4. CONFIGURACIÓN DE IMPRESIÓN (NUEVO) ---
     impresora_ticket = models.CharField(max_length=100, blank=True, default="", verbose_name="Nombre Impresora (Referencia)", help_text="Nombre de la impresora predeterminada en el sistema operativo")

@@ -1,17 +1,36 @@
 from django import forms
 from .models import Producto, IngredienteProducto, CostoAsignadoProducto, CostoAdicional
 from inventory.models import Insumo
+from core.models import Configuracion
 
 # PASO 1: SOLO DATOS BÁSICOS
 class ProductoBasicForm(forms.ModelForm):
     class Meta:
         model = Producto
-        fields = ['nombre', 'categoria', 'tamano'] # Quitamos precio
+        fields = ['codigo', 'nombre', 'categoria', 'tamano']
         widgets = {
+            'codigo': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Ej: 001, PROD-01'}),
             'nombre': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Ej: Pizza Margarita'}),
             'categoria': forms.Select(attrs={'class': 'form-input'}),
             'tamano': forms.Select(attrs={'class': 'form-input'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        config = Configuracion.get_solo()
+        if config.codigo_producto_automatico:
+            self.fields['codigo'].required = False
+            self.fields['codigo'].widget.attrs['readonly'] = True
+            
+            # Mostrar el siguiente ID si es un producto nuevo
+            if not self.instance.pk:
+                ultimo_producto = Producto.objects.order_by('-id').first()
+                siguiente_id = ultimo_producto.id + 1 if ultimo_producto else 1
+                self.fields['codigo'].widget.attrs['placeholder'] = f"Automático (Siguiente: {siguiente_id})"
+            else:
+                self.fields['codigo'].widget.attrs['placeholder'] = "Generado automáticamente"
+                
+            self.fields['codigo'].widget.attrs['style'] = "background-color: #e9ecef; cursor: not-allowed;"
 
 # PASO 2: (Usamos el IngredienteForm que ya tienes, no cambia)
 # En tu archivo forms.py
