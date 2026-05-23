@@ -11,7 +11,6 @@ class Configuracion(models.Model):
 
     # --- 2. MONEDA E IMPUESTOS ---
     tasa_dolar = models.DecimalField(max_digits=10, decimal_places=2, default=40.00, verbose_name="Tasa BCV ($)")
-    iva_porcentaje = models.DecimalField(max_digits=5, decimal_places=2, default=16.00, verbose_name="% IVA")
     
     # --- 3. AUTOMATIZACIÓN Y PROCESOS ---
     usar_scraping_bcv = models.BooleanField(default=True, verbose_name="¿Actualizar Tasa BCV automáticamente?", help_text="Si se desactiva, el sistema utilizará la tasa manual ingresada arriba.")
@@ -27,6 +26,11 @@ class Configuracion(models.Model):
     impresora_ticket = models.CharField(max_length=100, blank=True, default="", verbose_name="Nombre Impresora (Referencia)", help_text="Nombre de la impresora predeterminada en el sistema operativo")
     ancho_papel = models.IntegerField(default=80, verbose_name="Ancho Papel (mm)", help_text="Estándar: 80mm o 58mm")
     auto_imprimir = models.BooleanField(default=True, verbose_name="¿Impresión Automática?", help_text="Si se marca, el sistema intentará imprimir sin preguntar al cerrar la venta.")
+
+    # --- 5. CONFIGURACIÓN DE EMPAQUES (NUEVO) ---
+    caja_individual = models.ForeignKey('inventory.Insumo', related_name='config_caja_ind', on_delete=models.SET_NULL, null=True, blank=True, limit_choices_to={'es_insumo_compuesto': False}, verbose_name="Empaque Individual")
+    caja_mediana = models.ForeignKey('inventory.Insumo', related_name='config_caja_med', on_delete=models.SET_NULL, null=True, blank=True, limit_choices_to={'es_insumo_compuesto': False}, verbose_name="Empaque Mediano")
+    caja_familiar = models.ForeignKey('inventory.Insumo', related_name='config_caja_fam', on_delete=models.SET_NULL, null=True, blank=True, limit_choices_to={'es_insumo_compuesto': False}, verbose_name="Empaque Familiar")
     
     def __str__(self):
         return "Configuración General"

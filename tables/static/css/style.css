@@ -306,6 +306,8 @@ body.light-theme {
     display: flex;
     flex-direction: column;
     gap: 20px;
+    overflow: hidden;
+    min-height: 0;
 }
 
 .info-inputs {
@@ -335,6 +337,8 @@ body.light-theme {
     flex-grow: 1; /* Ocupa el espacio restante */
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
 }
 
 .cart-header {

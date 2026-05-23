@@ -14,17 +14,18 @@
         .header { 
             text-align: center; 
             border-bottom: 2px dashed #000; 
-            padding-bottom: 10px; 
-            margin-bottom: 10px; 
+            padding-bottom: 5px; 
+            margin-bottom: 5px; 
         }
         .mesa-title {
-            font-size: 24px;
+            font-size: 20px;
             font-weight: bold;
-            margin: 5px 0;
+            margin: 2px 0;
         }
         .meta-info {
-            font-size: 12px;
-            margin-bottom: 15px;
+            font-size: 11px;
+            margin-bottom: 8px;
+            line-height: 1.2;
         }
         table { 
             width: 100%; 
@@ -33,26 +34,27 @@
         th { 
             text-align: left; 
             border-bottom: 2px solid #000; 
-            font-size: 14px;
-            padding-bottom: 5px;
+            font-size: 13px;
+            padding-bottom: 2px;
         }
         td { 
-            padding: 8px 0; 
+            padding: 3px 0; 
             vertical-align: top;
             border-bottom: 1px solid #ccc;
         }
         .cant {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: bold;
             text-align: center;
             width: 15%;
         }
         /* Estilo principal del producto */
         .prod {
-            font-size: 16px;
+            font-size: 14px;
             font-weight: bold;
-            padding-left: 10px;
+            padding-left: 5px;
             width: 85%;
+            line-height: 1.1
         }
         .tamano {
             font-size: 0.9em;
@@ -67,7 +69,7 @@
         }
         .footer {
             text-align: center;
-            margin-top: 20px;
+            margin-top: 10px;
             font-size: 10px;
         }
 
@@ -75,12 +77,12 @@
         .alert-global {
             background-color: #000;
             color: #fff;
-            font-size: 20px;
+            font-size: 18px;
             font-weight: bold;
             text-align: center;
-            padding: 10px;
+            padding: 5px;
             border: 3px dashed #000;
-            margin-bottom: 15px;
+            margin-bottom: 8px;
             text-transform: uppercase;
             display: block;
         }
@@ -99,8 +101,8 @@
 
         /* --- ESTILO PARA EXTRAS (MODIFICADO) --- */
         .lista-extras {
-            margin-top: 5px;
-            font-size: 14px;
+            margin-top: 2px;
+            font-size: 12px;
             font-weight: normal;
             color: #333;
             border-top: 1px dotted #ccc; /* Pequeño separador */
@@ -109,7 +111,7 @@
         .item-extra {
             /* Quitamos el padding y el "before" anterior */
             margin-left: 5px;
-            padding: 2px 0;
+            padding:0;
         }
         /* Clase para resaltar la palabra EXTRA */
         .label-extra {
@@ -150,21 +152,39 @@
                 <td class="cant">{{ item.cantidad }}</td>
                 
                 <td class="prod">
-                    {{ item.producto.nombre|upper }}
-                    
-                    {% if item.producto.tamano != 'UNI' %}
-                         <span class="tamano">({{ item.producto.get_tamano_display|upper }})</span>
+                    {% if item.mitad_producto %}
+                        MITAD 
+                        {% if item.producto.tamano != 'UNI' %}
+                             <span class="tamano">({{ item.producto.get_tamano_display|upper }})</span>
+                        {% endif %}
+                        <div class="lista-extras" style="border-top: none; padding-top: 0; margin-top: 2px;">
+                            <div class="item-extra">>> 1/2 {{ item.producto.nombre|upper }}</div>
+                            <div class="item-extra">>> 1/2 {{ item.mitad_producto.nombre|upper }}</div>
+                        </div>
+                    {% else %}
+                        {{ item.producto.nombre|upper }}
+                        
+                        {% if item.producto.tamano != 'UNI' %}
+                             <span class="tamano">({{ item.producto.get_tamano_display|upper }})</span>
+                        {% endif %}
                     {% endif %}
                     
                     {% if item.extras_elegidos.exists %}
                         <div class="lista-extras">
                             {% for extra in item.extras_elegidos.all %}
                                 <div class="item-extra">
-                                    <span class="label-extra">>> EXTRA:</span> {{ extra.insumo.nombre|upper }}
+                                    <span class="label-extra">>> EXTRA:</span> {{ extra.porcion_display }}{{ extra.insumo.nombre|upper }}
                                 </div>
                             {% endfor %}
                         </div>
                     {% endif %}
+                    
+                    {% if item.ingredientes_removidos and item.ingredientes_removidos.exists %}
+                        <div class="lista-extras">
+                            {% for rem in item.ingredientes_removidos.all %}<div class="item-extra" style="color: #dc3545;"><span class="label-extra">>> SIN:</span> {{ rem.nombre|upper }}</div>{% endfor %}
+                        </div>
+                    {% endif %}
+
                     {% if item.es_para_llevar %}
                         <div style="margin-top: 5px;">
                             <span class="badge-llevar">PARA LLEVAR 📦</span>

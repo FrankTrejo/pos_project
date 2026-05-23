@@ -104,18 +104,33 @@ def ventas_producto(request):
     fecha_fin = request.GET.get('fecha_fin', timezone.now().strftime('%Y-%m-%d'))
 
     # Agrupamos detalles por Producto (Top 10)
-    data = (DetalleVenta.objects.filter(venta__fecha__date__range=[fecha_inicio, fecha_fin])
-            .values('nombre_producto')
+    data_qs = (DetalleVenta.objects.filter(venta__fecha__date__range=[fecha_inicio, fecha_fin])
+            .values('nombre_producto', 'nombre_mitad')
             .annotate(cantidad_total=Sum('cantidad'), dinero_generado=Sum('subtotal'))
             .order_by('-cantidad_total')[:10])
 
-    labels = [item['nombre_producto'] for item in data]
-    values = [float(item['cantidad_total']) for item in data] 
-    data = Paginator(data, 10).get_page(request.GET.get('page'))
+    labels = []
+    data_list = []
+    
+    for item in data_qs:
+        if item.get('nombre_mitad'):
+            nombre_completo = f"1/2 {item['nombre_producto']} + 1/2 {item['nombre_mitad']}"
+        else:
+            nombre_completo = item['nombre_producto']
+            
+        labels.append(nombre_completo)
+        data_list.append({
+            'nombre_producto': nombre_completo,
+            'cantidad_total': item['cantidad_total'],
+            'dinero_generado': item['dinero_generado']
+        })
+
+    values = [float(item['cantidad_total']) for item in data_qs] 
+    data_paginada = Paginator(data_list, 10).get_page(request.GET.get('page'))
 
     context = {
         'titulo': 'Top Productos Vendidos (Unidades)',
-        'data_tabla': data,
+        'data_tabla': data_paginada,
         'labels': labels,
         'values': values,
         'tipo_chart': 'doughnut', # Gráfico de Dona
@@ -198,22 +213,26 @@ def reporte_ventas_detalle(request):
 
     # 4. APLICACIÓN DE FILTROS Y CÁLCULO DE TOTALES
     total_periodo = 0
+    total_propina = 0
 
     if estado_filtro == 'anuladas':
         # CASO A: Solo ver las canceladas
         ventas_list = ventas_list.filter(anulada=True)
         # El total muestra cuánto dinero se "perdió" en anulaciones
         total_periodo = ventas_list.aggregate(Sum('total'))['total__sum'] or 0
+        total_propina = ventas_list.aggregate(Sum('propina'))['propina__sum'] or 0
 
     elif estado_filtro == 'validas':
         # CASO B: Solo ver las cobradas
         ventas_list = ventas_list.filter(anulada=False)
         total_periodo = ventas_list.aggregate(Sum('total'))['total__sum'] or 0
+        total_propina = ventas_list.aggregate(Sum('propina'))['propina__sum'] or 0
 
     else:
         # CASO C: Ver todas (Mix)
         # Aquí mostramos la lista completa, pero el total SUMA SOLO LO REAL (No anulado)
         total_periodo = ventas_list.filter(anulada=False).aggregate(Sum('total'))['total__sum'] or 0
+        total_propina = ventas_list.filter(anulada=False).aggregate(Sum('propina'))['propina__sum'] or 0
 
     paginator = Paginator(ventas_list, 10)
     page_number = request.GET.get('page')
@@ -224,6 +243,7 @@ def reporte_ventas_detalle(request):
         'fecha_inicio': fecha_inicio,
         'fecha_fin': fecha_fin,
         'total_periodo': total_periodo,
+        'total_propina': total_propina,
         'estado_filtro': estado_filtro # Pasamos esto para pintar los botones
     }
     return render(request, 'reports/sales_detail_report.html', context)

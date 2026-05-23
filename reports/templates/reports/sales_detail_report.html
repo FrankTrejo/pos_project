@@ -119,18 +119,19 @@
 
     </div>
 
-    <div style="background: ...">
-        <span style="font-size: 1.4em; font-weight: bold;">
-            {% if estado_filtro == 'anuladas' %}
-                Total Anulado: <span style="color: #dc3545;">${{ total_periodo|floatformat:2 }}</span>
-            {% else %}
-                Total Facturado: <span style="color: #0d47a1;">${{ total_periodo|floatformat:2 }}</span>
-            {% endif %}
-        </span>
-    </div>
     <div style="background: #e3f2fd; color: #0d47a1; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #bbdefb; display: flex; justify-content: space-between; align-items: center;">
         <span style="font-size: 1.1em;">Mostrando <b>{{ ventas.count }}</b> transacciones</span>
-        <span style="font-size: 1.4em; font-weight: bold;">Total Facturado: ${{ total_periodo|floatformat:2 }}</span>
+        <div style="text-align: right;">
+            <span style="font-size: 1.4em; font-weight: bold; display: block;">
+                {% if estado_filtro == 'anuladas' %} Total Anulado: {% else %} Total Facturado: {% endif %}
+                ${{ total_periodo|floatformat:2 }}
+            </span>
+            {% if total_propina > 0 %}
+            <span style="font-size: 1.1em; font-weight: bold; color: #198754; display: block; margin-top: 5px;">
+                <i class="fas fa-hand-holding-usd"></i> Propinas Recibidas: ${{ total_propina|floatformat:2 }}
+            </span>
+            {% endif %}
+        </div>
     </div>
 
     <div class="card-style" style="padding: 0; overflow-x: auto;">
@@ -172,7 +173,20 @@
                         <ul style="margin: 0; padding-left: 15px; list-style-type: square;">
                             {% for det in venta.detalles.all %}
                                 <li style="margin-bottom: 2px;">
-                                    <b>{{ det.cantidad }}</b> {{ det.nombre_producto }}
+                                    {% if det.mitad_producto %}
+                                        <b>{{ det.cantidad }}</b> MITAD/MITAD (1/2 {{ det.nombre_producto }} + 1/2 {{ det.nombre_mitad }})
+                                    {% else %}
+                                        <b>{{ det.cantidad }}</b> {{ det.nombre_producto }}
+                                    {% endif %}
+                                    
+                                    {% if det.extras.exists %}
+                                        <br>
+                                        <small style="color: #666; font-style: italic;">
+                                            {% for extra in det.extras.all %}
+                                                [+{{ extra.nombre_extra }}]
+                                            {% endfor %}
+                                        </small>
+                                    {% endif %}
                                 </li>
                             {% endfor %}
                         </ul>
@@ -188,6 +202,12 @@
                             {% endfor %}
                         {% else %}
                             {{ venta.get_metodo_pago_display }}
+                        {% endif %}
+                        
+                        {% if venta.propina > 0 %}
+                            <div style="margin-top: 5px; color: #198754; font-size: 0.85em; font-weight: bold;">
+                                <i class="fas fa-hand-holding-usd"></i> Propina: ${{ venta.propina|floatformat:2 }}
+                            </div>
                         {% endif %}
                     </td>
 

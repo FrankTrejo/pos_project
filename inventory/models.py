@@ -283,6 +283,9 @@ def actualizar_stock_conversion(sender, instance, created, **kwargs):
         
         # --- LÓGICA CORREGIDA ---
         
+        # IMPORTANTÍSIMO: Refrescar el insumo desde la BD para evitar sobrescribir datos en memoria (arregla el error de mitades y extras)
+        insumo.refresh_from_db()
+        
         if instance.tipo == 'ENTRADA':
             # COMPRAS: SUMAN (+)
             insumo.stock_actual += cantidad_en_gramos

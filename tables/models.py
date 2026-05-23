@@ -288,6 +288,11 @@ class DetalleVenta(models.Model):
     precio_unitario = models.DecimalField(max_digits=10, decimal_places=2)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
 
+    # --- NUEVOS CAMPOS PERSONALIZACIÓN ---
+    mitad_producto = models.ForeignKey(Producto, on_delete=models.SET_NULL, null=True, blank=True, related_name='mitad_ventas')
+    nombre_mitad = models.CharField(max_length=100, blank=True, null=True)
+    ingredientes_removidos = models.ManyToManyField(Insumo, blank=True)
+
     def __str__(self):
         return f"{self.cantidad}x {self.nombre_producto}"
     
@@ -329,6 +334,10 @@ class DetalleOrden(models.Model):
 
     # --- NUEVO CAMPO ---
     es_para_llevar = models.BooleanField(default=False, verbose_name="¿Para Llevar?")
+
+    # --- PERSONALIZACIÓN ---
+    mitad_producto = models.ForeignKey(Producto, on_delete=models.SET_NULL, null=True, blank=True, related_name='detalles_como_mitad')
+    ingredientes_removidos = models.ManyToManyField(Insumo, blank=True)
     
     @property
     def subtotal(self):
@@ -338,9 +347,17 @@ class DetalleOrdenExtra(models.Model):
     detalle_orden = models.ForeignKey(DetalleOrden, on_delete=models.CASCADE, related_name='extras_elegidos')
     insumo = models.ForeignKey(Insumo, on_delete=models.PROTECT, verbose_name="Ingrediente Extra")
     precio = models.DecimalField(max_digits=10, decimal_places=2, help_text="Precio cobrado por el extra")
+    porcion = models.DecimalField(max_digits=4, decimal_places=2, default=1.00)
 
     def __str__(self):
         return f"Extra {self.insumo.nombre} en {self.detalle_orden.producto.nombre}"
+        
+    @property
+    def porcion_display(self):
+        if self.porcion == Decimal('0.25'): return "1/4 "
+        elif self.porcion == Decimal('0.50'): return "1/2 "
+        elif self.porcion == Decimal('0.75'): return "3/4 "
+        return ""
     
 class Pago(models.Model):
     METODOS = [
@@ -365,9 +382,17 @@ class DetalleVentaExtra(models.Model):
     detalle_venta = models.ForeignKey(DetalleVenta, related_name='extras', on_delete=models.CASCADE)
     nombre_extra = models.CharField(max_length=100)
     precio = models.DecimalField(max_digits=10, decimal_places=2)
+    porcion = models.DecimalField(max_digits=4, decimal_places=2, default=1.00)
 
     def __str__(self):
         return f"Extra {self.nombre_extra} en venta {self.detalle_venta.id}"
+        
+    @property
+    def porcion_display(self):
+        if self.porcion == Decimal('0.25'): return "1/4 "
+        elif self.porcion == Decimal('0.50'): return "1/2 "
+        elif self.porcion == Decimal('0.75'): return "3/4 "
+        return ""
     
 
 class PrecioExtra(models.Model):

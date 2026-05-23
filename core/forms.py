@@ -11,29 +11,6 @@ class ConfigIdentidadForm(forms.ModelForm):
             'direccion': forms.Textarea(attrs={'rows': 3}),
         }
 
-# 2. FORMULARIO DE ECONOMÍA
-class ConfigEconomiaForm(forms.ModelForm):
-    class Meta:
-        model = Configuracion
-        fields = [
-            'tasa_dolar',           
-            'usar_scraping_bcv',
-            'enviar_alerta_stock_correo',
-            'correo_destino_alertas'
-        ]
-        labels = {
-            'tasa_dolar': 'Tasa del Dólar (Manual/Fallback)',
-            'usar_scraping_bcv': '¿Scrapear Tasa BCV automáticamente?',
-            'enviar_alerta_stock_correo': '¿Activar Alertas de Stock por correo?',
-            'correo_destino_alertas': 'Correo Destino de Alertas',
-        }
-        widgets = {
-            'tasa_dolar': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'usar_scraping_bcv': forms.CheckboxInput(attrs={'class': 'form-check-input', 'style': 'width: 20px; height: 20px;'}),
-            'enviar_alerta_stock_correo': forms.CheckboxInput(attrs={'class': 'form-check-input', 'style': 'width: 20px; height: 20px;'}),
-            'correo_destino_alertas': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'ejemplo@correo.com'}),
-        }
-
 # 3. FORMULARIO VISUAL Y TÉCNICO (AQUÍ AGREGUÉ LA CONFIGURACIÓN DE IMPRESIÓN)
 class ConfigVisualForm(forms.ModelForm):
     class Meta:
@@ -70,14 +47,32 @@ class ConfigProcesosForm(forms.ModelForm):
     class Meta:
         model = Configuracion
         fields = [
+            'tasa_dolar',
             'usar_scraping_bcv',
             'enviar_alerta_stock_correo',
             'correo_destino_alertas',
-            'codigo_producto_automatico'
+            'codigo_producto_automatico',
+            'caja_individual',
+            'caja_mediana',
+            'caja_familiar'
         ]
+        labels = {
+            'tasa_dolar': 'Tasa del Dólar (Manual/Fallback)',
+            'usar_scraping_bcv': '¿Actualizar Tasa BCV automáticamente?',
+            'enviar_alerta_stock_correo': '¿Enviar alerta de stock por correo?',
+            'correo_destino_alertas': 'Correo Destino de Alertas',
+            'codigo_producto_automatico': '¿Código de producto automático?',
+            'caja_individual': 'Caja / Empaque para Pizzas Individuales',
+            'caja_mediana': 'Caja / Empaque para Pizzas Medianas',
+            'caja_familiar': 'Caja / Empaque para Pizzas Familiares',
+        }
         widgets = {
+            'tasa_dolar': forms.NumberInput(attrs={'class': 'form-control-card', 'step': '0.01'}),
             'usar_scraping_bcv': forms.CheckboxInput(attrs={'class': 'form-check-input', 'style': 'width: 20px; height: 20px;'}),
             'enviar_alerta_stock_correo': forms.CheckboxInput(attrs={'class': 'form-check-input', 'style': 'width: 20px; height: 20px;'}),
             'correo_destino_alertas': forms.EmailInput(attrs={'class': 'form-control-card', 'placeholder': 'ejemplo@correo.com'}),
             'codigo_producto_automatico': forms.CheckboxInput(attrs={'class': 'form-check-input', 'style': 'width: 20px; height: 20px;'}),
+            'caja_individual': forms.Select(attrs={'class': 'form-control-card'}),
+            'caja_mediana': forms.Select(attrs={'class': 'form-control-card'}),
+            'caja_familiar': forms.Select(attrs={'class': 'form-control-card'}),
         }

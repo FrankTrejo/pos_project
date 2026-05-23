@@ -63,14 +63,21 @@ def mandar_a_tickera(venta):
         t += "--------------------------------\n"
 
         for item in venta.detalles.all():
-            nombre = item.nombre_producto[:15]
             subt_item = to_decimal(item.subtotal)
-            linea = f"{item.cantidad}x {nombre:<15} {subt_item:>8.2f}\n"
-            t += linea
+            
+            if getattr(item, 'mitad_producto', None):
+                t += f"{item.cantidad}x MITAD/MITAD    {subt_item:>8.2f}\n"
+                t += f"  1/2 {item.nombre_producto[:20]}\n"
+                mitad_nombre = item.mitad_producto.nombre if hasattr(item.mitad_producto, 'nombre') else str(item.mitad_producto)
+                t += f"  1/2 {mitad_nombre[:20]}\n"
+            else:
+                nombre = item.nombre_producto[:15]
+                t += f"{item.cantidad}x {nombre:<15} {subt_item:>8.2f}\n"
             
             if hasattr(item, 'extras'):
                 for ex in item.extras.all():
-                    t += f"  + {ex.nombre_extra[:20].lower()}\n"
+                    porcion_txt = ex.porcion_display
+                    t += f"  + {porcion_txt}{ex.nombre_extra[:20].lower()}\n"
 
         t += "--------------------------------\n"
         t += f"TOTAL USD:           ${total_usd:>8.2f}\n"
@@ -117,10 +124,17 @@ def imprimir_precuenta(orden, tasa_valor_ignorado):
             subtotal_linea = (p_base + c_extras) * item.cantidad
             total_usd += subtotal_linea
             
-            nom = item.producto.nombre[:15]
-            t += f"{item.cantidad}x {nom:<15} {subtotal_linea:>8.2f}\n"
+            if getattr(item, 'mitad_producto', None):
+                t += f"{item.cantidad}x MITAD/MITAD    {subtotal_linea:>8.2f}\n"
+                t += f"  1/2 {item.producto.nombre[:20]}\n"
+                t += f"  1/2 {item.mitad_producto.nombre[:20]}\n"
+            else:
+                nom = item.producto.nombre[:15]
+                t += f"{item.cantidad}x {nom:<15} {subtotal_linea:>8.2f}\n"
+                
             for ex in item.extras_elegidos.all():
-                t += f"  + {ex.insumo.nombre[:20].lower()}\n"
+                porcion_txt = ex.porcion_display
+                t += f"  + {porcion_txt}{ex.insumo.nombre[:20].lower()}\n"
 
         total_bs = (total_usd * tasa).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
@@ -154,11 +168,19 @@ def imprimir_comanda(orden):
         t += f"Ticket: #{orden.id} | Mesero: {orden.mesero.username.upper() if orden.mesero else 'CAJA'}\n"
         t += f"Hora: {timezone.now().strftime('%H:%M')}\n--------------------------------\n\n"
         for item in orden.detalles.all():
-            t += f"{item.cantidad}x {item.producto.nombre.upper()}\n"
-            for extra in item.extras_elegidos.all(): t += f"   + {extra.insumo.nombre.upper()}\n"
+            if getattr(item, 'mitad_producto', None):
+                tamano_txt = f" ({item.producto.get_tamano_display().upper()})" if item.producto.tamano != 'UNI' else ""
+                t += f"{item.cantidad}x MITAD{tamano_txt}\n"
+                t += f"   >> 1/2 {item.producto.nombre.upper()}\n"
+                t += f"   >> 1/2 {item.mitad_producto.nombre.upper()}\n"
+            else:
+                t += f"{item.cantidad}x {item.producto.nombre.upper()}\n"
+            
+            for extra in item.extras_elegidos.all(): t += f"   + {extra.porcion_display}{extra.insumo.nombre.upper()}\n"
+            if getattr(item, 'ingredientes_removidos', None) and item.ingredientes_removidos.exists():
+                for rem in item.ingredientes_removidos.all(): t += f"   - SIN {rem.nombre.upper()}\n"
             if getattr(item, 'es_para_llevar', False): t += "   [EMPACAR PARA LLEVAR]\n"
             if getattr(item, 'nota', None): t += f"   ** {item.nota} **\n"
-            t += "\n"
         t += "--------------------------------\n\n\n\n\n\n\x1D\x56\x41\x10"
         return enviar_a_spooler(config.impresora_ticket, t, "Comanda")
     except Exception as e:

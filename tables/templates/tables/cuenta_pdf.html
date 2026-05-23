@@ -81,7 +81,7 @@
         <thead>
             <tr>
                 <th class="c-cant">CNT</th>
-                <th class="c-desc">DESC</th>
+                <th class="c-desc">DESCRIPCION</th>
                 <th class="c-tot">TOTAL</th>
             </tr>
         </thead>
@@ -90,11 +90,22 @@
             <tr>
                 <td class="c-cant">{{ item.cantidad }}</td>
                 <td class="c-desc">
-                    {{ item.producto }} <small>({{ item.tamano }})</small>
+                    {% if item.mitad_producto %}
+                        MITAD/MITAD <small>({{ item.tamano }})</small>
+                        <div class="extra">1/2 {{ item.producto }}</div>
+                        <div class="extra">1/2 {{ item.mitad_producto.nombre }}</div>
+                    {% else %}
+                        {{ item.producto }} <small>({{ item.tamano }})</small>
+                    {% endif %}
                     
                     {% if item.extras_elegidos %}
                         {% for extra in item.extras_elegidos %}
-                            <div class="extra">+ {{ extra.insumo.nombre }} (${{ extra.precio }})</div>
+                            <div class="extra">+ {{ extra.porcion_display }}{{ extra.insumo.nombre }} (${{ extra.precio }})</div>
+                        {% endfor %}
+                    {% endif %}
+                    {% if item.ingredientes_removidos.exists %}
+                        {% for rem in item.ingredientes_removidos.all %}
+                            <div class="extra">- SIN {{ rem.nombre }}</div>
                         {% endfor %}
                     {% endif %}
                 </td>
@@ -112,12 +123,12 @@
     <div class="totales-box">
         <div class="row">
             <b>SUBTOTAL:</b>
-            <b>${{ total_usd }}</b>
+            <b>${{ total_usd|floatformat:2 }}</b>
         </div>
         
         <div style="text-align: right;">
             <div style="font-size: 10px;">TOTAL A PAGAR:</div>
-            <div class="big">${{ total_usd }}</div>
+            <div class="big">${{ total_usd|floatformat:2 }}</div>
             <div class="big">Bs. {{ total_bs|floatformat:2 }}</div>
         </div>
     </div>

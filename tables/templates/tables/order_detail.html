@@ -169,6 +169,37 @@
         </div>
     </div>
 
+    <!-- MODAL PERSONALIZAR PIZZA -->
+    <div id="modalPersonalizar" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; justify-content:center; align-items:center;">
+        <div style="background:white; width: 90%; max-width: 500px; border-radius:10px; overflow:hidden; display:flex; flex-direction:column; max-height: 90vh;">
+            <div style="background: var(--primary-blue, #0d6efd); color:white; padding:15px; display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0; font-size:1.2em;"><i class="fas fa-magic"></i> Personalizar Pizza</h3>
+                <button onclick="cerrarModalPersonalizar()" style="background:none; border:none; color:white; font-size:1.5em; cursor:pointer;">&times;</button>
+            </div>
+            <div style="padding:20px; overflow-y:auto; flex:1;">
+                <p id="tituloPersonalizar" style="color:#666; margin-bottom:15px; font-weight:bold;">Personalizando:</p>
+                
+                <div style="display:flex; gap:10px; margin-bottom: 20px;">
+                    <button onclick="mostrarOpcionesMitad()" class="action-btn" style="flex:1; border:1px solid #ccc; padding:10px;"><i class="fas fa-adjust"></i> Mitad y Mitad</button>
+                    <button onclick="mostrarOpcionesSin()" class="action-btn" style="flex:1; border:1px solid #ccc; padding:10px;"><i class="fas fa-minus-circle"></i> Quitar Ingrediente</button>
+                </div>
+
+                <div id="opcionesMitad" style="display:none;">
+                    <label style="font-weight:bold;">Selecciona la otra mitad (mismo tamaño):</label>
+                    <select id="selectMitad" class="form-control" style="width:100%; padding:10px; margin-top:10px; border-radius:5px; border:1px solid #ccc;"></select>
+                </div>
+
+                <div id="opcionesSin" style="display:none;">
+                    <label style="font-weight:bold;">Selecciona qué ingredientes QUITAR de esta porción:</label>
+                    <div id="listaIngredientesQuitar" style="margin-top:10px; display:grid; gap:10px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));"></div>
+                </div>
+            </div>
+            <div style="padding:15px; background:#f8f9fa; border-top:1px solid #ddd; text-align:right;">
+                <button onclick="guardarPersonalizacion()" class="add-btn" style="width:100%; font-size:1.1em; padding:12px;"><i class="fas fa-check"></i> Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
     <div id="payment-modal-overlay" class="modal-overlay">
         <div class="modal-card">
             <div class="modal-header">
@@ -359,6 +390,8 @@
         const TASA_CAMBIO = parseFloat("{{ tasa_valor|stringformat:'f' }}");
         let carrito = {{ carrito_json|safe|default:"[]" }};
         const LISTA_EXTRAS_DISPONIBLES = JSON.parse('{{ extras_json|escapejs }}' || '[]');
+        const INGREDIENTES_PRODUCTO = JSON.parse('{{ ingredientes_dict_json|escapejs }}' || '{}');
+        const PRODUCTOS_DISPONIBLES = JSON.parse('{{ productos_json|escapejs }}' || '[]');
         
         const MESEROS_DATA = {
             {% for m in meseros %}
@@ -368,6 +401,8 @@
 
         let indexProductoEditando = null;
         let seleccionTemporal = [];
+        let indexPersonalizar = null;
+        let ingredientesQuitadosTemporales = [];
 
         // VARIABLES GLOBALES PARA PAGO
         let totalMesaFacturacion = 0;
@@ -434,11 +469,19 @@
         function abrirModalExtras(index) {
             indexProductoEditando = index;
             const item = carrito[index];
-            seleccionTemporal = item.extras ? [...item.extras] : [];
+            
+            seleccionTemporal = item.extras ? JSON.parse(JSON.stringify(item.extras)) : [];
+            seleccionTemporal = seleccionTemporal.map(e => typeof e === 'object' ? e : {id: e, porcion: 1.0});
             
             document.getElementById('tituloProductoExtra').innerText = "Extras para: " + item.nombre;
+            renderizarOpcionesExtras();
+            document.getElementById('modalExtras').style.display = 'flex';
+        }
+
+        function renderizarOpcionesExtras() {
             const contenedor = document.getElementById('contenedorBotonesExtras');
             contenedor.innerHTML = ''; 
+            const item = carrito[indexProductoEditando];
 
             if (LISTA_EXTRAS_DISPONIBLES.length === 0) {
                 contenedor.innerHTML = '<p style="text-align:center; color:#888;">No hay extras configurados en Inventario.</p>';
@@ -447,29 +490,54 @@
             LISTA_EXTRAS_DISPONIBLES.forEach(extra => {
                 const btn = document.createElement('div');
                 btn.className = 'btn-extra-item';
-                if (seleccionTemporal.includes(extra.id)) { btn.classList.add('selected'); }
-                btn.onclick = function() { toggleExtraSelection(extra.id, btn); };
                 
-                // CORRECCIÓN: Calcular precio a mostrar según el tamaño del producto actual
+                const extraSeleccionado = seleccionTemporal.find(e => e.id == extra.id);
+                if (extraSeleccionado) { btn.classList.add('selected'); }
+                
                 let precioMostrar = parseFloat(extra.precio_venta_extra);
                 if (extra.precios_por_tamano && extra.precios_por_tamano[item.tamano_codigo] !== undefined) {
                     precioMostrar = parseFloat(extra.precios_por_tamano[item.tamano_codigo]);
                 }
 
-                btn.innerHTML = `${extra.nombre} <span class="badge-precio">+$${precioMostrar.toFixed(2)}</span>`;
+                let htmlContent = `<div onclick="toggleExtraSelection(${extra.id})" style="cursor: pointer; padding-bottom: 5px;">${extra.nombre}</div>`;
+                
+                if (extraSeleccionado) {
+                    const porcionActual = extraSeleccionado.porcion;
+                    const precioCalculado = precioMostrar * porcionActual;
+                    htmlContent += `<span class="badge-precio" style="margin-bottom: 8px;">+$${precioCalculado.toFixed(2)}</span>`;
+                    
+                    htmlContent += `
+                        <div style="display: flex; justify-content: space-between; gap: 4px;" onclick="event.stopPropagation();">
+                            <button onclick="cambiarPorcionExtra(${extra.id}, 0.25)" style="flex:1; padding: 4px 2px; font-size: 0.75em; font-weight: bold; border-radius: 4px; border: 1px solid #198754; background: ${porcionActual === 0.25 ? '#198754' : '#fff'}; color: ${porcionActual === 0.25 ? '#fff' : '#198754'}; cursor: pointer;">1/4</button>
+                            <button onclick="cambiarPorcionExtra(${extra.id}, 0.50)" style="flex:1; padding: 4px 2px; font-size: 0.75em; font-weight: bold; border-radius: 4px; border: 1px solid #198754; background: ${porcionActual === 0.50 ? '#198754' : '#fff'}; color: ${porcionActual === 0.50 ? '#fff' : '#198754'}; cursor: pointer;">1/2</button>
+                            <button onclick="cambiarPorcionExtra(${extra.id}, 0.75)" style="flex:1; padding: 4px 2px; font-size: 0.75em; font-weight: bold; border-radius: 4px; border: 1px solid #198754; background: ${porcionActual === 0.75 ? '#198754' : '#fff'}; color: ${porcionActual === 0.75 ? '#fff' : '#198754'}; cursor: pointer;">3/4</button>
+                            <button onclick="cambiarPorcionExtra(${extra.id}, 1.0)" style="flex:1; padding: 4px 2px; font-size: 0.75em; font-weight: bold; border-radius: 4px; border: 1px solid #198754; background: ${porcionActual === 1.0 ? '#198754' : '#fff'}; color: ${porcionActual === 1.0 ? '#fff' : '#198754'}; cursor: pointer;">1</button>
+                        </div>
+                    `;
+                } else {
+                    htmlContent += `<span class="badge-precio">+$${precioMostrar.toFixed(2)}</span>`;
+                }
+                
+                btn.innerHTML = htmlContent;
                 contenedor.appendChild(btn);
             });
-            document.getElementById('modalExtras').style.display = 'flex';
         }
 
-        function toggleExtraSelection(id, btnElement) {
-            const idx = seleccionTemporal.indexOf(id);
+        function toggleExtraSelection(id) {
+            const idx = seleccionTemporal.findIndex(e => e.id == id);
             if (idx > -1) {
                 seleccionTemporal.splice(idx, 1);
-                btnElement.classList.remove('selected');
             } else {
-                seleccionTemporal.push(id);
-                btnElement.classList.add('selected');
+                seleccionTemporal.push({id: id, porcion: 1.0});
+            }
+            renderizarOpcionesExtras();
+        }
+
+        function cambiarPorcionExtra(id, porcion) {
+            const extra = seleccionTemporal.find(e => e.id == id);
+            if (extra) {
+                extra.porcion = porcion;
+                renderizarOpcionesExtras();
             }
         }
         function cerrarModalExtras() {
@@ -484,16 +552,118 @@
             }
         }
 
+        // ==========================================
+        //  FUNCIONES PERSONALIZAR (MODAL)
+        // ==========================================
+        function abrirModalPersonalizar(index) {
+            indexPersonalizar = index;
+            const item = carrito[index];
+            document.getElementById('tituloPersonalizar').innerText = "Personalizando: " + item.nombre;
+            
+            document.getElementById('opcionesMitad').style.display = 'none';
+            document.getElementById('opcionesSin').style.display = 'none';
+            ingredientesQuitadosTemporales = item.removidos ? [...item.removidos] : [];
+            
+            const selectMitad = document.getElementById('selectMitad');
+            selectMitad.innerHTML = '<option value="">-- Ninguna (Completa) --</option>';
+            PRODUCTOS_DISPONIBLES.forEach(p => {
+                if (p.tamano === item.tamano_codigo && p.id != item.id) {
+                    let opt = document.createElement('option');
+                    opt.value = p.id;
+                    opt.text = p.nombre;
+                    if (item.mitad_id == p.id) opt.selected = true;
+                    selectMitad.appendChild(opt);
+                }
+            });
+
+            if (item.mitad_id) document.getElementById('opcionesMitad').style.display = 'block';
+            if (ingredientesQuitadosTemporales.length > 0) mostrarOpcionesSin();
+
+            document.getElementById('modalPersonalizar').style.display = 'flex';
+        }
+
+        function cerrarModalPersonalizar() {
+            document.getElementById('modalPersonalizar').style.display = 'none';
+            indexPersonalizar = null;
+        }
+
+        function mostrarOpcionesMitad() {
+            document.getElementById('opcionesMitad').style.display = 'block';
+            document.getElementById('opcionesSin').style.display = 'none';
+        }
+
+        function mostrarOpcionesSin() {
+            document.getElementById('opcionesMitad').style.display = 'none';
+            document.getElementById('opcionesSin').style.display = 'block';
+            
+            const item = carrito[indexPersonalizar];
+            const ingredientes = INGREDIENTES_PRODUCTO[item.id] || [];
+            const lista = document.getElementById('listaIngredientesQuitar');
+            lista.innerHTML = '';
+            
+            if (ingredientes.length === 0) {
+                lista.innerHTML = '<span style="color:#999;">Este producto no tiene ingredientes configurados.</span>';
+                return;
+            }
+
+            ingredientes.forEach(ing => {
+                const isRemoved = ingredientesQuitadosTemporales.includes(ing.id);
+                const div = document.createElement('div');
+                div.className = 'btn-extra-item ' + (isRemoved ? 'selected' : '');
+                div.innerHTML = `SIN ${ing.nombre}`;
+                div.onclick = function() {
+                    const idx = ingredientesQuitadosTemporales.indexOf(ing.id);
+                    if (idx > -1) {
+                        ingredientesQuitadosTemporales.splice(idx, 1);
+                        div.classList.remove('selected');
+                    } else {
+                        ingredientesQuitadosTemporales.push(ing.id);
+                        div.classList.add('selected');
+                    }
+                };
+                lista.appendChild(div);
+            });
+        }
+
+        function guardarPersonalizacion() {
+            if (indexPersonalizar !== null) {
+                const item = carrito[indexPersonalizar];
+                const selectMitad = document.getElementById('selectMitad');
+                
+                if (document.getElementById('opcionesMitad').style.display === 'block') {
+                    if (selectMitad.value !== "") {
+                        const mitadObj = PRODUCTOS_DISPONIBLES.find(p => p.id == selectMitad.value);
+                        item.mitad_id = mitadObj.id;
+                        item.mitad_nombre = mitadObj.nombre;
+                        // Si la otra mitad es más cara, actualizamos el precio al mayor
+                        item.precio = Math.max(item.precio, mitadObj.precio);
+                    } else {
+                        item.mitad_id = null;
+                        item.mitad_nombre = null;
+                    }
+                } else if (document.getElementById('opcionesSin').style.display === 'block') {
+                    item.removidos = [...ingredientesQuitadosTemporales];
+                    item.removidos_nombres = item.removidos.map(id => INGREDIENTES_PRODUCTO[item.id].find(ing => ing.id === id).nombre);
+                }
+                
+                cerrarModalPersonalizar();
+                renderizarCarrito();
+            }
+        }
+
         // --- FUNCIONES DEL CARRITO ---
         function agregarAlCarrito(id, nombre, precio, tamano) {
             let precioFloat = parseFloat(precio);
             let nombreDisplay = nombre;
             if(tamano !== 'UNI') nombreDisplay += ` (${tamano})`;
-            let existente = carrito.find(item => item.id == id && item.nombre == nombreDisplay);
-            if (existente) { existente.cantidad++; } else {
+            let existente = carrito.find(item => item.id == id && item.nombre == nombreDisplay && !item.mitad_id && (!item.removidos || item.removidos.length === 0));
+            if (existente) { 
+                existente.cantidad++; 
+            } else {
                 carrito.push({
                     id: id, nombre: nombreDisplay, precio: precioFloat, cantidad: 1,
-                    tamano_codigo: tamano, para_llevar: false, extras: [] 
+                    tamano_codigo: tamano, para_llevar: false, extras: [],
+                    mitad_id: null, mitad_nombre: null, removidos: [], removidos_nombres: []
                 });
             }
             renderizarCarrito();
@@ -511,26 +681,44 @@
                 let htmlExtras = '';
                 
                 if (item.extras && item.extras.length > 0) {
-                    item.extras.forEach(extraId => {
+                    item.extras.forEach(extraObj => {
+                        const extraId = typeof extraObj === 'object' ? extraObj.id : extraObj;
+                        const porcion = typeof extraObj === 'object' ? extraObj.porcion : 1.0;
+                        
                         const info = LISTA_EXTRAS_DISPONIBLES.find(e => e.id == extraId);
                         if (info) {
-                            // 1. Precio Base por defecto
                             let precioCrudo = String(info.precio_venta_extra).replace(',', '.');
                             let precioEx = parseFloat(precioCrudo) || 0; 
                             
-                            // 2. CORRECCIÓN: Verificar si hay precio específico para este tamaño
                             if (info.precios_por_tamano && info.precios_por_tamano[item.tamano_codigo] !== undefined) {
                                 precioEx = parseFloat(info.precios_por_tamano[item.tamano_codigo]);
                             }
 
-                            costoExtras += precioEx;
-                            htmlExtras += `<div style="font-size:0.75em; color:#198754; margin-left:5px;">+ ${info.nombre} ($${precioEx.toFixed(2)})</div>`;
+                            const precioFinal = precioEx * porcion;
+                            costoExtras += precioFinal;
+                            
+                            let porcionStr = "";
+                            if (porcion === 0.25) porcionStr = "1/4 ";
+                            else if (porcion === 0.5) porcionStr = "1/2 ";
+                            else if (porcion === 0.75) porcionStr = "3/4 ";
+
+                            htmlExtras += `<div style="font-size:0.75em; color:#198754; margin-left:5px;">+ ${porcionStr}${info.nombre} ($${precioFinal.toFixed(2)})</div>`;
                         } else {
                             console.warn("No se encontró información para el extra con ID:", extraId);
                         }
                     });
                 }
                 
+                // Customizaciones visuales
+                if (item.mitad_id) {
+                    htmlExtras += `<div style="font-size:0.75em; color:#0d6efd; margin-left:5px; font-weight:bold;">1/2 ${item.mitad_nombre}</div>`;
+                }
+                if (item.removidos_nombres && item.removidos_nombres.length > 0) {
+                    item.removidos_nombres.forEach(n => {
+                        htmlExtras += `<div style="font-size:0.75em; color:#dc3545; margin-left:5px; font-weight:bold;">- SIN ${n}</div>`;
+                    });
+                }
+
                 const precioTotalUnitario = item.precio + costoExtras;
                 const subtotalItem = precioTotalUnitario * item.cantidad;
                 sumaUsd += subtotalItem;
@@ -544,7 +732,10 @@
                     <div style="display:flex; flex-direction:column; padding-right:5px;">
                         <span style="font-weight:500;">${item.nombre}</span>
                         ${htmlExtras} ${etiquetaLlevar}
-                        <button onclick="abrirModalExtras(${index})" style="margin-top:4px; align-self:start; background:#f0f2f5; border:1px solid #ccc; border-radius:10px; font-size:0.75em; cursor:pointer; padding:2px 8px; color:#555;"><i class="fas fa-plus-circle" style="color:#d63384;"></i> Extras</button>
+                        <div style="display:flex; gap:5px; margin-top:4px;">
+                            <button onclick="abrirModalExtras(${index})" style="background:#f0f2f5; border:1px solid #ccc; border-radius:10px; font-size:0.75em; cursor:pointer; padding:2px 8px; color:#555;"><i class="fas fa-plus-circle" style="color:#d63384;"></i> Extras</button>
+                            <button onclick="abrirModalPersonalizar(${index})" style="background:#f0f2f5; border:1px solid #ccc; border-radius:10px; font-size:0.75em; cursor:pointer; padding:2px 8px; color:#555;"><i class="fas fa-magic" style="color:#0d6efd;"></i> Personalizar</button>
+                        </div>
                     </div>
                     <span style="text-align: center;">x${item.cantidad}</span>
                     <span style="text-align: right; font-weight:bold;">$${subtotalItem.toFixed(2)}</span>
@@ -834,7 +1025,7 @@
                 const urlPDF = `/factura/${data.venta_id}/pdf/`;
                 cerrarModalPago()
                 // Si quieres que SIGA abriendo el PDF en otra pestaña, descomenta esta línea:
-                //window.open(urlPDF, '_blank'); 
+                window.open(urlPDF, '_blank'); 
 
                 let msgExito = '¡Pago Exitoso!';
                 // Alertamos al usuario si la tickera física no respondió
