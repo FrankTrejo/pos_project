@@ -304,10 +304,10 @@ def actualizar_stock_conversion(sender, instance, created, **kwargs):
             # SI QUIERES RESTAR, USA "SALIDA".
             insumo.stock_actual += instance.cantidad * factor
 
-        # Evitamos stock negativo
+        # Validación: Evitamos que el stock quede en negativo si se fuerza la salida
         if insumo.stock_actual < 0:
-            insumo.stock_actual = 0
-            
+            insumo.stock_actual = Decimal('0')
+
         insumo.save()
 
 class ConsumoInterno(models.Model):

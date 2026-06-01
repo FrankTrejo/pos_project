@@ -1,17 +1,28 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
+from django.core.paginator import Paginator
 from inventory.models import Insumo
 from .forms import MaestroInsumoForm
 
 # VISTA PRINCIPAL: TABLA TIPO EXCEL
 def maestro_list(request):
-    insumos = Insumo.objects.all().order_by('nombre')
+    query = request.GET.get('q', '')
+    
+    insumos_list = Insumo.objects.all().order_by('nombre')
+    
+    if query:
+        insumos_list = insumos_list.filter(nombre__icontains=query)
+        
+    paginator = Paginator(insumos_list, 10)
+    page_number = request.GET.get('page')
+    insumos = paginator.get_page(page_number)
     
     # Simulamos una tasa de cambio (podrías guardarla en BD luego)
     tasa_dolar = 300.00 
     
     return render(request, 'maestros/maestro_list.html', {
         'insumos': insumos,
+        'q': query,
         'tasa': tasa_dolar
     })
 

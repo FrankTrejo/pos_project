@@ -182,6 +182,7 @@
                 <div style="display:flex; gap:10px; margin-bottom: 20px;">
                     <button onclick="mostrarOpcionesMitad()" class="action-btn" style="flex:1; border:1px solid #ccc; padding:10px;"><i class="fas fa-adjust"></i> Mitad y Mitad</button>
                     <button onclick="mostrarOpcionesSin()" class="action-btn" style="flex:1; border:1px solid #ccc; padding:10px;"><i class="fas fa-minus-circle"></i> Quitar Ingrediente</button>
+                    <button onclick="mostrarOpcionesSustituir()" class="action-btn" style="flex:1; border:1px solid #ccc; padding:10px;"><i class="fas fa-exchange-alt"></i> Sustituir</button>
                 </div>
 
                 <div id="opcionesMitad" style="display:none;">
@@ -192,6 +193,17 @@
                 <div id="opcionesSin" style="display:none;">
                     <label style="font-weight:bold;">Selecciona qué ingredientes QUITAR de esta porción:</label>
                     <div id="listaIngredientesQuitar" style="margin-top:10px; display:grid; gap:10px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));"></div>
+                </div>
+
+                <div id="opcionesSustituir" style="display:none;">
+                    <label style="font-weight:bold; color:#dc3545;">1. Quitar este ingrediente (Faltante):</label>
+                    <select id="selectQuitarSustituto" class="form-control" style="width:100%; padding:10px; margin-bottom:15px; border-radius:5px; border:1px solid #ccc;"></select>
+                    
+                    <label style="font-weight:bold; color:#198754;">2. Agregar este en su lugar (GRATIS):</label>
+                    <select id="selectAgregarSustituto" class="form-control" style="width:100%; padding:10px; margin-bottom:10px; border-radius:5px; border:1px solid #ccc;"></select>
+
+                    <label style="font-weight:bold; color:#0d6efd;">3. Peso a descontar (Ej: en gramos):</label>
+                    <input type="number" id="pesoAgregarSustituto" class="form-control" style="width:100%; padding:10px; margin-bottom:10px; border-radius:5px; border:1px solid #ccc;" placeholder="Ej: 150">
                 </div>
             </div>
             <div style="padding:15px; background:#f8f9fa; border-top:1px solid #ddd; text-align:right;">
@@ -403,6 +415,7 @@
         let seleccionTemporal = [];
         let indexPersonalizar = null;
         let ingredientesQuitadosTemporales = [];
+        let carritoModificado = false;
 
         // VARIABLES GLOBALES PARA PAGO
         let totalMesaFacturacion = 0;
@@ -470,7 +483,8 @@
             indexProductoEditando = index;
             const item = carrito[index];
             
-            seleccionTemporal = item.extras ? JSON.parse(JSON.stringify(item.extras)) : [];
+            // Filtramos para que no aparezcan los sustitutos en la ventana de extras
+            seleccionTemporal = item.extras ? JSON.parse(JSON.stringify(item.extras.filter(e => !(typeof e === 'object' && e.es_sustituto)))) : [];
             seleccionTemporal = seleccionTemporal.map(e => typeof e === 'object' ? e : {id: e, porcion: 1.0});
             
             document.getElementById('tituloProductoExtra').innerText = "Extras para: " + item.nombre;
@@ -546,7 +560,9 @@
         }
         function guardarSeleccionExtras() {
             if (indexProductoEditando !== null) {
-                carrito[indexProductoEditando].extras = [...seleccionTemporal];
+                const sustitutos = carrito[indexProductoEditando].extras ? carrito[indexProductoEditando].extras.filter(e => typeof e === 'object' && e.es_sustituto) : [];
+                carrito[indexProductoEditando].extras = [...seleccionTemporal, ...sustitutos];
+                carritoModificado = true;
                 cerrarModalExtras();
                 renderizarCarrito(); 
             }
@@ -562,6 +578,7 @@
             
             document.getElementById('opcionesMitad').style.display = 'none';
             document.getElementById('opcionesSin').style.display = 'none';
+            document.getElementById('opcionesSustituir').style.display = 'none';
             ingredientesQuitadosTemporales = item.removidos ? [...item.removidos] : [];
             
             const selectMitad = document.getElementById('selectMitad');
@@ -590,10 +607,12 @@
         function mostrarOpcionesMitad() {
             document.getElementById('opcionesMitad').style.display = 'block';
             document.getElementById('opcionesSin').style.display = 'none';
+            document.getElementById('opcionesSustituir').style.display = 'none';
         }
 
         function mostrarOpcionesSin() {
             document.getElementById('opcionesMitad').style.display = 'none';
+            document.getElementById('opcionesSustituir').style.display = 'none';
             document.getElementById('opcionesSin').style.display = 'block';
             
             const item = carrito[indexPersonalizar];
@@ -625,6 +644,23 @@
             });
         }
 
+        function mostrarOpcionesSustituir() {
+            document.getElementById('opcionesMitad').style.display = 'none';
+            document.getElementById('opcionesSin').style.display = 'none';
+            document.getElementById('opcionesSustituir').style.display = 'block';
+            
+            const item = carrito[indexPersonalizar];
+            const ingredientes = INGREDIENTES_PRODUCTO[item.id] || [];
+            
+            const selQuitar = document.getElementById('selectQuitarSustituto');
+            selQuitar.innerHTML = '<option value="">-- Selecciona el que falta --</option>';
+            ingredientes.forEach(ing => { selQuitar.innerHTML += `<option value="${ing.id}">${ing.nombre}</option>`; });
+
+            const selAgregar = document.getElementById('selectAgregarSustituto');
+            selAgregar.innerHTML = '<option value="">-- Selecciona el reemplazo --</option>';
+            LISTA_EXTRAS_DISPONIBLES.forEach(extra => { selAgregar.innerHTML += `<option value="${extra.id}">${extra.nombre}</option>`; });
+        }
+
         function guardarPersonalizacion() {
             if (indexPersonalizar !== null) {
                 const item = carrito[indexPersonalizar];
@@ -644,8 +680,37 @@
                 } else if (document.getElementById('opcionesSin').style.display === 'block') {
                     item.removidos = [...ingredientesQuitadosTemporales];
                     item.removidos_nombres = item.removidos.map(id => INGREDIENTES_PRODUCTO[item.id].find(ing => ing.id === id).nombre);
+                } else if (document.getElementById('opcionesSustituir').style.display === 'block') {
+                    const selQuitar = document.getElementById('selectQuitarSustituto').value;
+                    const selAgregar = document.getElementById('selectAgregarSustituto').value;
+                    const pesoSustituto = parseFloat(document.getElementById('pesoAgregarSustituto').value) || 1.0;
+                    if (selQuitar && selAgregar) {
+                        // Añadir a removidos
+                        if (!ingredientesQuitadosTemporales.includes(parseInt(selQuitar))) {
+                            ingredientesQuitadosTemporales.push(parseInt(selQuitar));
+                        }
+                        item.removidos = [...ingredientesQuitadosTemporales];
+                        item.removidos_nombres = item.removidos.map(id => INGREDIENTES_PRODUCTO[item.id].find(ing => ing.id === id).nombre);
+                        
+                        // Añadir como sustituto (gratis)
+                        item.extras = item.extras || [];
+                        const extraObj = { id: parseInt(selAgregar), porcion: pesoSustituto, es_sustituto: true };
+                        item.extras = item.extras.filter(e => {
+                            let eid = typeof e === 'object' ? e.id : e;
+                            return eid !== parseInt(selAgregar);
+                        });
+                        item.extras.push(extraObj);
+                    } else if (selQuitar && !selAgregar) {
+                        // Si solo selecciona quitar pero no agregar un sustituto, lo eliminamos sin cobrar ni sustituir
+                        if (!ingredientesQuitadosTemporales.includes(parseInt(selQuitar))) {
+                            ingredientesQuitadosTemporales.push(parseInt(selQuitar));
+                        }
+                        item.removidos = [...ingredientesQuitadosTemporales];
+                        item.removidos_nombres = item.removidos.map(id => INGREDIENTES_PRODUCTO[item.id].find(ing => ing.id === id).nombre);
+                    }
                 }
                 
+                carritoModificado = true;
                 cerrarModalPersonalizar();
                 renderizarCarrito();
             }
@@ -666,6 +731,7 @@
                     mitad_id: null, mitad_nombre: null, removidos: [], removidos_nombres: []
                 });
             }
+            carritoModificado = true;
             renderizarCarrito();
         }
 
@@ -684,25 +750,32 @@
                     item.extras.forEach(extraObj => {
                         const extraId = typeof extraObj === 'object' ? extraObj.id : extraObj;
                         const porcion = typeof extraObj === 'object' ? extraObj.porcion : 1.0;
+                        const esSustituto = typeof extraObj === 'object' ? extraObj.es_sustituto : false;
                         
                         const info = LISTA_EXTRAS_DISPONIBLES.find(e => e.id == extraId);
                         if (info) {
-                            let precioCrudo = String(info.precio_venta_extra).replace(',', '.');
-                            let precioEx = parseFloat(precioCrudo) || 0; 
-                            
-                            if (info.precios_por_tamano && info.precios_por_tamano[item.tamano_codigo] !== undefined) {
-                                precioEx = parseFloat(info.precios_por_tamano[item.tamano_codigo]);
+                            let precioFinal = 0;
+                            if (!esSustituto) {
+                                let precioCrudo = String(info.precio_venta_extra).replace(',', '.');
+                                let precioEx = parseFloat(precioCrudo) || 0; 
+                                if (info.precios_por_tamano && info.precios_por_tamano[item.tamano_codigo] !== undefined) {
+                                    precioEx = parseFloat(info.precios_por_tamano[item.tamano_codigo]);
+                                }
+                                precioFinal = precioEx * porcion;
+                                costoExtras += precioFinal;
                             }
-
-                            const precioFinal = precioEx * porcion;
-                            costoExtras += precioFinal;
                             
                             let porcionStr = "";
                             if (porcion === 0.25) porcionStr = "1/4 ";
                             else if (porcion === 0.5) porcionStr = "1/2 ";
                             else if (porcion === 0.75) porcionStr = "3/4 ";
+                            else if (esSustituto) porcionStr = porcion + " ";
 
-                            htmlExtras += `<div style="font-size:0.75em; color:#198754; margin-left:5px;">+ ${porcionStr}${info.nombre} ($${precioFinal.toFixed(2)})</div>`;
+                            if (esSustituto) {
+                                htmlExtras += `<div style="font-size:0.75em; color:#e67e22; margin-left:5px; font-weight:bold;">+ SUSTITUTO: ${porcionStr}${info.unidad__codigo || ''} ${info.nombre} (Gratis)</div>`;
+                            } else {
+                                htmlExtras += `<div style="font-size:0.75em; color:#198754; margin-left:5px;">+ ${porcionStr}${info.nombre} ($${precioFinal.toFixed(2)})</div>`;
+                            }
                         } else {
                             console.warn("No se encontró información para el extra con ID:", extraId);
                         }
@@ -756,8 +829,16 @@
             }
         }
 
-        function toggleParaLlevar(index) { carrito[index].para_llevar = !carrito[index].para_llevar; renderizarCarrito(); }
-        function eliminarDelCarrito(index) { carrito.splice(index, 1); renderizarCarrito(); }
+        function toggleParaLlevar(index) { 
+            carrito[index].para_llevar = !carrito[index].para_llevar; 
+            carritoModificado = true;
+            renderizarCarrito(); 
+        }
+        function eliminarDelCarrito(index) { 
+            carrito.splice(index, 1); 
+            carritoModificado = true;
+            renderizarCarrito(); 
+        }
 
         // --- FUNCIÓN GLOBAL DE IMPRESIÓN ---
         function imprimirTicket(url) {
@@ -766,7 +847,7 @@
         }
 
         // --- FUNCIONES DE GRABAR Y FACTURAR ---
-        function grabarMesa() {
+        function grabarMesa(ignorarStock = false) {
             if (carrito.length === 0) { Swal.fire('Mesa Vacía', 'Agrega productos antes de grabar.', 'warning'); return; }
             const meseroNombre = document.getElementById('input-mesero').value;
             if (!meseroNombre || meseroNombre.trim() === "") {
@@ -776,7 +857,11 @@
                 }).then((result) => { if (result.isConfirmed) { abrirModalMeseros(); } });
                 return;
             }
-            const data = { carrito: carrito, mesero: meseroNombre, imprimir: true };
+            
+            const esPrimeraVez = '{{ orden_activa.impreso|yesno:"true,false"|default:"false" }}' === 'false';
+            const debeImprimir = esPrimeraVez || carritoModificado;
+            
+            const data = { carrito: carrito, mesero: meseroNombre, imprimir: true, imprimir_ticket: debeImprimir, ignorar_stock: ignorarStock };
             Swal.fire({ title: 'Guardando...', didOpen: () => Swal.showLoading(), timerProgressBar: true, allowOutsideClick: false });
 
             fetch("{% url 'grabar_mesa' table.id %}", {
@@ -785,10 +870,39 @@
             .then(response => response.json())
             .then(result => {
                 if(result.status === 'ok') {
-                    Swal.fire({ icon: 'success', title: '¡Mesa Guardada!', text: 'Imprimiendo ticket...', showConfirmButton: false, timer: 1000 });
-                    const urlPDF = `/orden/${result.orden_id}/pdf/`; 
-                    imprimirTicket(urlPDF);
-                    setTimeout(() => { window.location.href = "{% url 'index' %}"; }, 800); 
+                    if (result.imprimir) {
+                        Swal.fire({ icon: 'success', title: '¡Mesa Guardada!', text: 'Enviando a cocina...', showConfirmButton: false, timer: 1000 });
+                        setTimeout(() => { window.location.href = "{% url 'index' %}"; }, 800); 
+                    } else {
+                        Swal.fire({ icon: 'info', title: 'Mesa Actualizada', text: 'Sin cambios en la orden. No se imprime ticket nuevo.', showConfirmButton: false, timer: 1500 });
+                        setTimeout(() => { window.location.href = "{% url 'index' %}"; }, 1200); 
+                    }
+                } else if (result.status === 'warning_stock' || (result.message && result.message.includes('STOCK_INSUFICIENTE'))) {
+                    let mensajeError = result.message.replace('STOCK_INSUFICIENTE|', '').replace(/\n/g, '<br>');
+                    Swal.fire({
+                        title: 'Faltan Ingredientes',
+                        html: mensajeError,
+                        icon: 'warning',
+                        showCancelButton: true,
+                        showDenyButton: true,
+                        confirmButtonColor: '#d33',
+                        denyButtonColor: '#ffc107',
+                        cancelButtonColor: '#6c757d',
+                        confirmButtonText: 'Sí, enviar igual',
+                        denyButtonText: 'Sustituir Ingrediente',
+                        cancelButtonText: 'Cancelar'
+                    }).then((res) => {
+                        if (res.isConfirmed) {
+                            grabarMesa(true);
+                        } else if (res.isDenied) {
+                            if (carrito.length === 1) {
+                                abrirModalPersonalizar(0);
+                                mostrarOpcionesSustituir();
+                            } else {
+                                Swal.fire({icon: 'info', title: 'Selecciona el producto', text: 'Como tienes varios productos en la orden, haz clic en el botón "Personalizar" del producto específico que deseas modificar para sustituir el ingrediente.', timer: 4500, showConfirmButton: false});
+                            }
+                        }
+                    });
                 } else { Swal.fire('Error', 'El servidor respondió: ' + result.message, 'error'); }
             })
             .catch(error => { console.error('Error:', error); Swal.fire('Error Técnico', 'No se pudo conectar con el servidor.', 'error'); });
@@ -798,7 +912,7 @@
         // === NUEVA LÓGICA DE FACTURACIÓN (MODAL) ===
         // =============================================
 
-        function iniciarFacturacion() {
+        function iniciarFacturacion(ignorarStock = false) {
         // 1. Validar que el carrito no esté vacío
         if (carrito.length === 0) {
             Swal.fire('Mesa Vacía', 'Agrega productos antes de facturar.', 'warning');
@@ -829,7 +943,10 @@
             allowOutsideClick: false 
         });
 
-        const data = { carrito: carrito, mesero: meseroNombre, imprimir: false };
+        const esPrimeraVez = '{{ orden_activa.impreso|yesno:"true,false"|default:"false" }}' === 'false';
+        const debeImprimir = esPrimeraVez || carritoModificado;
+
+        const data = { carrito: carrito, mesero: meseroNombre, imprimir_ticket: debeImprimir };
 
         // Hacemos el llamado a la vista grabar_mesa_ajax
         fetch("{% url 'grabar_mesa' table.id %}", {
@@ -842,9 +959,10 @@
         })
         .then(response => response.json())
         .then(result => {
-            Swal.close(); // Cerramos el cuadro de carga
             
             if (result.status === 'ok') {
+                Swal.close(); // Cerramos el cuadro de carga
+                
                 // 4. AHORA SÍ, ABRIMOS EL MODAL DE PAGO
                 const totalTexto = document.getElementById('total-usd').innerText;
                 totalMesaFacturacion = parseFloat(totalTexto);
@@ -876,7 +994,34 @@
                 // Activar cálculos
                 activarListenersPagos();
                 calcularResumenPago();
+            } else if (result.status === 'warning_stock' || (result.message && result.message.includes('STOCK_INSUFICIENTE'))) {
+                let mensajeError = result.message.replace('STOCK_INSUFICIENTE|', '').replace(/\n/g, '<br>');
+                Swal.fire({
+                    title: 'Faltan Ingredientes',
+                    html: mensajeError,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    showDenyButton: true,
+                    confirmButtonColor: '#d33',
+                    denyButtonColor: '#ffc107',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: 'Sí, facturar igual',
+                    denyButtonText: 'Sustituir Ingrediente',
+                    cancelButtonText: 'Cancelar'
+                }).then((res) => {
+                    if (res.isConfirmed) {
+                        iniciarFacturacion(true);
+                    } else if (res.isDenied) {
+                        if (carrito.length === 1) {
+                            abrirModalPersonalizar(0);
+                            mostrarOpcionesSustituir();
+                        } else {
+                            Swal.fire({icon: 'info', title: 'Selecciona el producto', text: 'Como tienes varios productos en la orden, haz clic en el botón "Personalizar" del producto específico que deseas modificar para sustituir el ingrediente.', timer: 4500, showConfirmButton: false});
+                        }
+                    }
+                });
             } else {
+                Swal.close(); // Cerramos el cuadro de carga
                 Swal.fire('Error', 'No se pudo actualizar la mesa: ' + result.message, 'error');
             }
         })
@@ -1021,11 +1166,7 @@
         .then(r => r.json())
         .then(data => {
             if (data.status === 'ok') {
-                // Generamos la URL del PDF como respaldo en caso de que quieran guardarlo digital
-                const urlPDF = `/factura/${data.venta_id}/pdf/`;
                 cerrarModalPago()
-                // Si quieres que SIGA abriendo el PDF en otra pestaña, descomenta esta línea:
-                window.open(urlPDF, '_blank'); 
 
                 let msgExito = '¡Pago Exitoso!';
                 // Alertamos al usuario si la tickera física no respondió
@@ -1040,6 +1181,30 @@
                     timer: 2000 
                 }).then(() => { 
                     window.location.href = "{% url 'index' %}"; 
+                });
+            } else if (data.status === 'error' && data.message && data.message.includes('STOCK INSUFICIENTE')) {
+                Swal.fire({
+                    title: 'Faltan Ingredientes',
+                    html: data.message.replace('STOCK INSUFICIENTE:\n', '').replace(/\n/g, '<br>'),
+                    icon: 'warning',
+                    showCancelButton: true,
+                    showDenyButton: true,
+                    confirmButtonColor: '#d33',
+                    denyButtonColor: '#ffc107',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: 'Entendido',
+                    denyButtonText: 'Sustituir Ingrediente',
+                    cancelButtonText: 'Cancelar'
+                }).then((res) => {
+                    if (res.isDenied) {
+                        cerrarModalPago();
+                        if (carrito.length === 1) {
+                            abrirModalPersonalizar(0);
+                            mostrarOpcionesSustituir();
+                        } else {
+                            Swal.fire({icon: 'info', title: 'Selecciona el producto', text: 'Haz clic en el botón "Personalizar" del producto específico que deseas modificar para sustituir el ingrediente.', timer: 4500, showConfirmButton: false});
+                        }
+                    }
                 });
             } else {
                 Swal.fire('Error', data.message, 'error');
@@ -1130,8 +1295,12 @@
             }).then((result) => {
                 if (result.isConfirmed) {
                     const url = "{% url 'generar_cuenta_pdf' table.id %}";
-                    imprimirTicket(url);
-                    setTimeout(() => { window.location.href = "{% url 'index' %}"; }, 1000);
+                    Swal.fire({ title: 'Imprimiendo...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                    
+                    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                    .then(() => {
+                        window.location.href = "{% url 'index' %}";
+                    });
                 }
             });
         }

@@ -50,11 +50,7 @@
                     </td>
                     
                     <td style="padding: 15px; text-align: center; font-size: 1.1em;">
-                        {% if item.stock_actual <= 0 %}
-                            <span style="color: red; font-weight: bold;">0</span>
-                        {% else %}
-                            {{ item.stock_actual|floatformat:2 }}
-                        {% endif %}
+                        <span style="{% if item.stock_actual <= 0 %}color: red; font-weight: bold;{% endif %}">{{ item.stock_actual|floatformat:2 }}</span>
                     </td>
                     
                     <td style="padding: 15px; text-align: center; color: #555;">

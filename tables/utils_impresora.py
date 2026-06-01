@@ -81,7 +81,6 @@ def mandar_a_tickera(venta):
 
         t += "--------------------------------\n"
         t += f"TOTAL USD:           ${total_usd:>8.2f}\n"
-        t += f"TASA BCV:             {tasa:>8.2f}\n"
         t += f"TOTAL Bs.:         {total_bs:>11.2f}\n"
         t += "--------------------------------\n"
         t += f"RECIBIDO USD:        ${monto_recibido:>8.2f}\n"
@@ -140,7 +139,6 @@ def imprimir_precuenta(orden, tasa_valor_ignorado):
 
         t += "--------------------------------\n"
         t += f"SUBTOTAL USD:        ${total_usd:>8.2f}\n"
-        t += f"TASA REF:             {tasa:>8.2f}\n"
         t += "\n"
         t += "     TOTAL A PAGAR:     \n"
         t += f"  USD: ${total_usd:>15.2f}\n"

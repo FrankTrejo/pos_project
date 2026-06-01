@@ -80,7 +80,9 @@ class CostoAdicionalForm(forms.ModelForm):
             'valor_aplicado': forms.TextInput(attrs={
                 'class': 'form-input', 
                 'placeholder': '0,00',
-                'inputmode': 'decimal' # Activa teclado numérico en móviles
+                'inputmode': 'decimal', # Activa teclado numérico en móviles
+                'readonly': True,
+                'style': 'background-color: #e9ecef; color: #495057; cursor: not-allowed; font-weight: bold;'
             }),
         }
     
@@ -88,3 +90,12 @@ class CostoAdicionalForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['costo_adicional'].queryset = CostoAdicional.objects.all()
         self.fields['costo_adicional'].empty_label = "Seleccione un costo..."
+
+    def clean(self):
+        cleaned_data = super().clean()
+        costo_adicional = cleaned_data.get('costo_adicional')
+        # Forzamos que el valor aplicado sea siempre el que tiene el maestro,
+        # ignorando si el usuario intentó manipular el HTML.
+        if costo_adicional:
+            cleaned_data['valor_aplicado'] = costo_adicional.valor_defecto
+        return cleaned_data

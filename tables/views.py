@@ -115,7 +115,8 @@ def table_order_view(request, table_id):
             for extra in detalle.extras_elegidos.all():
                 extras_list.append({
                     'id': extra.insumo_id,
-                    'porcion': float(extra.porcion)
+                    'porcion': float(extra.porcion),
+                    'es_sustituto': float(extra.precio) == 0.0
                 })
             
             mitad_id = detalle.mitad_producto.id if detalle.mitad_producto else None
@@ -195,6 +196,10 @@ def table_order_view(request, table_id):
 
 @staff_member_required
 def product_list(request):
+    query = request.GET.get('q', '')
+    categoria_id = request.GET.get('categoria', '')
+    tamano = request.GET.get('tamano', '')
+
     # Usamos prefetch_related para traer los datos relacionados en una sola consulta
     # 'costos_adicionales' es necesario para calcular el Costo Total
     productos_list = Producto.objects.all().prefetch_related(
@@ -202,11 +207,30 @@ def product_list(request):
         'costos_adicionales'
     ).order_by('nombre')
     
+    if query:
+        productos_list = productos_list.filter(nombre__icontains=query)
+        
+    if categoria_id:
+        productos_list = productos_list.filter(categoria_id=categoria_id)
+        
+    if tamano:
+        productos_list = productos_list.filter(tamano=tamano)
+
     paginator = Paginator(productos_list, 10)
     page_number = request.GET.get('page')
     productos = paginator.get_page(page_number)
 
-    return render(request, 'products/product_list.html', {'productos': productos})
+    categorias = Categoria.objects.all()
+    tamanos = Producto.OPCIONES_TAMANO
+
+    return render(request, 'products/product_list.html', {
+        'productos': productos,
+        'q': query,
+        'categoria_sel': categoria_id,
+        'tamano_sel': tamano,
+        'categorias': categorias,
+        'tamanos': tamanos,
+    })
 
 @staff_member_required
 def product_create(request, pk=None):
@@ -339,6 +363,110 @@ def product_delete(request, pk):
 #  FUNCIONES AJAX (GUARDADO Y FACTURACIÓN)
 # ==========================================
 
+def calcular_insumos_requeridos_json(items):
+    insumos_requeridos = {}
+    for item in items:
+        prod_id = item.get('id')
+        cant = Decimal(str(item.get('cantidad', 1)))
+        mitad_id = item.get('mitad_id')
+        removidos = item.get('removidos', [])
+        ids_extras = item.get('extras', [])
+        para_llevar = item.get('para_llevar', False)
+        
+        prod_obj = Producto.objects.get(id=prod_id)
+        
+        if mitad_id:
+            mitad_obj = Producto.objects.get(id=mitad_id)
+            ings_prod1 = {ing.insumo.id: ing for ing in prod_obj.ingredientes.all()}
+            ings_prod2 = {ing.insumo.id: ing for ing in mitad_obj.ingredientes.all()}
+            for i_id in set(ings_prod1.keys()).union(set(ings_prod2.keys())):
+                if i_id in removidos: continue
+                if i_id in ings_prod1 and i_id in ings_prod2:
+                    qty = (ings_prod1[i_id].cantidad / Decimal('2.0')) + (ings_prod2[i_id].cantidad / Decimal('2.0'))
+                elif i_id in ings_prod1:
+                    qty = ings_prod1[i_id].cantidad / Decimal('2.0')
+                else:
+                    qty = ings_prod2[i_id].cantidad / Decimal('2.0')
+                insumos_requeridos[i_id] = insumos_requeridos.get(i_id, Decimal('0.0')) + (qty * cant)
+        else:
+            for ing in prod_obj.ingredientes.all():
+                if ing.insumo.id not in removidos:
+                    insumos_requeridos[ing.insumo.id] = insumos_requeridos.get(ing.insumo.id, Decimal('0.0')) + (ing.cantidad * cant)
+                    
+        if ids_extras:
+            for extra_data in ids_extras:
+                extra_id = extra_data.get('id') if isinstance(extra_data, dict) else extra_data
+                porcion = Decimal(str(extra_data.get('porcion', 1.0))) if isinstance(extra_data, dict) else Decimal('1.0')
+                es_sustituto = extra_data.get('es_sustituto', False) if isinstance(extra_data, dict) else False
+                try:
+                    insumo = Insumo.objects.get(id=extra_id)
+                    if es_sustituto:
+                        cantidad_a_descontar = porcion
+                    else:
+                        cantidad_a_descontar = insumo.cantidad_porcion_extra
+                        precio_obj = PrecioExtra.objects.filter(insumo=insumo, tamano=prod_obj.tamano).first()
+                        if precio_obj and precio_obj.cantidad > 0:
+                            cantidad_a_descontar = precio_obj.cantidad
+                        cantidad_a_descontar = cantidad_a_descontar * porcion
+                        
+                    cant_extra = cantidad_a_descontar * cant
+                    if cant_extra > 0:
+                        insumos_requeridos[insumo.id] = insumos_requeridos.get(insumo.id, Decimal('0.0')) + cant_extra
+                except: pass
+
+        if para_llevar:
+            config_global = Configuracion.get_solo()
+            caja_insumo = None
+            if prod_obj.tamano == 'IND': caja_insumo = config_global.caja_individual
+            elif prod_obj.tamano == 'MED': caja_insumo = config_global.caja_mediana
+            elif prod_obj.tamano == 'FAM': caja_insumo = config_global.caja_familiar
+            if caja_insumo:
+                insumos_requeridos[caja_insumo.id] = insumos_requeridos.get(caja_insumo.id, Decimal('0.0')) + cant
+    return insumos_requeridos
+
+def procesar_inventario_orden(orden, usuario, nota_base, tipo_movimiento):
+    for det in orden.detalles.all():
+        if det.mitad_producto:
+            ings_prod1 = {ing.insumo.id: ing for ing in det.producto.ingredientes.all()}
+            ings_prod2 = {ing.insumo.id: ing for ing in det.mitad_producto.ingredientes.all()}
+            for i_id in set(ings_prod1.keys()).union(set(ings_prod2.keys())):
+                if det.ingredientes_removidos.filter(id=i_id).exists(): continue
+                if i_id in ings_prod1 and i_id in ings_prod2:
+                    qty = (ings_prod1[i_id].cantidad / Decimal('2.0')) + (ings_prod2[i_id].cantidad / Decimal('2.0'))
+                    ins = ings_prod1[i_id].insumo
+                elif i_id in ings_prod1:
+                    qty = ings_prod1[i_id].cantidad / Decimal('2.0')
+                    ins = ings_prod1[i_id].insumo
+                else:
+                    qty = ings_prod2[i_id].cantidad / Decimal('2.0')
+                    ins = ings_prod2[i_id].insumo
+                MovimientoInventario.objects.create(insumo=ins, tipo=tipo_movimiento, cantidad=qty * det.cantidad, unidad_movimiento=ins.unidad, usuario=usuario, nota=nota_base)
+        else:
+            for ing in det.producto.ingredientes.all():
+                if not det.ingredientes_removidos.filter(id=ing.insumo.id).exists():
+                    MovimientoInventario.objects.create(insumo=ing.insumo, tipo=tipo_movimiento, cantidad=ing.cantidad * det.cantidad, unidad_movimiento=ing.insumo.unidad, usuario=usuario, nota=nota_base)
+        for extra in det.extras_elegidos.all():
+            if extra.precio == Decimal('0.00') or extra.precio == 0:
+                cantidad_a_descontar = extra.porcion
+            else:
+                cantidad_a_descontar = extra.insumo.cantidad_porcion_extra 
+                precio_obj = PrecioExtra.objects.filter(insumo=extra.insumo, tamano=det.producto.tamano).first()
+                if precio_obj and precio_obj.cantidad > 0: cantidad_a_descontar = precio_obj.cantidad
+                cantidad_a_descontar = cantidad_a_descontar * extra.porcion
+            
+            cantidad_a_descontar = cantidad_a_descontar * det.cantidad
+            if cantidad_a_descontar > 0:
+                MovimientoInventario.objects.create(insumo=extra.insumo, tipo=tipo_movimiento, cantidad=cantidad_a_descontar, unidad_movimiento=extra.insumo.unidad, usuario=usuario, nota=f"{nota_base} (Extra)")
+        
+        if det.es_para_llevar:
+            config_global = Configuracion.get_solo()
+            caja_insumo = None
+            if det.producto.tamano == 'IND': caja_insumo = config_global.caja_individual
+            elif det.producto.tamano == 'MED': caja_insumo = config_global.caja_mediana
+            elif det.producto.tamano == 'FAM': caja_insumo = config_global.caja_familiar
+            if caja_insumo:
+                MovimientoInventario.objects.create(insumo=caja_insumo, tipo=tipo_movimiento, cantidad=det.cantidad, unidad_movimiento=caja_insumo.unidad, usuario=usuario, nota=f"{nota_base} (Empaque)")
+
 def grabar_mesa_ajax(request, table_id):
     if request.method == 'POST':
         try:
@@ -346,6 +474,12 @@ def grabar_mesa_ajax(request, table_id):
             items = data.get('carrito', [])
             mesero_nombre = data.get('mesero', '')
             debe_imprimir = data.get('imprimir', True)
+            imprimir_ticket = data.get('imprimir_ticket', True)
+            ignorar_stock = data.get('ignorar_stock', False)
+            
+            # Combinamos ambos: debe_imprimir es para saber si se solicitó la comanda
+            # imprimir_ticket es el flag inteligente que dice si hubo cambios
+            imprimir_real = debe_imprimir and imprimir_ticket
             
             table = Table.objects.get(id=table_id)
             
@@ -353,93 +487,123 @@ def grabar_mesa_ajax(request, table_id):
             if mesero_nombre:
                 mesero_obj = User.objects.filter(username=mesero_nombre).first()
 
-            # 1. Crear/Recuperar Orden
-            orden, created = Orden.objects.get_or_create(mesa=table)
-            orden.mesero = mesero_obj
-            orden.save()
-            
-            # 2. BORRÓN Y CUENTA NUEVA
-            orden.detalles.all().delete()
-            
-            # 3. Guardar nuevos items
-            for item in items:
-                prod_id = item.get('id')
-                cant = item.get('cantidad')
-                precio = item.get('precio')
+            with transaction.atomic():
+                orden, created = Orden.objects.get_or_create(mesa=table)
                 
-                prod_obj = Producto.objects.get(id=prod_id)
-                
-                # A) Detalle Principal
-                nuevo_detalle = DetalleOrden.objects.create(
-                    orden=orden,
-                    producto=prod_obj,
-                    cantidad=cant,
-                    precio_unitario=precio,
-                    es_para_llevar=item.get('para_llevar', False)
-                )
-                
-                mitad_id = item.get('mitad_id')
-                if mitad_id:
-                    mitad_obj = Producto.objects.get(id=mitad_id)
-                    nuevo_detalle.mitad_producto = mitad_obj
-                    nuevo_detalle.save()
-                    
-                removidos = item.get('removidos', [])
-                if removidos:
-                    for rem_id in removidos:
-                        nuevo_detalle.ingredientes_removidos.add(rem_id)
+                # 1. Reponer inventario si estamos editando una orden existente
+                if not created and orden.detalles.exists():
+                    procesar_inventario_orden(orden, request.user, f"Rep. edición Mesa {table.number}", 'ENTRADA')
 
-                # B) GUARDAR EXTRAS
-                ids_extras = item.get('extras', [])
-                if ids_extras:
-                    for extra_data in ids_extras:
+                # 2. Validar Stock de la nueva orden
+                insumos_req = calcular_insumos_requeridos_json(items)
+                
+                if not ignorar_stock:
+                    faltantes = []
+                    for i_id, cant_necesaria in insumos_req.items():
                         try:
-                            if isinstance(extra_data, dict):
-                                extra_id = extra_data.get('id')
-                                porcion = Decimal(str(extra_data.get('porcion', 1.0)))
-                            else:
-                                extra_id = extra_data
-                                porcion = Decimal('1.0')
-                                
-                            insumo = Insumo.objects.get(id=extra_id)
-                            
-                            # LÓGICA CORREGIDA: Buscar precio según tamaño del producto
-                            precio_final = insumo.precio_venta_extra # Valor por defecto
-                            
-                            # Buscamos si existe un precio configurado para este tamaño
-                            precio_obj = PrecioExtra.objects.filter(
-                                insumo=insumo, 
-                                tamano=prod_obj.tamano
-                            ).first()
-                            
-                            if precio_obj:
-                                precio_final = precio_obj.precio
-                                
-                            precio_cobrado = precio_final * porcion
-
-                            DetalleOrdenExtra.objects.create(
-                                detalle_orden=nuevo_detalle,
-                                insumo=insumo,
-                                precio=precio_cobrado,
-                                porcion=porcion
-                            )
+                            ins = Insumo.objects.get(id=i_id)
+                            if ins.stock_actual < cant_necesaria:
+                                faltantes.append(f"• {ins.nombre}: Faltan {(cant_necesaria - ins.stock_actual):.2f}")
                         except Insumo.DoesNotExist:
-                            print(f"Error: Insumo ID {extra_id} no existe.")
-                        except Exception as e_extra:
-                            print(f"Error guardando extra: {e_extra}")
+                            pass
+                    
+                    if faltantes:
+                        raise ValueError("STOCK_INSUFICIENTE|" + "\n".join(faltantes))
+
+                # 3. Borrar items viejos y aplicar nuevos
+                orden.detalles.all().delete()
+                orden.mesero = mesero_obj
+                orden.save()
+
+                for item in items:
+                    prod_id = item.get('id')
+                    cant = item.get('cantidad')
+                    precio = item.get('precio')
+                    
+                    prod_obj = Producto.objects.get(id=prod_id)
+                    
+                    # A) Detalle Principal
+                    nuevo_detalle = DetalleOrden.objects.create(
+                        orden=orden,
+                        producto=prod_obj,
+                        cantidad=cant,
+                        precio_unitario=precio,
+                        es_para_llevar=item.get('para_llevar', False)
+                    )
+                    
+                    mitad_id = item.get('mitad_id')
+                    if mitad_id:
+                        mitad_obj = Producto.objects.get(id=mitad_id)
+                        nuevo_detalle.mitad_producto = mitad_obj
+                        nuevo_detalle.save()
+                        
+                    removidos = item.get('removidos', [])
+                    if removidos:
+                        for rem_id in removidos:
+                            nuevo_detalle.ingredientes_removidos.add(rem_id)
+
+                    # B) GUARDAR EXTRAS
+                    ids_extras = item.get('extras', [])
+                    if ids_extras:
+                        for extra_data in ids_extras:
+                            try:
+                                if isinstance(extra_data, dict):
+                                    extra_id = extra_data.get('id')
+                                    porcion = Decimal(str(extra_data.get('porcion', 1.0)))
+                                    es_sustituto = extra_data.get('es_sustituto', False)
+                                else:
+                                    extra_id = extra_data
+                                    porcion = Decimal('1.0')
+                                    es_sustituto = False
+                                    
+                                insumo = Insumo.objects.get(id=extra_id)
+                                
+                                # LÓGICA CORREGIDA: Buscar precio según tamaño del producto
+                                precio_final = insumo.precio_venta_extra # Valor por defecto
+                                
+                                # Buscamos si existe un precio configurado para este tamaño
+                                precio_obj = PrecioExtra.objects.filter(
+                                    insumo=insumo, 
+                                    tamano=prod_obj.tamano
+                                ).first()
+                                
+                                if precio_obj:
+                                    precio_final = precio_obj.precio
+                                    
+                                precio_cobrado = Decimal('0.00') if es_sustituto else (precio_final * porcion)
+
+                                DetalleOrdenExtra.objects.create(
+                                    detalle_orden=nuevo_detalle,
+                                    insumo=insumo,
+                                    precio=precio_cobrado,
+                                    porcion=porcion
+                                )
+                            except Insumo.DoesNotExist:
+                                print(f"Error: Insumo ID {extra_id} no existe.")
+                            except Exception as e_extra:
+                                print(f"Error guardando extra: {e_extra}")
+                                
+                # 4. Descontar el inventario de la nueva orden recién grabada
+                procesar_inventario_orden(orden, request.user, f"Orden Mesa {table.number}", 'SALIDA')
 
             # 4. Actualizar Mesa
             table.is_occupied = True
             table.mesero = mesero_obj
             table.save()
-            if debe_imprimir:
+            
+            if imprimir_real:
                 from .utils_impresora import imprimir_comanda
                 exito_comanda = imprimir_comanda(orden)
                 if exito_comanda:
                     orden.impreso = True  # Marcamos que ya pasó por cocina
                     orden.save()
+            else:
+                # Si no mandamos a tickera pero actualizamos, igual guardamos el flag si venía True de antes
+                if not orden.impreso:
+                    orden.impreso = True
+                    orden.save()
 
-            return JsonResponse({'status': 'ok', 'orden_id': orden.id})
+            return JsonResponse({'status': 'ok', 'orden_id': orden.id, 'imprimir': imprimir_real})
             
         except Exception as e:
             print(f"ERROR GRABAR MESA: {e}")
@@ -463,6 +627,7 @@ def generar_ticket_pdf(request, orden_id):
 
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = f'filename="comanda_cocina_mesa_{orden.mesa.number}.pdf"'
+    return HttpResponse(html)
 
     pisa_status = pisa.CreatePDF(html, dest=response)
     if pisa_status.err:
@@ -494,6 +659,8 @@ def eliminar_mesa_ajax(request, table_id):
                     total_eliminado=total_calc,
                     motivo=motivo
                 )
+                # Restablecer el inventario de la orden eliminada
+                procesar_inventario_orden(orden, request.user, f"Eliminación Mesa {table.number} - {motivo}", 'ENTRADA')
                 orden.delete()
             
             table.is_occupied = False
@@ -563,6 +730,10 @@ def generar_cuenta_pdf(request, table_id):
     total_acumulado_bs = total_acumulado_usd * tasa_valor
     imprimir_precuenta(orden, tasa_valor)
 
+    # --- Si la petición viene en segundo plano, terminamos aquí ---
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({'status': 'ok', 'mensaje': 'Enviado a impresora'})
+
     context = {
         'orden': orden,
         'detalles': detalles_con_conversion,
@@ -587,6 +758,7 @@ def generar_cuenta_pdf(request, table_id):
     if pisa_status.err:
         return HttpResponse('Error al generar PDF', status=500)
     return response
+    return HttpResponse(html)
 
 @staff_member_required
 def facturar_mesa_ajax(request, table_id):
@@ -617,50 +789,6 @@ def facturar_mesa_ajax(request, table_id):
             
             diferencia = monto_total_recibido - total_venta_real
             propina_calc = diferencia if (diferencia > 0 and es_propina) else 0
-
-            # --- 2. VALIDACIÓN DE STOCK ---
-            insumos_requeridos = {} 
-            for detalle in orden.detalles.all():
-                # Ingredientes
-                if detalle.mitad_producto:
-                    ings_prod1 = {ing.insumo.id: ing for ing in detalle.producto.ingredientes.all()}
-                    ings_prod2 = {ing.insumo.id: ing for ing in detalle.mitad_producto.ingredientes.all()}
-                    
-                    for i_id in set(ings_prod1.keys()).union(set(ings_prod2.keys())):
-                        if detalle.ingredientes_removidos.filter(id=i_id).exists():
-                            continue
-                        
-                        if i_id in ings_prod1 and i_id in ings_prod2:
-                            qty = (ings_prod1[i_id].cantidad / Decimal('2.0')) + (ings_prod2[i_id].cantidad / Decimal('2.0'))
-                        elif i_id in ings_prod1:
-                            qty = ings_prod1[i_id].cantidad / Decimal('2.0') # Único: se cobra la mitad
-                        else:
-                            qty = ings_prod2[i_id].cantidad / Decimal('2.0') # Único: se cobra la mitad
-                            
-                        total_item = qty * detalle.cantidad
-                        if i_id in insumos_requeridos: insumos_requeridos[i_id] += total_item
-                        else: insumos_requeridos[i_id] = total_item
-                else:
-                    for ing in detalle.producto.ingredientes.all():
-                        if not detalle.ingredientes_removidos.filter(id=ing.insumo.id).exists():
-                            total_item = ing.cantidad * detalle.cantidad
-                            if ing.insumo.id in insumos_requeridos: insumos_requeridos[ing.insumo.id] += total_item
-                            else: insumos_requeridos[ing.insumo.id] = total_item
-                # Extras
-                for extra in detalle.extras_elegidos.all():
-                    cant_extra = extra.insumo.cantidad_porcion_extra * extra.porcion
-                    if cant_extra > 0:
-                        if extra.insumo.id in insumos_requeridos: insumos_requeridos[extra.insumo.id] += cant_extra
-                        else: insumos_requeridos[extra.insumo.id] = cant_extra
-
-            faltantes = []
-            for i_id, cant in insumos_requeridos.items():
-                ins_obj = Insumo.objects.get(id=i_id)
-                if ins_obj.stock_actual < cant:
-                    faltantes.append(f"❌ {ins_obj.nombre}: Stock {ins_obj.stock_actual:.2f} / Req {cant:.2f}")
-
-            if faltantes:
-                return JsonResponse({'status': 'error', 'message': "STOCK INSUFICIENTE:\n" + "\n".join(faltantes)})
 
             # --- 3. TRANSACCIÓN DE GUARDADO ---
             with transaction.atomic():
@@ -716,87 +844,6 @@ def facturar_mesa_ajax(request, table_id):
                             porcion=extra_orden.porcion
                         )
 
-                    # Descuento Inventario (Receta)
-                    if det.mitad_producto:
-                        ings_prod1 = {ing.insumo.id: ing for ing in det.producto.ingredientes.all()}
-                        ings_prod2 = {ing.insumo.id: ing for ing in det.mitad_producto.ingredientes.all()}
-                        
-                        for i_id in set(ings_prod1.keys()).union(set(ings_prod2.keys())):
-                            if det.ingredientes_removidos.filter(id=i_id).exists():
-                                continue
-                            
-                            if i_id in ings_prod1 and i_id in ings_prod2:
-                                ing_obj1 = ings_prod1[i_id]
-                                ing_obj2 = ings_prod2[i_id]
-                                qty = (ing_obj1.cantidad / Decimal('2.0')) + (ing_obj2.cantidad / Decimal('2.0'))
-                                nota_mov = f"Fac: {codigo} - 1/2 {det.producto.nombre} + 1/2 {det.mitad_producto.nombre} (Común)"
-                                insumo_usado = ing_obj1.insumo
-                            elif i_id in ings_prod1:
-                                ing_obj = ings_prod1[i_id]
-                                qty = ing_obj.cantidad / Decimal('2.0')
-                                nota_mov = f"Fac: {codigo} - 1/2 {det.producto.nombre}"
-                                insumo_usado = ing_obj.insumo
-                            else:
-                                ing_obj = ings_prod2[i_id]
-                                qty = ing_obj.cantidad / Decimal('2.0')
-                                nota_mov = f"Fac: {codigo} - 1/2 {det.mitad_producto.nombre}"
-                                insumo_usado = ing_obj.insumo
-
-                            MovimientoInventario.objects.create(
-                                insumo=insumo_usado, tipo='SALIDA', cantidad=qty * det.cantidad,
-                                unidad_movimiento=insumo_usado.unidad, usuario=request.user,
-                                nota=nota_mov
-                            )
-                    else:
-                        for ing in det.producto.ingredientes.all():
-                            if not det.ingredientes_removidos.filter(id=ing.insumo.id).exists():
-                                MovimientoInventario.objects.create(
-                                    insumo=ing.insumo, tipo='SALIDA', cantidad=ing.cantidad * det.cantidad,
-                                    unidad_movimiento=ing.insumo.unidad, usuario=request.user,
-                                    nota=f"Fac: {codigo} - {det.producto.nombre}"
-                                )
-                    
-                    # Descuento Inventario (Extras)
-                    for extra in det.extras_elegidos.all():
-                        cantidad_a_descontar = extra.insumo.cantidad_porcion_extra 
-                        tamano_producto = det.producto.tamano
-                        precio_obj = PrecioExtra.objects.filter(
-                            insumo=extra.insumo,
-                            tamano=tamano_producto
-                        ).first()
-                        
-                        if precio_obj and precio_obj.cantidad > 0:
-                            cantidad_a_descontar = precio_obj.cantidad
-                            
-                        cantidad_a_descontar = cantidad_a_descontar * extra.porcion
-
-                        if cantidad_a_descontar > 0:
-                            MovimientoInventario.objects.create(
-                                insumo=extra.insumo, tipo='SALIDA', 
-                                cantidad=cantidad_a_descontar,
-                                unidad_movimiento=extra.insumo.unidad, usuario=request.user,
-                                nota=f"Fac: {codigo} - {extra.porcion_display}Extra {extra.insumo.nombre}"
-                            )
-
-                # Descuento de Cajas (Empaques)
-                for det in orden.detalles.all():
-                    config_global = Configuracion.get_solo()
-                    if det.es_para_llevar:
-                        caja_insumo = None
-                        if det.producto.tamano == 'IND':
-                            caja_insumo = config_global.caja_individual
-                        elif det.producto.tamano == 'MED':
-                            caja_insumo = config_global.caja_mediana
-                        elif det.producto.tamano == 'FAM':
-                            caja_insumo = config_global.caja_familiar
-                            
-                        if caja_insumo:
-                            MovimientoInventario.objects.create(
-                                insumo=caja_insumo, tipo='SALIDA', cantidad=det.cantidad,
-                                unidad_movimiento=caja_insumo.unidad, usuario=request.user,
-                                nota=f"Empaque Fac: {codigo}"
-                            )
-
                 orden.delete()
                 table.is_occupied = False
                 table.solicitud_pago = False
@@ -844,6 +891,7 @@ def generar_factura_pdf(request, venta_id):
     if pisa_status.err:
         return HttpResponse('Error al generar PDF', status=500)
     return response
+    return HttpResponse(html)
 
 def anular_venta(request, venta_id):
     if request.method == 'POST':

@@ -16,12 +16,47 @@
             <h2 class="fw-bold text-dark mb-1">Catálogo de Productos</h2>
             <p class="text-secondary m-0">Gestiona precios, recetas y costos de tus platos.</p>
         </div>
-        <a href="{% url 'manage_extras' %}" class="btn btn-warning shadow-sm me-2">
-            <i class="bi bi-tag-fill me-2"></i>Precios Extras
-        </a>
-        <a href="{% url 'product_create' %}" class="btn btn-primary shadow-sm">
-            <i class="bi bi-plus-lg me-2"></i>Nuevo Producto
-        </a>
+        <div>
+            <a href="{% url 'manage_extras' %}" class="btn btn-warning shadow-sm me-2">
+                <i class="bi bi-tag-fill me-2"></i>Precios Extras
+            </a>
+            <a href="{% url 'product_create' %}" class="btn btn-primary shadow-sm">
+                <i class="bi bi-plus-lg me-2"></i>Nuevo Producto
+            </a>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm rounded-3 mb-3 bg-light">
+        <div class="card-body py-2 px-3">
+            <form method="GET" class="row g-2 align-items-center">
+                <div class="col-12 col-md-4">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white text-secondary border-end-0"><i class="bi bi-search"></i></span>
+                        <input type="text" name="q" class="form-control border-start-0" placeholder="Buscar por nombre..." value="{{ q }}">
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <select name="categoria" class="form-select form-select-sm">
+                        <option value="">Todas las Categorías</option>
+                        {% for c in categorias %}
+                            <option value="{{ c.id }}" {% if categoria_sel == c.id|stringformat:"s" %}selected{% endif %}>{{ c.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-6 col-md-3">
+                    <select name="tamano" class="form-select form-select-sm">
+                        <option value="">Todos los Tamaños</option>
+                        {% for key, value in tamanos %}
+                            <option value="{{ key }}" {% if tamano_sel == key %}selected{% endif %}>{{ value }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12 col-md-2 text-end d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold"><i class="bi bi-funnel"></i> Filtrar</button>
+                    <a href="{% url 'product_list' %}" class="btn btn-outline-secondary btn-sm w-100" title="Limpiar"><i class="bi bi-eraser"></i></a>
+                </div>
+            </form>
+        </div>
     </div>
 
     <div class="card border-0 shadow-sm rounded-3">
@@ -134,7 +169,7 @@
                     <ul class="pagination pagination-sm m-0">
                         {% if productos.has_previous %}
                         <li class="page-item">
-                            <a class="page-link text-primary" href="?page={{ productos.previous_page_number }}">&laquo;</a>
+                            <a class="page-link text-primary" href="?page={{ productos.previous_page_number }}&q={{ q }}&categoria={{ categoria_sel }}&tamano={{ tamano_sel }}">&laquo;</a>
                         </li>
                         {% endif %}
 
@@ -142,13 +177,13 @@
                             {% if productos.number == i %}
                             <li class="page-item active"><span class="page-link">{{ i }}</span></li>
                             {% else %}
-                            <li class="page-item"><a class="page-link text-primary" href="?page={{ i }}">{{ i }}</a></li>
+                            <li class="page-item"><a class="page-link text-primary" href="?page={{ i }}&q={{ q }}&categoria={{ categoria_sel }}&tamano={{ tamano_sel }}">{{ i }}</a></li>
                             {% endif %}
                         {% endfor %}
 
                         {% if productos.has_next %}
                         <li class="page-item">
-                            <a class="page-link text-primary" href="?page={{ productos.next_page_number }}">&raquo;</a>
+                            <a class="page-link text-primary" href="?page={{ productos.next_page_number }}&q={{ q }}&categoria={{ categoria_sel }}&tamano={{ tamano_sel }}">&raquo;</a>
                         </li>
                         {% endif %}
                     </ul>

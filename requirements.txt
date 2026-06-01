@@ -2,3 +2,4 @@ Django>=5.0
 requests
 beautifulsoup4
 xhtml2pdf
+pywin32

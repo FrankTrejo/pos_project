@@ -2,6 +2,7 @@
 {% block title %}- {{ titulo }}{% endblock %}
 
 {% block content %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <style>
     /* Esto arregla el desbordamiento de los inputs */
@@ -54,6 +55,22 @@
         <p style="color: #666; margin-top: 5px;">Configura los parámetros de costo y rendimiento.</p>
     </div>
     
+    {% if form.errors %}
+        <div style="background-color: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #f5c6cb;">
+            <h4 style="margin-top:0; font-size: 1.1em;"><i class="fas fa-exclamation-triangle"></i> Revisa los siguientes errores:</h4>
+            <ul style="margin-bottom: 0; padding-left: 20px;">
+            {% for field in form %}
+                {% for error in field.errors %}
+                    <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                {% endfor %}
+            {% endfor %}
+            {% for error in form.non_field_errors %}
+                <li>{{ error }}</li>
+            {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
     <form method="POST">
         {% csrf_token %}
         
@@ -136,6 +153,19 @@
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
+        
+        {% if messages %}
+            {% for message in messages %}
+                Swal.fire({
+                    title: "Aviso",
+                    text: "{{ message }}",
+                    icon: "{{ message.tags }}" === "error" ? "error" : "success",
+                    confirmButtonColor: '#3085d6',
+                    timer: 3000
+                });
+            {% endfor %}
+        {% endif %}
+
         // --- NUEVA LÓGICA: Limpieza de ceros decimales en los inputs ---
         const inputsNumericos = document.querySelectorAll('input[type="number"]');
         

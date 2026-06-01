@@ -107,22 +107,29 @@
         </div>
     </div>
 
-    <div class="filter-container">
-        <input type="text" id="searchInput" oninput="filtrarTabla()" placeholder="🔍 Buscar por nombre..." class="search-input">
+    <form method="GET" class="filter-container">
+        <input type="text" name="q" value="{{ q }}" placeholder="🔍 Buscar por nombre..." class="search-input">
         
-        <select id="estadoFilter" onchange="filtrarTabla()" class="filter-select">
-            <option value="todos">📦 Todos los Estados</option>
-            <option value="bajo">⚠️ Stock Crítico / Bajo</option>
-            <option value="ok">✅ Stock Saludable</option>
-            <option value="cero">⛔ Agotados (0)</option>
+        <select name="estado" class="filter-select">
+            <option value="todos" {% if estado == 'todos' %}selected{% endif %}>📦 Todos los Estados</option>
+            <option value="bajo" {% if estado == 'bajo' %}selected{% endif %}>⚠️ Stock Crítico / Bajo</option>
+            <option value="ok" {% if estado == 'ok' %}selected{% endif %}>✅ Stock Saludable</option>
+            <option value="cero" {% if estado == 'cero' %}selected{% endif %}>⛔ Agotados (0)</option>
         </select>
 
-        <select id="tipoFilter" onchange="filtrarTabla()" class="filter-select">
-            <option value="todos">📁 Todo Tipo</option>
-            <option value="insumo">🚚 Compras (Insumos)</option>
-            <option value="receta">🌪️ Recetas (Cocina)</option>
+        <select name="tipo" class="filter-select">
+            <option value="todos" {% if tipo == 'todos' %}selected{% endif %}>📁 Todo Tipo</option>
+            <option value="insumo" {% if tipo == 'insumo' %}selected{% endif %}>🚚 Compras (Insumos)</option>
+            <option value="receta" {% if tipo == 'receta' %}selected{% endif %}>🌪️ Recetas (Cocina)</option>
         </select>
-    </div>
+
+        <button type="submit" style="background: #0d6efd; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold;" title="Buscar">
+            <i class="fas fa-search"></i>
+        </button>
+        <a href="{% url 'inventory_index' %}" style="background: #6c757d; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; text-decoration: none; display: inline-flex; align-items: center;" title="Limpiar Filtros">
+            <i class="fas fa-eraser"></i>
+        </a>
+    </form>
 
     <div class="card-style" style="overflow-x: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.05); padding: 0;">
         <table style="width: 100%; border-collapse: separate; border-spacing: 0;" id="tablaInventario">

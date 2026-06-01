@@ -37,6 +37,18 @@ class MaestroInsumoForm(forms.ModelForm):
             'merma_porcentaje': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.1'}),
         }
 
+    def clean_nombre(self):
+        nombre = self.cleaned_data.get('nombre')
+        if nombre:
+            # Buscamos de forma insensible a mayúsculas/minúsculas si el nombre existe
+            qs = Insumo.objects.filter(nombre__iexact=nombre)
+            # Si estamos editando, excluimos de la búsqueda al propio insumo que estamos guardando
+            if self.instance and self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise forms.ValidationError("Ya existe un concepto registrado con este nombre.")
+        return nombre
+
     def clean(self):
         cleaned_data = super().clean()
         # Forzamos a que NO sea compuesto (porque es Materia Prima del Maestro)
