@@ -30,4 +30,6 @@ urlpatterns = [
     # 7. Extras
     path('salidas-especiales/', views.salidas_especiales_view, name='salidas_especiales'),
     path('comanda-interna/<int:consumo_id>/pdf/', views.generar_comanda_interno_pdf, name='generar_comanda_interno_pdf'),
+    path('salidas-especiales/anular/<int:consumo_id>/', views.anular_consumo_interno, name='anular_consumo_interno'),
+
 ]

@@ -11,5 +11,6 @@ urlpatterns = [
     path('ventas-detalle/', views.reporte_ventas_detalle, name='reporte_ventas_detalle'),
     path('insumos-agotados/', views.reporte_insumos_agotados, name='reporte_insumos_agotados'),
     path('historial-tasas/', views.historial_tasas_bcv, name='historial_tasas_bcv'),
+    path('propinas/', views.reporte_propinas, name='reporte_propinas'),
 
 ]

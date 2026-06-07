@@ -74,6 +74,17 @@
         color: white;
         border-color: #dc3545;
     }
+
+    /* Estilos para el botón de Excel */
+    .btn-excel {
+        background-color: #198754 !important;
+        border-color: #198754 !important;
+        cursor: pointer;
+    }
+    .btn-excel:hover {
+        background-color: #157347 !important; /* Verde más oscuro al pasar el ratón */
+        border-color: #146c43 !important;
+    }
 </style>
 
 <div style="padding: 20px; max-width: 1400px; margin: 0 auto;">
@@ -89,6 +100,7 @@
         </div>
 
         <form method="GET" style="background: white; padding: 10px; border-radius: 8px; border: 1px solid #ddd; display: flex; gap: 10px; align-items: center;">
+            <input type="hidden" name="estado" value="{{ estado_filtro }}">
             <label style="font-weight: bold; font-size: 0.9em;">Desde:</label>
             <input type="date" name="fecha_inicio" value="{{ fecha_inicio }}" class="form-input" style="padding: 5px;">
             
@@ -97,6 +109,9 @@
             
             <button type="submit" class="add-btn" style="padding: 6px 15px;">
                 <i class="fas fa-search"></i>
+            </button>
+            <button type="submit" name="exportar" value="csv" class="add-btn btn-excel" onclick="animarBotonExcel(this)" style="padding: 6px 15px; transition: all 0.2s ease;" title="Exportar a Excel">
+                <i class="fas fa-file-excel"></i> Excel
             </button>
         </form>
     </div>
@@ -128,7 +143,7 @@
             </span>
             {% if total_propina > 0 %}
             <span style="font-size: 1.1em; font-weight: bold; color: #198754; display: block; margin-top: 5px;">
-                <i class="fas fa-hand-holding-usd"></i> Propinas Recibidas: ${{ total_propina|floatformat:2 }}
+                <i class="fas fa-hand-holding-usd"></i> Propinas Recibidas: ${{ total_propina|floatformat:4 }}
             </span>
             {% endif %}
         </div>
@@ -206,7 +221,7 @@
                         
                         {% if venta.propina > 0 %}
                             <div style="margin-top: 5px; color: #198754; font-size: 0.85em; font-weight: bold;">
-                                <i class="fas fa-hand-holding-usd"></i> Propina: ${{ venta.propina|floatformat:2 }}
+                                <i class="fas fa-hand-holding-usd"></i> Propina: ${{ venta.propina|floatformat:4 }}
                             </div>
                         {% endif %}
                     </td>
@@ -338,6 +353,21 @@
         if (event.target == document.getElementById('modalAnular')) {
             cerrarModalAnular();
         }
+    }
+
+    // Animación para el botón de exportar a Excel
+    function animarBotonExcel(btn) {
+        // Guardamos el contenido original
+        const contenidoOriginal = btn.innerHTML;
+        // Cambiamos el icono por un spinner girando
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exportando...';
+        btn.style.transform = 'scale(0.95)'; // Efecto de hundimiento
+        
+        // Restauramos el botón después de 2 segundos (tiempo estimado para que inicie la descarga)
+        setTimeout(() => {
+            btn.innerHTML = contenidoOriginal;
+            btn.style.transform = 'scale(1)'; // Restaura el tamaño
+        }, 2000);
     }
 </script>
 {% endblock %}

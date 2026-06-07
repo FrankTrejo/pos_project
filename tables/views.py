@@ -22,7 +22,8 @@ from .utils_impresora import mandar_a_tickera, imprimir_comanda, imprimir_precue
 from .models import (
     Table, Categoria, Producto, TasaBCV, IngredienteProducto, 
     Venta, DetalleVenta, Pago, Orden, DetalleOrden, 
-    DetalleOrdenExtra, CostoAdicional, CostoAsignadoProducto, DetalleVentaExtra, PrecioExtra
+    DetalleOrdenExtra, CostoAdicional, CostoAsignadoProducto, DetalleVentaExtra, PrecioExtra,
+    DetalleOrdenRemovido, DetalleVentaRemovido
 )
 from .forms import (
     ProductoBasicForm, RecetaProductoForm, ProductoPriceForm, 
@@ -97,7 +98,7 @@ def table_order_view(request, table_id):
     tasa_actual_texto = f"{tasa_numerica:.2f} Bs/S" if tasa_obj else "0.00 Bs/S"
     
     categorias = Categoria.objects.all()
-    productos = Producto.objects.filter(precio__gt=0).select_related('categoria').order_by('nombre')
+    productos = Producto.objects.filter(precio__gt=0).select_related('categoria').order_by('id')
     meseros = User.objects.filter(is_active=True, groups__name='Mesero')
 
     # 2. LOGICA: RECUPERAR EL CARRITO GUARDADO
@@ -121,8 +122,25 @@ def table_order_view(request, table_id):
             
             mitad_id = detalle.mitad_producto.id if detalle.mitad_producto else None
             mitad_nombre = detalle.mitad_producto.nombre if detalle.mitad_producto else None
-            removidos = list(detalle.ingredientes_removidos.values_list('id', flat=True))
-            removidos_nombres = list(detalle.ingredientes_removidos.values_list('nombre', flat=True))
+            
+            removidos = []
+            removidos_nombres = []
+            for rem in detalle.ingredientes_removidos.all():
+                removidos.append({'id': rem.id, 'porcion': 1.0})
+                removidos_nombres.append(rem.nombre)
+                
+            if hasattr(detalle, 'removidos_detalles'):
+                for rem in detalle.removidos_detalles.all():
+                    removidos.append({'id': rem.insumo.id, 'porcion': float(rem.porcion)})
+                    porcion_str = "1/4 " if rem.porcion == Decimal('0.25') else "1/2 " if rem.porcion == Decimal('0.50') else "3/4 " if rem.porcion == Decimal('0.75') else ""
+                    removidos_nombres.append(f"{porcion_str}{rem.insumo.nombre}")
+            
+            cuarto_2_id = detalle.cuarto_2_producto.id if detalle.cuarto_2_producto else None
+            cuarto_2_nombre = detalle.cuarto_2_producto.nombre if detalle.cuarto_2_producto else None
+            cuarto_3_id = detalle.cuarto_3_producto.id if detalle.cuarto_3_producto else None
+            cuarto_3_nombre = detalle.cuarto_3_producto.nombre if detalle.cuarto_3_producto else None
+            cuarto_4_id = detalle.cuarto_4_producto.id if detalle.cuarto_4_producto else None
+            cuarto_4_nombre = detalle.cuarto_4_producto.nombre if detalle.cuarto_4_producto else None
 
             carrito_recuperado.append({
                 'id': detalle.producto.id,
@@ -134,6 +152,12 @@ def table_order_view(request, table_id):
                 'extras': extras_list,
                 'mitad_id': mitad_id,
                 'mitad_nombre': mitad_nombre,
+                'cuarto_2_id': cuarto_2_id,
+                'cuarto_2_nombre': cuarto_2_nombre,
+                'cuarto_3_id': cuarto_3_id,
+                'cuarto_3_nombre': cuarto_3_nombre,
+                'cuarto_4_id': cuarto_4_id,
+                'cuarto_4_nombre': cuarto_4_nombre,
                 'removidos': removidos,
                 'removidos_nombres': removidos_nombres
             })
@@ -205,7 +229,7 @@ def product_list(request):
     productos_list = Producto.objects.all().prefetch_related(
         'ingredientes__insumo', 
         'costos_adicionales'
-    ).order_by('nombre')
+    ).order_by('id')
     
     if query:
         productos_list = productos_list.filter(nombre__icontains=query)
@@ -369,29 +393,71 @@ def calcular_insumos_requeridos_json(items):
         prod_id = item.get('id')
         cant = Decimal(str(item.get('cantidad', 1)))
         mitad_id = item.get('mitad_id')
+        cuarto_2_id = item.get('cuarto_2_id')
+        cuarto_3_id = item.get('cuarto_3_id')
+        cuarto_4_id = item.get('cuarto_4_id')
         removidos = item.get('removidos', [])
         ids_extras = item.get('extras', [])
         para_llevar = item.get('para_llevar', False)
         
+        removidos_dict = {}
+        for rem_data in removidos:
+            try:
+                if isinstance(rem_data, dict):
+                    removidos_dict[int(rem_data.get('id', 0))] = Decimal(str(rem_data.get('porcion', 1.0)))
+                else:
+                    removidos_dict[int(rem_data)] = Decimal('1.0')
+            except: pass
+                
         prod_obj = Producto.objects.get(id=prod_id)
         
-        if mitad_id:
+        if cuarto_2_id and cuarto_3_id and cuarto_4_id:
+            c2_obj = Producto.objects.get(id=cuarto_2_id)
+            c3_obj = Producto.objects.get(id=cuarto_3_id)
+            c4_obj = Producto.objects.get(id=cuarto_4_id)
+            ings_prod1 = {ing.insumo.id: ing for ing in prod_obj.ingredientes.all()}
+            ings_prod2 = {ing.insumo.id: ing for ing in c2_obj.ingredientes.all()}
+            ings_prod3 = {ing.insumo.id: ing for ing in c3_obj.ingredientes.all()}
+            ings_prod4 = {ing.insumo.id: ing for ing in c4_obj.ingredientes.all()}
+            all_i_ids = set(ings_prod1.keys()) | set(ings_prod2.keys()) | set(ings_prod3.keys()) | set(ings_prod4.keys())
+            for i_id in all_i_ids:
+                porcion_removida = removidos_dict.get(i_id, Decimal('0.0'))
+                if porcion_removida >= Decimal('1.0'): continue
+                
+                cantidades = []
+                if i_id in ings_prod1: cantidades.append(ings_prod1[i_id].cantidad)
+                if i_id in ings_prod2: cantidades.append(ings_prod2[i_id].cantidad)
+                if i_id in ings_prod3: cantidades.append(ings_prod3[i_id].cantidad)
+                if i_id in ings_prod4: cantidades.append(ings_prod4[i_id].cantidad)
+                
+                # Estandarizamos a la porción mínima para evitar excesos si una receta difiere
+                qty = min(cantidades) * (Decimal(len(cantidades)) / Decimal('4.0'))
+                qty = qty * (Decimal('1.0') - porcion_removida)
+                if qty > 0:
+                    insumos_requeridos[i_id] = insumos_requeridos.get(i_id, Decimal('0.0')) + (qty * cant)
+        elif mitad_id:
             mitad_obj = Producto.objects.get(id=mitad_id)
             ings_prod1 = {ing.insumo.id: ing for ing in prod_obj.ingredientes.all()}
             ings_prod2 = {ing.insumo.id: ing for ing in mitad_obj.ingredientes.all()}
             for i_id in set(ings_prod1.keys()).union(set(ings_prod2.keys())):
-                if i_id in removidos: continue
-                if i_id in ings_prod1 and i_id in ings_prod2:
-                    qty = (ings_prod1[i_id].cantidad / Decimal('2.0')) + (ings_prod2[i_id].cantidad / Decimal('2.0'))
-                elif i_id in ings_prod1:
-                    qty = ings_prod1[i_id].cantidad / Decimal('2.0')
-                else:
-                    qty = ings_prod2[i_id].cantidad / Decimal('2.0')
+                porcion_removida = removidos_dict.get(i_id, Decimal('0.0'))
+                if porcion_removida >= Decimal('1.0'): continue
+                
+                cantidades = []
+                if i_id in ings_prod1: cantidades.append(ings_prod1[i_id].cantidad)
+                if i_id in ings_prod2: cantidades.append(ings_prod2[i_id].cantidad)
+                
+                qty = min(cantidades) * (Decimal(len(cantidades)) / Decimal('2.0'))
+                qty = qty * (Decimal('1.0') - porcion_removida)
                 insumos_requeridos[i_id] = insumos_requeridos.get(i_id, Decimal('0.0')) + (qty * cant)
         else:
             for ing in prod_obj.ingredientes.all():
-                if ing.insumo.id not in removidos:
-                    insumos_requeridos[ing.insumo.id] = insumos_requeridos.get(ing.insumo.id, Decimal('0.0')) + (ing.cantidad * cant)
+                porcion_removida = removidos_dict.get(ing.insumo.id, Decimal('0.0'))
+                if porcion_removida >= Decimal('1.0'): continue
+                
+                qty = ing.cantidad * (Decimal('1.0') - porcion_removida)
+                if qty > 0:
+                    insumos_requeridos[ing.insumo.id] = insumos_requeridos.get(ing.insumo.id, Decimal('0.0')) + (qty * cant)
                     
         if ids_extras:
             for extra_data in ids_extras:
@@ -426,25 +492,71 @@ def calcular_insumos_requeridos_json(items):
 
 def procesar_inventario_orden(orden, usuario, nota_base, tipo_movimiento):
     for det in orden.detalles.all():
-        if det.mitad_producto:
+        removidos_dict = {}
+        for r in det.ingredientes_removidos.all():
+            removidos_dict[r.id] = Decimal('1.0')
+        if hasattr(det, 'removidos_detalles'):
+            for r in det.removidos_detalles.all():
+                removidos_dict[r.insumo.id] = r.porcion
+                
+        if getattr(det, 'cuarto_2_producto', None) and getattr(det, 'cuarto_3_producto', None) and getattr(det, 'cuarto_4_producto', None):
+            ings_prod1 = {ing.insumo.id: ing for ing in det.producto.ingredientes.all()}
+            ings_prod2 = {ing.insumo.id: ing for ing in det.cuarto_2_producto.ingredientes.all()}
+            ings_prod3 = {ing.insumo.id: ing for ing in det.cuarto_3_producto.ingredientes.all()}
+            ings_prod4 = {ing.insumo.id: ing for ing in det.cuarto_4_producto.ingredientes.all()}
+            
+            all_i_ids = set(ings_prod1.keys()) | set(ings_prod2.keys()) | set(ings_prod3.keys()) | set(ings_prod4.keys())
+            for i_id in all_i_ids:
+                porcion_removida = removidos_dict.get(i_id, Decimal('0.0'))
+                if porcion_removida >= Decimal('1.0'): continue
+                
+                cantidades = []
+                ins = None
+                if i_id in ings_prod1: 
+                    cantidades.append(ings_prod1[i_id].cantidad)
+                    ins = ings_prod1[i_id].insumo
+                if i_id in ings_prod2: 
+                    cantidades.append(ings_prod2[i_id].cantidad)
+                    if not ins: ins = ings_prod2[i_id].insumo
+                if i_id in ings_prod3: 
+                    cantidades.append(ings_prod3[i_id].cantidad)
+                    if not ins: ins = ings_prod3[i_id].insumo
+                if i_id in ings_prod4: 
+                    cantidades.append(ings_prod4[i_id].cantidad)
+                    if not ins: ins = ings_prod4[i_id].insumo
+                
+                qty = min(cantidades) * (Decimal(len(cantidades)) / Decimal('4.0'))
+                qty = qty * (Decimal('1.0') - porcion_removida)
+                if qty > 0 and ins:
+                    MovimientoInventario.objects.create(insumo=ins, tipo=tipo_movimiento, cantidad=qty * det.cantidad, unidad_movimiento=ins.unidad, usuario=usuario, nota=nota_base)
+        elif det.mitad_producto:
             ings_prod1 = {ing.insumo.id: ing for ing in det.producto.ingredientes.all()}
             ings_prod2 = {ing.insumo.id: ing for ing in det.mitad_producto.ingredientes.all()}
             for i_id in set(ings_prod1.keys()).union(set(ings_prod2.keys())):
-                if det.ingredientes_removidos.filter(id=i_id).exists(): continue
-                if i_id in ings_prod1 and i_id in ings_prod2:
-                    qty = (ings_prod1[i_id].cantidad / Decimal('2.0')) + (ings_prod2[i_id].cantidad / Decimal('2.0'))
+                porcion_removida = removidos_dict.get(i_id, Decimal('0.0'))
+                if porcion_removida >= Decimal('1.0'): continue
+                
+                cantidades = []
+                ins = None
+                if i_id in ings_prod1:
+                    cantidades.append(ings_prod1[i_id].cantidad)
                     ins = ings_prod1[i_id].insumo
-                elif i_id in ings_prod1:
-                    qty = ings_prod1[i_id].cantidad / Decimal('2.0')
-                    ins = ings_prod1[i_id].insumo
-                else:
-                    qty = ings_prod2[i_id].cantidad / Decimal('2.0')
-                    ins = ings_prod2[i_id].insumo
-                MovimientoInventario.objects.create(insumo=ins, tipo=tipo_movimiento, cantidad=qty * det.cantidad, unidad_movimiento=ins.unidad, usuario=usuario, nota=nota_base)
+                if i_id in ings_prod2:
+                    cantidades.append(ings_prod2[i_id].cantidad)
+                    if not ins: ins = ings_prod2[i_id].insumo
+                
+                qty = min(cantidades) * (Decimal(len(cantidades)) / Decimal('2.0'))
+                qty = qty * (Decimal('1.0') - porcion_removida)
+                if qty > 0 and ins:
+                    MovimientoInventario.objects.create(insumo=ins, tipo=tipo_movimiento, cantidad=qty * det.cantidad, unidad_movimiento=ins.unidad, usuario=usuario, nota=nota_base)
         else:
             for ing in det.producto.ingredientes.all():
-                if not det.ingredientes_removidos.filter(id=ing.insumo.id).exists():
-                    MovimientoInventario.objects.create(insumo=ing.insumo, tipo=tipo_movimiento, cantidad=ing.cantidad * det.cantidad, unidad_movimiento=ing.insumo.unidad, usuario=usuario, nota=nota_base)
+                porcion_removida = removidos_dict.get(ing.insumo.id, Decimal('0.0'))
+                if porcion_removida >= Decimal('1.0'): continue
+                
+                qty = ing.cantidad * (Decimal('1.0') - porcion_removida)
+                if qty > 0:
+                    MovimientoInventario.objects.create(insumo=ing.insumo, tipo=tipo_movimiento, cantidad=qty * det.cantidad, unidad_movimiento=ing.insumo.unidad, usuario=usuario, nota=nota_base)
         for extra in det.extras_elegidos.all():
             if extra.precio == Decimal('0.00') or extra.precio == 0:
                 cantidad_a_descontar = extra.porcion
@@ -532,15 +644,43 @@ def grabar_mesa_ajax(request, table_id):
                     )
                     
                     mitad_id = item.get('mitad_id')
-                    if mitad_id:
+                    cuarto_2_id = item.get('cuarto_2_id')
+                    cuarto_3_id = item.get('cuarto_3_id')
+                    cuarto_4_id = item.get('cuarto_4_id')
+                    
+                    if cuarto_2_id and cuarto_3_id and cuarto_4_id:
+                        nuevo_detalle.cuarto_2_producto = Producto.objects.get(id=cuarto_2_id)
+                        nuevo_detalle.cuarto_3_producto = Producto.objects.get(id=cuarto_3_id)
+                        nuevo_detalle.cuarto_4_producto = Producto.objects.get(id=cuarto_4_id)
+                        nuevo_detalle.save()
+                    elif mitad_id:
                         mitad_obj = Producto.objects.get(id=mitad_id)
                         nuevo_detalle.mitad_producto = mitad_obj
                         nuevo_detalle.save()
                         
                     removidos = item.get('removidos', [])
                     if removidos:
-                        for rem_id in removidos:
-                            nuevo_detalle.ingredientes_removidos.add(rem_id)
+                        for rem_data in removidos:
+                            try:
+                                if isinstance(rem_data, dict):
+                                    rem_id = int(rem_data.get('id', 0))
+                                    porcion = Decimal(str(rem_data.get('porcion', 1.0)))
+                                else:
+                                    rem_id = int(rem_data)
+                                    porcion = Decimal('1.0')
+                                    
+                                if rem_id > 0:
+                                    if porcion == Decimal('1.0'):
+                                        nuevo_detalle.ingredientes_removidos.add(rem_id)
+                                    else:
+                                        ins_rem = Insumo.objects.get(id=rem_id)
+                                        DetalleOrdenRemovido.objects.create(
+                                            detalle_orden=nuevo_detalle,
+                                            insumo=ins_rem,
+                                            porcion=porcion
+                                        )
+                            except Exception as e_rem:
+                                print(f"Error procesando removido: {e_rem}")
 
                     # B) GUARDAR EXTRAS
                     ids_extras = item.get('extras', [])
@@ -722,8 +862,12 @@ def generar_cuenta_pdf(request, table_id):
             'subtotal_usd': subtotal_linea_usd, 
             'subtotal_bs': subtotal_linea_bs,
             'extras_elegidos': item.extras_elegidos.all(),
-            'mitad_producto': item.mitad_producto,
+            'mitad_producto': item.mitad_producto.nombre if item.mitad_producto else None,
+            'cuarto_2_producto': item.cuarto_2_producto.nombre if item.cuarto_2_producto else None,
+            'cuarto_3_producto': item.cuarto_3_producto.nombre if item.cuarto_3_producto else None,
+            'cuarto_4_producto': item.cuarto_4_producto.nombre if item.cuarto_4_producto else None,
             'ingredientes_removidos': item.ingredientes_removidos,
+            'removidos_detalles': getattr(item, 'removidos_detalles', None)
         })
 
     # Calculamos el total en Bs basado en el nuevo total USD
@@ -819,16 +963,26 @@ def facturar_mesa_ajax(request, table_id):
                     precio_base = float(det.precio_unitario)
                     costo_extras = sum(float(e.precio) for e in det.extras_elegidos.all())
                     subtotal_real = (precio_base + costo_extras) * det.cantidad
+                    
+                    nombre_con_tamano = det.producto.nombre
+                    if det.producto.tamano != 'UNI':
+                        nombre_con_tamano += f" ({det.producto.get_tamano_display() if hasattr(det.producto, 'get_tamano_display') else det.producto.tamano})"
 
                     dv = DetalleVenta.objects.create(
                         venta=venta, 
                         producto=det.producto, 
-                        nombre_producto=det.producto.nombre,
+                        nombre_producto=nombre_con_tamano,
                         cantidad=det.cantidad, 
                         precio_unitario=det.precio_unitario, 
                         subtotal=subtotal_real,
                         mitad_producto=det.mitad_producto,
-                        nombre_mitad=det.mitad_producto.nombre if det.mitad_producto else None
+                        nombre_mitad=det.mitad_producto.nombre if det.mitad_producto else None,
+                        cuarto_2_producto=det.cuarto_2_producto,
+                        nombre_cuarto_2=det.cuarto_2_producto.nombre if det.cuarto_2_producto else None,
+                        cuarto_3_producto=det.cuarto_3_producto,
+                        nombre_cuarto_3=det.cuarto_3_producto.nombre if det.cuarto_3_producto else None,
+                        cuarto_4_producto=det.cuarto_4_producto,
+                        nombre_cuarto_4=det.cuarto_4_producto.nombre if det.cuarto_4_producto else None
                     )
                     
                     if det.ingredientes_removidos.exists():
@@ -907,47 +1061,86 @@ def anular_venta(request, venta_id):
                     producto = detalle.producto
                     cantidad_vendida = detalle.cantidad
                     
-                    if detalle.mitad_producto:
+                    removidos_dict = {}
+                    for r in detalle.ingredientes_removidos.all():
+                        removidos_dict[r.id] = Decimal('1.0')
+                    if hasattr(detalle, 'removidos_detalles'):
+                        for r in detalle.removidos_detalles.all():
+                            if r.insumo: removidos_dict[r.insumo.id] = r.porcion
+                            
+                    if getattr(detalle, 'cuarto_2_producto', None) and getattr(detalle, 'cuarto_3_producto', None) and getattr(detalle, 'cuarto_4_producto', None):
+                        ings_prod1 = {ing.insumo.id: ing for ing in producto.ingredientes.all()} if producto else {}
+                        ings_prod2 = {ing.insumo.id: ing for ing in detalle.cuarto_2_producto.ingredientes.all()} if detalle.cuarto_2_producto else {}
+                        ings_prod3 = {ing.insumo.id: ing for ing in detalle.cuarto_3_producto.ingredientes.all()} if detalle.cuarto_3_producto else {}
+                        ings_prod4 = {ing.insumo.id: ing for ing in detalle.cuarto_4_producto.ingredientes.all()} if detalle.cuarto_4_producto else {}
+                        
+                        all_i_ids = set(ings_prod1.keys()) | set(ings_prod2.keys()) | set(ings_prod3.keys()) | set(ings_prod4.keys())
+                        for i_id in all_i_ids:
+                            porcion_removida = removidos_dict.get(i_id, Decimal('0.0'))
+                            if porcion_removida >= Decimal('1.0'): continue
+                            
+                            cantidades = []
+                            ins = None
+                            if i_id in ings_prod1: 
+                                cantidades.append(ings_prod1[i_id].cantidad)
+                                ins = ings_prod1[i_id].insumo
+                            if i_id in ings_prod2: 
+                                cantidades.append(ings_prod2[i_id].cantidad)
+                                if not ins: ins = ings_prod2[i_id].insumo
+                            if i_id in ings_prod3: 
+                                cantidades.append(ings_prod3[i_id].cantidad)
+                                if not ins: ins = ings_prod3[i_id].insumo
+                            if i_id in ings_prod4: 
+                                cantidades.append(ings_prod4[i_id].cantidad)
+                                if not ins: ins = ings_prod4[i_id].insumo
+                            
+                            qty = min(cantidades) * (Decimal(len(cantidades)) / Decimal('4.0'))
+                            qty = qty * (Decimal('1.0') - porcion_removida)
+                            if qty > 0 and ins:
+                                nota_mov = f"ANULACIÓN Venta #{venta.codigo_factura}: 4 Cuartos {producto.nombre[:10]}..."
+                                MovimientoInventario.objects.create(insumo=ins, tipo='ENTRADA', cantidad=qty * cantidad_vendida, unidad_movimiento=ins.unidad, usuario=request.user, nota=nota_mov, costo_unitario_movimiento=ins.costo_unitario)
+                    elif detalle.mitad_producto:
                         if producto:
                             ings_prod1 = {ing.insumo.id: ing for ing in producto.ingredientes.all()}
                             ings_prod2 = {ing.insumo.id: ing for ing in detalle.mitad_producto.ingredientes.all()}
                             
                             for i_id in set(ings_prod1.keys()).union(set(ings_prod2.keys())):
-                                if detalle.ingredientes_removidos.filter(id=i_id).exists():
-                                    continue
+                                porcion_removida = removidos_dict.get(i_id, Decimal('0.0'))
+                                if porcion_removida >= Decimal('1.0'): continue
                                 
-                                if i_id in ings_prod1 and i_id in ings_prod2:
-                                    ing_obj1 = ings_prod1[i_id]
-                                    ing_obj2 = ings_prod2[i_id]
-                                    qty = (ing_obj1.cantidad / Decimal('2.0')) + (ing_obj2.cantidad / Decimal('2.0'))
-                                    nota_mov = f"ANULACIÓN Venta #{venta.codigo_factura}: 1/2 {producto.nombre} + 1/2 {detalle.mitad_producto.nombre} (Común)"
-                                    insumo_usado = ing_obj1.insumo
-                                elif i_id in ings_prod1:
-                                    ing_obj = ings_prod1[i_id]
-                                    qty = ing_obj.cantidad / Decimal('2.0')
-                                    nota_mov = f"ANULACIÓN Venta #{venta.codigo_factura}: 1/2 {producto.nombre}"
-                                    insumo_usado = ing_obj.insumo
-                                else:
-                                    ing_obj = ings_prod2[i_id]
-                                    qty = ing_obj.cantidad / Decimal('2.0')
-                                    nota_mov = f"ANULACIÓN Venta #{venta.codigo_factura}: 1/2 {detalle.mitad_producto.nombre}"
-                                    insumo_usado = ing_obj.insumo
+                                cantidades = []
+                                insumo_usado = None
+                                if i_id in ings_prod1:
+                                    cantidades.append(ings_prod1[i_id].cantidad)
+                                    insumo_usado = ings_prod1[i_id].insumo
+                                if i_id in ings_prod2:
+                                    cantidades.append(ings_prod2[i_id].cantidad)
+                                    if not insumo_usado: insumo_usado = ings_prod2[i_id].insumo
+                                    
+                                qty = min(cantidades) * (Decimal(len(cantidades)) / Decimal('2.0'))
+                                nota_mov = f"ANULACIÓN Venta #{venta.codigo_factura}: Mitad/Mitad"
 
-                                MovimientoInventario.objects.create(
-                                    insumo=insumo_usado, tipo='ENTRADA',
-                                    cantidad=qty * cantidad_vendida,
-                                    unidad_movimiento=insumo_usado.unidad,
-                                    usuario=request.user,
-                                    nota=nota_mov,
-                                    costo_unitario_movimiento=insumo_usado.costo_unitario 
-                                )
+                                qty = qty * (Decimal('1.0') - porcion_removida)
+                                if qty > 0:
+                                    MovimientoInventario.objects.create(
+                                        insumo=insumo_usado, tipo='ENTRADA',
+                                        cantidad=qty * cantidad_vendida,
+                                        unidad_movimiento=insumo_usado.unidad,
+                                        usuario=request.user,
+                                        nota=nota_mov,
+                                        costo_unitario_movimiento=insumo_usado.costo_unitario 
+                                    )
                     else:
                         if producto:
                             for ingrediente in producto.ingredientes.all():
-                                if not detalle.ingredientes_removidos.filter(id=ingrediente.insumo.id).exists():
+                                porcion_removida = removidos_dict.get(ingrediente.insumo.id, Decimal('0.0'))
+                                if porcion_removida >= Decimal('1.0'): continue
+                                
+                                qty = ingrediente.cantidad * (Decimal('1.0') - porcion_removida)
+                                if qty > 0:
                                     MovimientoInventario.objects.create(
                                         insumo=ingrediente.insumo, tipo='ENTRADA',
-                                        cantidad=ingrediente.cantidad * cantidad_vendida,
+                                        cantidad=qty * cantidad_vendida,
                                         unidad_movimiento=ingrediente.insumo.unidad,
                                         usuario=request.user,
                                         nota=f"ANULACIÓN Venta #{venta.codigo_factura}: {producto.nombre}",

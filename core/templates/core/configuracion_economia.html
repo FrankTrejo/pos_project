@@ -84,7 +84,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for costo in lista_costos %}
+                    {% for costo in costos %}
                     <tr style="background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.03); transition: transform 0.2s;">
                         <td style="padding: 15px; border-radius: 8px 0 0 8px; border-left: 4px solid {% if costo.tipo == 'FIJO' %}#198754{% else %}#0dcaf0{% endif %}; font-weight: 600; color: #333;">
                             {{ costo.nombre }}
@@ -106,15 +106,20 @@
                             {{ costo.valor_defecto }}
                         </td>
                         
-                        <td style="padding: 15px; text-align: right; border-radius: 0 8px 8px 0;">
-                            <form method="POST" onsubmit="return confirm('¿Estás seguro de eliminar \'{{ costo.nombre }}\'?');" style="margin: 0;">
-                                {% csrf_token %}
-                                <input type="hidden" name="delete_costo" value="1">
-                                <input type="hidden" name="costo_id" value="{{ costo.id }}">
-                                <button type="submit" style="background: #ffebee; color: #c62828; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; transition: background 0.2s;" title="Eliminar">
-                                    <i class="fas fa-trash-alt"></i>
-                                </button>
-                            </form>
+                        <td style="padding: 15px; text-align: right; border-radius: 0 8px 8px 0; white-space: nowrap;">
+                            <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                                <a href="{% url 'costo_indirecto_edit' costo.id %}" style="display: inline-flex; align-items: center; justify-content: center; background: #e3f2fd; color: #0d6efd; text-decoration: none; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; transition: background 0.2s;" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <form method="POST" onsubmit="return confirm('¿Estás seguro de eliminar \'{{ costo.nombre }}\'?');" style="margin: 0;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="delete_costo" value="1">
+                                    <input type="hidden" name="costo_id" value="{{ costo.id }}">
+                                    <button type="submit" style="background: #ffebee; color: #c62828; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; transition: background 0.2s;" title="Eliminar">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </form>
+                            </div>
                         </td>
                     </tr>
                     {% empty %}

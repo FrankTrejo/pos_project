@@ -69,30 +69,31 @@ def add_movement(request):
         nota = request.POST.get('nota')
         
         try:
-            unidades = Decimal(request.POST.get('cantidad_unidades', '0'))
+            # Aunque en el formulario se llame 'cantidad_unidades', ahora recibimos directamente la cantidad en la unidad base (Gramos/ML)
+            cantidad_ingresada = Decimal(request.POST.get('cantidad_unidades', '0'))
         except:
-            unidades = 0
+            cantidad_ingresada = 0
             
         insumo = get_object_or_404(Insumo, id=insumo_id)
 
         # --- CORRECCIÓN AQUÍ ---
-        # Antes bloqueábamos si era <= 0. 
-        # Ahora: Si es AJUSTE, permitimos negativos. Si es ENTRADA/SALIDA, exigimos positivos.
+        # Si es AJUSTE, permitimos negativos. Si es ENTRADA/SALIDA, exigimos positivos.
         
-        if tipo != 'AJUSTE' and unidades <= 0:
+        if tipo != 'AJUSTE' and cantidad_ingresada <= 0:
             messages.error(request, "Para Entradas y Salidas la cantidad debe ser mayor a 0.")
             return redirect('inventory_index')
             
-        if tipo == 'AJUSTE' and unidades == 0:
+        if tipo == 'AJUSTE' and cantidad_ingresada == 0:
              messages.error(request, "El ajuste no puede ser 0.")
              return redirect('inventory_index')
 
-        # Calculamos gramos reales (manteniendo el signo si es negativo)
-        peso_por_unidad = insumo.peso_standar 
-        cantidad_real_gramos = unidades * peso_por_unidad
+        # La cantidad ingresada ya no se multiplica por peso_standar (lotes),
+        # se usa directamente como el peso a ingresar/descontar.
+        cantidad_real_gramos = cantidad_ingresada
         
         # Costo (Solo informativo)
-        costo_total_movimiento = abs(unidades * insumo.precio_mercado)
+        # Se calcula el costo del movimiento en base al costo unitario (por gramo/ml)
+        costo_total_movimiento = abs(cantidad_real_gramos * insumo.costo_unitario)
 
         try:
             MovimientoInventario.objects.create(
@@ -100,57 +101,10 @@ def add_movement(request):
                 tipo=tipo,
                 cantidad=cantidad_real_gramos, 
                 usuario=request.user if request.user.is_authenticated else None,
-                nota=f"{nota} (Carga: {unidades} Unds)",
+                nota=f"{nota} (Carga directa: {cantidad_ingresada:g} {insumo.unidad.codigo})",
                 costo_unitario_movimiento=costo_total_movimiento 
             )
             messages.success(request, f"Movimiento registrado correctamente.")
-        except Exception as e:
-            messages.error(request, f"Error: {e}")
-
-        return redirect('inventory_index')
-    
-    return redirect('inventory_index')
-    if request.method == 'POST':
-        insumo_id = request.POST.get('insumo_id')
-        tipo = request.POST.get('tipo')
-        nota = request.POST.get('nota')
-        
-        # SOLO RECIBIMOS LAS UNIDADES (Cajas, Sacos, Botellas)
-        try:
-            unidades = Decimal(request.POST.get('cantidad_unidades', '0'))
-        except:
-            unidades = 0
-            
-        insumo = get_object_or_404(Insumo, id=insumo_id)
-
-        if unidades <= 0:
-            messages.error(request, "La cantidad debe ser mayor a 0.")
-            return redirect('inventory_index')
-
-        # 1. BUSCAMOS EL PESO EN EL MAESTRO (Base de Datos)
-        # Ya no se lo pedimos al usuario.
-        peso_por_unidad = insumo.peso_standar 
-        
-        # Calculamos cuántos gramos reales están entrando
-        cantidad_real_gramos = unidades * peso_por_unidad
-
-        # 2. BUSCAMOS EL COSTO EN EL MAESTRO (Base de Datos)
-        costo_total_movimiento = unidades * insumo.precio_mercado
-
-        # Validación de seguridad: Si el producto no tiene peso configurado en el maestro
-        if peso_por_unidad <= 0:
-            messages.warning(request, f"⚠️ El producto '{insumo.nombre}' no tiene peso configurado en el Maestro. Se cargó en 0.")
-
-        try:
-            MovimientoInventario.objects.create(
-                insumo=insumo,
-                tipo=tipo,
-                cantidad=cantidad_real_gramos, # Guardamos gramos para el stock
-                usuario=request.user if request.user.is_authenticated else None,
-                nota=f"{nota} (Carga: {unidades} Unds x {peso_por_unidad} {insumo.unidad.codigo})",
-                costo_unitario_movimiento=costo_total_movimiento 
-            )
-            messages.success(request, f"¡Éxito! Se procesaron {unidades} unidades. Stock aumentado en {cantidad_real_gramos} {insumo.unidad.codigo}.")
         except Exception as e:
             messages.error(request, f"Error: {e}")
 
@@ -814,17 +768,18 @@ def salidas_especiales_view(request):
                 # Guardamos costo final
                 registro.costo_estimado = costo_total
                 registro.save()
+
+                # --- IMPRESIÓN TICKERA ---
+                try:
+                    from tables.utils_impresora import imprimir_consumo_interno
+                    imprimir_consumo_interno(registro)
+                except Exception as e_print:
+                    print(f"Error tickera: {e_print}")
                 
                 # --- CORRECCIÓN DEFINITIVA ---
                 messages.success(request, f"Salida registrada exitosamente.")
                 
-                # Importamos aquí mismo para evitar el error de variable local
-                from django.urls import reverse 
-                
-                base_url = reverse('salidas_especiales')
-                final_url = f"{base_url}?print_id={registro.id}"
-                
-                return HttpResponseRedirect(final_url)
+                return redirect('salidas_especiales')
 
         except Exception as e:
             messages.error(request, f"Error técnico: {str(e)}")
@@ -936,17 +891,17 @@ def salidas_especiales_view(request):
                 # Guardamos costo final
                 registro.costo_estimado = costo_total
                 registro.save()
+
+                # --- IMPRESIÓN TICKERA ---
+                try:
+                    from tables.utils_impresora import imprimir_consumo_interno
+                    imprimir_consumo_interno(registro)
+                except Exception as e_print:
+                    print(f"Error tickera: {e_print}")
                 
                 messages.success(request, f"Salida registrada exitosamente.")
                 
-                # CAMBIO CLAVE: Redirigimos pasando el ID para imprimir
-                from django.urls import reverse
-
-                # Construimos la URL con el parámetro ?print_id=123
-                url_base = reverse('salidas_especiales')
-                url_destino = f"{url_base}?print_id={registro.id}"
-                
-                return redirect(url_destino)
+                return redirect('salidas_especiales')
 
         except Exception as e:
             messages.error(request, f"Error técnico: {str(e)}")
@@ -1047,6 +1002,13 @@ def salidas_especiales_view(request):
                 # Guardamos el costo final
                 registro.costo_estimado = costo_total_operacion
                 registro.save()
+
+                # --- IMPRESIÓN TICKERA ---
+                try:
+                    from tables.utils_impresora import imprimir_consumo_interno
+                    imprimir_consumo_interno(registro)
+                except Exception as e_print:
+                    print(f"Error tickera: {e_print}")
                 
                 messages.success(request, "Salida registrada e inventario actualizado.")
                 return redirect('salidas_especiales')
@@ -1129,3 +1091,43 @@ def receta_create(request):
         form = RecetaInsumoForm()
     
     return render(request, 'inventory/receta_form.html', {'form': form})
+
+@staff_member_required
+def anular_consumo_interno(request, consumo_id):
+    if request.method == 'POST':
+        consumo = get_object_or_404(ConsumoInterno, id=consumo_id)
+        
+        if "[ANULADO]" in consumo.descripcion:
+            messages.error(request, "Este registro ya está anulado.")
+            return redirect('salidas_especiales')
+
+        try:
+            with transaction.atomic():
+                # Buscar todos los movimientos de inventario que generó esta salida
+                movimientos = MovimientoInventario.objects.filter(
+                    models.Q(nota=f"Base Personal #{consumo.id}") |
+                    models.Q(nota=f"Extra Personal #{consumo.id}") |
+                    models.Q(nota=f"Regalo #{consumo.id}") |
+                    models.Q(nota=f"Personal #{consumo.id}")
+                )
+
+                # Devolver el inventario (Generar Entradas)
+                for mov in movimientos:
+                    MovimientoInventario.objects.create(
+                        insumo=mov.insumo,
+                        tipo='ENTRADA',
+                        cantidad=mov.cantidad,
+                        unidad_movimiento=mov.unidad_movimiento,
+                        usuario=request.user,
+                        nota=f"ANULACIÓN Salida #{consumo.id}"
+                    )
+                
+                # Marcar el registro visualmente como anulado
+                consumo.descripcion = f"[ANULADO] {consumo.descripcion}"
+                consumo.save()
+
+                messages.success(request, f"Salida #{consumo.id} anulada e inventario restaurado exitosamente.")
+        except Exception as e:
+            messages.error(request, f"Error al anular: {e}")
+            
+    return redirect('salidas_especiales')

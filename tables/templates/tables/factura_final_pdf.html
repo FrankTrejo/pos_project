@@ -2,7 +2,7 @@
 <html>
 <head>
     <style>
-        @page { size: 80mm 250mm; margin: 3mm; }
+        @page { size: 80mm 250mm; margin: 2mm; }
         body { font-family: sans-serif; font-size: 10px; line-height: 1.1; }
         .center { text-align: center; }
         .bold { font-weight: bold; }
@@ -51,7 +51,13 @@
             <tr>
                 <td>{{ item.cantidad }}</td>
                 <td>
-                    {% if item.mitad_producto %}
+                    {% if item.cuarto_2_producto %}
+                        4 CUARTOS
+                        <div class="extra-row">1/4 {{ item.nombre_producto }}</div>
+                        <div class="extra-row">1/4 {{ item.nombre_cuarto_2 }}</div>
+                        <div class="extra-row">1/4 {{ item.nombre_cuarto_3 }}</div>
+                        <div class="extra-row">1/4 {{ item.nombre_cuarto_4 }}</div>
+                    {% elif item.mitad_producto %}
                         MITAD/MITAD
                         <div class="extra-row">1/2 {{ item.nombre_producto }}</div>
                         <div class="extra-row">1/2 {{ item.nombre_mitad }}</div>
@@ -68,6 +74,11 @@
                     {% if item.ingredientes_removidos.exists %}
                         {% for rem in item.ingredientes_removidos.all %}
                             <div class="extra-row" style="color: #dc3545;">- SIN {{ rem.nombre }}</div>
+                        {% endfor %}
+                    {% endif %}
+                    {% if item.removidos_detalles.exists %}
+                        {% for r in item.removidos_detalles.all %}
+                            <div class="extra-row" style="color: #dc3545;">- SIN {{ r.porcion_display }}{{ r.insumo.nombre|default:r.nombre_insumo }}</div>
                         {% endfor %}
                     {% endif %}
                 </td>

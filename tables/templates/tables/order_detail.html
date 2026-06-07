@@ -64,7 +64,7 @@
                     <button class="category-btn" onclick="filtrarPorTamano('FAM', this)">FAM</button>
                 </div>
 
-                <div id="grid-productos" style="display: grid; grid-template-columns: repeat(auto-fill, 110px); grid-auto-rows: 110px; gap: 10px; margin-top: 15px; overflow-y: auto; height: 350px; padding-right: 5px; align-content: start;">
+                <div id="grid-productos" style="display: grid; grid-template-columns: repeat(auto-fill, 115px); grid-auto-rows: 115px; gap: 10px; margin-top: 15px; overflow-y: auto; height: 350px; padding-right: 5px; align-content: start;">
                     {% for prod in productos %}
                         <div class="producto-card card-style" 
                             data-cat-id="{{ prod.categoria.id }}" 
@@ -74,7 +74,10 @@
                             style="cursor: pointer; padding: 5px; text-align: center; border: 1px solid #ddd; transition: transform 0.1s; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%;"
                             onclick="agregarAlCarrito('{{ prod.id }}', '{{ prod.nombre }}', '{{ prod.precio }}', '{{ prod.tamano }}')">
                             
-                            <div style="font-weight: bold; font-size: 0.85em; margin-bottom: 5px; line-height: 1.2;">
+                            <div style="font-size: 0.65em; color: #888; margin-bottom: 2px;">
+                                Cód: {{ prod.id }}
+                            </div>
+                            <div style="font-weight: bold; font-size: 0.9em; margin-bottom: 5px; line-height: 1.2;">
                                 {{ prod.nombre }}
                             </div>
                             {% if prod.tamano != 'UNI' %}
@@ -82,7 +85,7 @@
                                     {{ prod.tamano }}
                                 </div>
                             {% endif %}
-                            <div style="color: var(--primary-blue); font-weight: bold; font-size: 0.9em;">
+                            <div style="color: var(--primary-blue); font-weight: bold; font-size: 0.95em;">
                                 ${{ prod.precio }}
                             </div>
                         </div>
@@ -181,6 +184,7 @@
                 
                 <div style="display:flex; gap:10px; margin-bottom: 20px;">
                     <button onclick="mostrarOpcionesMitad()" class="action-btn" style="flex:1; border:1px solid #ccc; padding:10px;"><i class="fas fa-adjust"></i> Mitad y Mitad</button>
+                    <button onclick="mostrarOpcionesCuartos()" class="action-btn" style="flex:1; border:1px solid #ccc; padding:10px;"><i class="fas fa-pizza-slice"></i> 4 Cuartos</button>
                     <button onclick="mostrarOpcionesSin()" class="action-btn" style="flex:1; border:1px solid #ccc; padding:10px;"><i class="fas fa-minus-circle"></i> Quitar Ingrediente</button>
                     <button onclick="mostrarOpcionesSustituir()" class="action-btn" style="flex:1; border:1px solid #ccc; padding:10px;"><i class="fas fa-exchange-alt"></i> Sustituir</button>
                 </div>
@@ -188,6 +192,14 @@
                 <div id="opcionesMitad" style="display:none;">
                     <label style="font-weight:bold;">Selecciona la otra mitad (mismo tamaño):</label>
                     <select id="selectMitad" class="form-control" style="width:100%; padding:10px; margin-top:10px; border-radius:5px; border:1px solid #ccc;"></select>
+                </div>
+
+                <div id="opcionesCuartos" style="display:none;">
+                    <label style="font-weight:bold;">Selecciona los 4 cuartos (mismo tamaño):</label>
+                    <select id="selectCuarto1" class="form-control" style="width:100%; padding:10px; margin-top:10px; border-radius:5px; border:1px solid #ccc;"></select>
+                    <select id="selectCuarto2" class="form-control" style="width:100%; padding:10px; margin-top:10px; border-radius:5px; border:1px solid #ccc;"></select>
+                    <select id="selectCuarto3" class="form-control" style="width:100%; padding:10px; margin-top:10px; border-radius:5px; border:1px solid #ccc;"></select>
+                    <select id="selectCuarto4" class="form-control" style="width:100%; padding:10px; margin-top:10px; border-radius:5px; border:1px solid #ccc;"></select>
                 </div>
 
                 <div id="opcionesSin" style="display:none;">
@@ -577,23 +589,52 @@
             document.getElementById('tituloPersonalizar').innerText = "Personalizando: " + item.nombre;
             
             document.getElementById('opcionesMitad').style.display = 'none';
+            document.getElementById('opcionesCuartos').style.display = 'none';
             document.getElementById('opcionesSin').style.display = 'none';
             document.getElementById('opcionesSustituir').style.display = 'none';
-            ingredientesQuitadosTemporales = item.removidos ? [...item.removidos] : [];
+            ingredientesQuitadosTemporales = (item.removidos || []).map(r => {
+                if (typeof r === 'object' && r !== null) return { id: parseInt(r.id), porcion: parseFloat(r.porcion) || 1.0 };
+                return {id: parseInt(r), porcion: 1.0};
+            });
             
             const selectMitad = document.getElementById('selectMitad');
+            const selectC1 = document.getElementById('selectCuarto1');
+            const selectC2 = document.getElementById('selectCuarto2');
+            const selectC3 = document.getElementById('selectCuarto3');
+            const selectC4 = document.getElementById('selectCuarto4');
+            
             selectMitad.innerHTML = '<option value="">-- Ninguna (Completa) --</option>';
+            selectC1.innerHTML = '<option value="">-- Selecciona el Cuarto 1 --</option>';
+            selectC2.innerHTML = '<option value="">-- Selecciona el Cuarto 2 --</option>';
+            selectC3.innerHTML = '<option value="">-- Selecciona el Cuarto 3 --</option>';
+            selectC4.innerHTML = '<option value="">-- Selecciona el Cuarto 4 --</option>';
+
             PRODUCTOS_DISPONIBLES.forEach(p => {
-                if (p.tamano === item.tamano_codigo && p.id != item.id) {
-                    let opt = document.createElement('option');
-                    opt.value = p.id;
-                    opt.text = p.nombre;
-                    if (item.mitad_id == p.id) opt.selected = true;
-                    selectMitad.appendChild(opt);
+                if (p.tamano === item.tamano_codigo) {
+                    if (p.id != item.id) {
+                        let opt = document.createElement('option');
+                        opt.value = p.id;
+                        opt.text = p.nombre;
+                        if (item.mitad_id == p.id) opt.selected = true;
+                        selectMitad.appendChild(opt);
+                    }
+
+                    let o1 = document.createElement('option'); o1.value = p.id; o1.text = p.nombre;
+                    if (item.id == p.id) o1.selected = true; selectC1.appendChild(o1);
+
+                    let o2 = document.createElement('option'); o2.value = p.id; o2.text = p.nombre;
+                    if (item.cuarto_2_id == p.id) o2.selected = true; selectC2.appendChild(o2);
+                    
+                    let o3 = document.createElement('option'); o3.value = p.id; o3.text = p.nombre;
+                    if (item.cuarto_3_id == p.id) o3.selected = true; selectC3.appendChild(o3);
+                    
+                    let o4 = document.createElement('option'); o4.value = p.id; o4.text = p.nombre;
+                    if (item.cuarto_4_id == p.id) o4.selected = true; selectC4.appendChild(o4);
                 }
             });
 
-            if (item.mitad_id) document.getElementById('opcionesMitad').style.display = 'block';
+            if (item.cuarto_2_id) document.getElementById('opcionesCuartos').style.display = 'block';
+            else if (item.mitad_id) document.getElementById('opcionesMitad').style.display = 'block';
             if (ingredientesQuitadosTemporales.length > 0) mostrarOpcionesSin();
 
             document.getElementById('modalPersonalizar').style.display = 'flex';
@@ -606,12 +647,21 @@
 
         function mostrarOpcionesMitad() {
             document.getElementById('opcionesMitad').style.display = 'block';
+            document.getElementById('opcionesCuartos').style.display = 'none';
+            document.getElementById('opcionesSin').style.display = 'none';
+            document.getElementById('opcionesSustituir').style.display = 'none';
+        }
+
+        function mostrarOpcionesCuartos() {
+            document.getElementById('opcionesMitad').style.display = 'none';
+            document.getElementById('opcionesCuartos').style.display = 'block';
             document.getElementById('opcionesSin').style.display = 'none';
             document.getElementById('opcionesSustituir').style.display = 'none';
         }
 
         function mostrarOpcionesSin() {
             document.getElementById('opcionesMitad').style.display = 'none';
+            document.getElementById('opcionesCuartos').style.display = 'none';
             document.getElementById('opcionesSustituir').style.display = 'none';
             document.getElementById('opcionesSin').style.display = 'block';
             
@@ -626,26 +676,73 @@
             }
 
             ingredientes.forEach(ing => {
-                const isRemoved = ingredientesQuitadosTemporales.includes(ing.id);
-                const div = document.createElement('div');
-                div.className = 'btn-extra-item ' + (isRemoved ? 'selected' : '');
-                div.innerHTML = `SIN ${ing.nombre}`;
-                div.onclick = function() {
-                    const idx = ingredientesQuitadosTemporales.indexOf(ing.id);
+                const removedObj = ingredientesQuitadosTemporales.find(r => (r.id == ing.id || r == ing.id));
+                const isRemoved = !!removedObj;
+                const porcion = isRemoved ? (parseFloat(removedObj.porcion) || 1.0) : 1.0;
+                
+                const divCont = document.createElement('div');
+                divCont.style.cssText = "display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px;";
+                
+                const divBtn = document.createElement('div');
+                divBtn.className = 'btn-extra-item ' + (isRemoved ? 'selected' : '');
+                
+                let porcionText = "";
+                if(isRemoved) {
+                    if(porcion == 0.25) porcionText = "1/4 ";
+                    else if(porcion == 0.50) porcionText = "1/2 ";
+                    else if(porcion == 0.75) porcionText = "3/4 ";
+                }
+                
+                divBtn.innerHTML = `SIN ${porcionText}${ing.nombre}`;
+                divBtn.onclick = function() {
+                    const idx = ingredientesQuitadosTemporales.findIndex(r => (r.id == ing.id || r == ing.id));
                     if (idx > -1) {
                         ingredientesQuitadosTemporales.splice(idx, 1);
-                        div.classList.remove('selected');
+                        divBtn.classList.remove('selected');
                     } else {
-                        ingredientesQuitadosTemporales.push(ing.id);
-                        div.classList.add('selected');
+                        ingredientesQuitadosTemporales.push({id: parseInt(ing.id), porcion: 1.0});
+                        divBtn.classList.add('selected');
                     }
+                    mostrarOpcionesSin();
                 };
-                lista.appendChild(div);
+                divCont.appendChild(divBtn);
+                
+                if (isRemoved) {
+                    const fracs = document.createElement('div');
+                    fracs.style.cssText = "display: flex; gap: 5px; justify-content: space-between;";
+                    const values = [0.25, 0.50, 0.75, 1.0];
+                    const labels = ["1/4", "1/2", "3/4", "Todo"];
+                    
+                    values.forEach((val, i) => {
+                        const btnFrac = document.createElement('button');
+                        btnFrac.type = 'button'; // Previene conflictos de formularios
+                        const isSel = (porcion == val);
+                        btnFrac.style.cssText = `flex:1; padding: 4px; font-size: 0.8em; border-radius: 4px; border: 1px solid #dc3545; background: ${isSel ? '#dc3545' : '#fff'}; color: ${isSel ? '#fff' : '#dc3545'}; cursor: pointer;`;
+                        btnFrac.innerText = labels[i];
+                        btnFrac.onclick = function(e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const idx = ingredientesQuitadosTemporales.findIndex(r => (r.id == ing.id || r == ing.id));
+                            if (idx > -1) {
+                                if (typeof ingredientesQuitadosTemporales[idx] !== 'object') {
+                                    ingredientesQuitadosTemporales[idx] = {id: parseInt(ingredientesQuitadosTemporales[idx]), porcion: val};
+                                } else {
+                                    ingredientesQuitadosTemporales[idx].porcion = val;
+                                }
+                                mostrarOpcionesSin();
+                            }
+                        };
+                        fracs.appendChild(btnFrac);
+                    });
+                    divCont.appendChild(fracs);
+                }
+                lista.appendChild(divCont);
             });
         }
 
         function mostrarOpcionesSustituir() {
             document.getElementById('opcionesMitad').style.display = 'none';
+            document.getElementById('opcionesCuartos').style.display = 'none';
             document.getElementById('opcionesSin').style.display = 'none';
             document.getElementById('opcionesSustituir').style.display = 'block';
             
@@ -665,32 +762,76 @@
             if (indexPersonalizar !== null) {
                 const item = carrito[indexPersonalizar];
                 const selectMitad = document.getElementById('selectMitad');
+                const selectC1 = document.getElementById('selectCuarto1');
+                const selectC2 = document.getElementById('selectCuarto2');
+                const selectC3 = document.getElementById('selectCuarto3');
+                const selectC4 = document.getElementById('selectCuarto4');
                 
                 if (document.getElementById('opcionesMitad').style.display === 'block') {
                     if (selectMitad.value !== "") {
                         const mitadObj = PRODUCTOS_DISPONIBLES.find(p => p.id == selectMitad.value);
                         item.mitad_id = mitadObj.id;
                         item.mitad_nombre = mitadObj.nombre;
+                        item.cuarto_2_id = null; item.cuarto_3_id = null; item.cuarto_4_id = null;
                         // Si la otra mitad es más cara, actualizamos el precio al mayor
                         item.precio = Math.max(item.precio, mitadObj.precio);
                     } else {
                         item.mitad_id = null;
                         item.mitad_nombre = null;
                     }
+                } else if (document.getElementById('opcionesCuartos').style.display === 'block') {
+                    if (selectC1.value !== "" && selectC2.value !== "" && selectC3.value !== "" && selectC4.value !== "") {
+                        const o1 = PRODUCTOS_DISPONIBLES.find(p => p.id == selectC1.value);
+                        const o2 = PRODUCTOS_DISPONIBLES.find(p => p.id == selectC2.value);
+                        const o3 = PRODUCTOS_DISPONIBLES.find(p => p.id == selectC3.value);
+                        const o4 = PRODUCTOS_DISPONIBLES.find(p => p.id == selectC4.value);
+                        
+                        item.id = o1.id;
+                        let nombreDisplay = o1.nombre;
+                        if(item.tamano_codigo !== 'UNI') nombreDisplay += ` (${item.tamano_codigo})`;
+                        item.nombre = nombreDisplay;
+                        
+                        item.cuarto_2_id = o2.id; item.cuarto_2_nombre = o2.nombre;
+                        item.cuarto_3_id = o3.id; item.cuarto_3_nombre = o3.nombre;
+                        item.cuarto_4_id = o4.id; item.cuarto_4_nombre = o4.nombre;
+                        item.mitad_id = null; item.mitad_nombre = null;
+                        // NO ACTUALIZAR PRECIO: Se mantiene el precio del producto original (Ej: Pizza 4 Estaciones)
+                        // item.precio = Math.max(o1.precio, o2.precio, o3.precio, o4.precio);
+                    } else {
+                        item.cuarto_2_id = null; item.cuarto_3_id = null; item.cuarto_4_id = null;
+                    }
                 } else if (document.getElementById('opcionesSin').style.display === 'block') {
                     item.removidos = [...ingredientesQuitadosTemporales];
-                    item.removidos_nombres = item.removidos.map(id => INGREDIENTES_PRODUCTO[item.id].find(ing => ing.id === id).nombre);
+                    item.removidos_nombres = item.removidos.map(rem => {
+                        let rId = typeof rem === 'object' ? rem.id : rem;
+                        let rPorcion = typeof rem === 'object' ? rem.porcion : 1.0;
+                        let nombre = INGREDIENTES_PRODUCTO[item.id].find(ing => ing.id == rId).nombre;
+                        let prefijo = "";
+                        if (rPorcion === 0.25) prefijo = "1/4 ";
+                        else if (rPorcion === 0.50) prefijo = "1/2 ";
+                        else if (rPorcion === 0.75) prefijo = "3/4 ";
+                        return prefijo + nombre;
+                    });
                 } else if (document.getElementById('opcionesSustituir').style.display === 'block') {
                     const selQuitar = document.getElementById('selectQuitarSustituto').value;
                     const selAgregar = document.getElementById('selectAgregarSustituto').value;
                     const pesoSustituto = parseFloat(document.getElementById('pesoAgregarSustituto').value) || 1.0;
                     if (selQuitar && selAgregar) {
                         // Añadir a removidos
-                        if (!ingredientesQuitadosTemporales.includes(parseInt(selQuitar))) {
-                            ingredientesQuitadosTemporales.push(parseInt(selQuitar));
+                        if (!ingredientesQuitadosTemporales.find(r => (r.id == selQuitar || r == selQuitar))) {
+                            ingredientesQuitadosTemporales.push({id: parseInt(selQuitar), porcion: 1.0});
                         }
                         item.removidos = [...ingredientesQuitadosTemporales];
-                        item.removidos_nombres = item.removidos.map(id => INGREDIENTES_PRODUCTO[item.id].find(ing => ing.id === id).nombre);
+                        item.removidos_nombres = item.removidos.map(rem => {
+                            let rId = typeof rem === 'object' ? rem.id : rem;
+                            let rPorcion = typeof rem === 'object' ? rem.porcion : 1.0;
+                            let nombre = INGREDIENTES_PRODUCTO[item.id].find(ing => ing.id == rId).nombre;
+                            let prefijo = "";
+                            if (rPorcion === 0.25) prefijo = "1/4 ";
+                            else if (rPorcion === 0.50) prefijo = "1/2 ";
+                            else if (rPorcion === 0.75) prefijo = "3/4 ";
+                            return prefijo + nombre;
+                        });
                         
                         // Añadir como sustituto (gratis)
                         item.extras = item.extras || [];
@@ -702,11 +843,20 @@
                         item.extras.push(extraObj);
                     } else if (selQuitar && !selAgregar) {
                         // Si solo selecciona quitar pero no agregar un sustituto, lo eliminamos sin cobrar ni sustituir
-                        if (!ingredientesQuitadosTemporales.includes(parseInt(selQuitar))) {
-                            ingredientesQuitadosTemporales.push(parseInt(selQuitar));
+                        if (!ingredientesQuitadosTemporales.find(r => (r.id == selQuitar || r == selQuitar))) {
+                            ingredientesQuitadosTemporales.push({id: parseInt(selQuitar), porcion: 1.0});
                         }
                         item.removidos = [...ingredientesQuitadosTemporales];
-                        item.removidos_nombres = item.removidos.map(id => INGREDIENTES_PRODUCTO[item.id].find(ing => ing.id === id).nombre);
+                        item.removidos_nombres = item.removidos.map(rem => {
+                            let rId = typeof rem === 'object' ? rem.id : rem;
+                            let rPorcion = typeof rem === 'object' ? rem.porcion : 1.0;
+                            let nombre = INGREDIENTES_PRODUCTO[item.id].find(ing => ing.id == rId).nombre;
+                            let prefijo = "";
+                            if (rPorcion === 0.25) prefijo = "1/4 ";
+                            else if (rPorcion === 0.50) prefijo = "1/2 ";
+                            else if (rPorcion === 0.75) prefijo = "3/4 ";
+                            return prefijo + nombre;
+                        });
                     }
                 }
                 
@@ -721,14 +871,15 @@
             let precioFloat = parseFloat(precio);
             let nombreDisplay = nombre;
             if(tamano !== 'UNI') nombreDisplay += ` (${tamano})`;
-            let existente = carrito.find(item => item.id == id && item.nombre == nombreDisplay && !item.mitad_id && (!item.removidos || item.removidos.length === 0));
+            let existente = carrito.find(item => item.id == id && item.nombre == nombreDisplay && !item.mitad_id && !item.cuarto_2_id && (!item.removidos || item.removidos.length === 0));
             if (existente) { 
                 existente.cantidad++; 
             } else {
                 carrito.push({
                     id: id, nombre: nombreDisplay, precio: precioFloat, cantidad: 1,
                     tamano_codigo: tamano, para_llevar: false, extras: [],
-                    mitad_id: null, mitad_nombre: null, removidos: [], removidos_nombres: []
+                    mitad_id: null, mitad_nombre: null, removidos: [], removidos_nombres: [],
+                    cuarto_2_id: null, cuarto_2_nombre: null, cuarto_3_id: null, cuarto_3_nombre: null, cuarto_4_id: null, cuarto_4_nombre: null
                 });
             }
             carritoModificado = true;
@@ -772,9 +923,9 @@
                             else if (esSustituto) porcionStr = porcion + " ";
 
                             if (esSustituto) {
-                                htmlExtras += `<div style="font-size:0.75em; color:#e67e22; margin-left:5px; font-weight:bold;">+ SUSTITUTO: ${porcionStr}${info.unidad__codigo || ''} ${info.nombre} (Gratis)</div>`;
+                            htmlExtras += `<div style="font-size:0.8em; color:#e67e22; margin-left:5px; font-weight:bold;">+ SUSTITUTO: ${porcionStr}${info.unidad__codigo || ''} ${info.nombre} (Gratis)</div>`;
                             } else {
-                                htmlExtras += `<div style="font-size:0.75em; color:#198754; margin-left:5px;">+ ${porcionStr}${info.nombre} ($${precioFinal.toFixed(2)})</div>`;
+                            htmlExtras += `<div style="font-size:0.8em; color:#198754; margin-left:5px;">+ ${porcionStr}${info.nombre} ($${precioFinal.toFixed(2)})</div>`;
                             }
                         } else {
                             console.warn("No se encontró información para el extra con ID:", extraId);
@@ -783,12 +934,18 @@
                 }
                 
                 // Customizaciones visuales
-                if (item.mitad_id) {
-                    htmlExtras += `<div style="font-size:0.75em; color:#0d6efd; margin-left:5px; font-weight:bold;">1/2 ${item.mitad_nombre}</div>`;
+                if (item.cuarto_2_id) {
+                    htmlExtras += `<div style="font-size:0.8em; color:#0d6efd; margin-left:5px; font-weight:bold;">1/4 ${item.nombre.split(' (')[0]}</div>`;
+                    htmlExtras += `<div style="font-size:0.8em; color:#0d6efd; margin-left:5px; font-weight:bold;">1/4 ${item.cuarto_2_nombre}</div>`;
+                    htmlExtras += `<div style="font-size:0.8em; color:#0d6efd; margin-left:5px; font-weight:bold;">1/4 ${item.cuarto_3_nombre}</div>`;
+                    htmlExtras += `<div style="font-size:0.8em; color:#0d6efd; margin-left:5px; font-weight:bold;">1/4 ${item.cuarto_4_nombre}</div>`;
+                } else if (item.mitad_id) {
+                    htmlExtras += `<div style="font-size:0.8em; color:#0d6efd; margin-left:5px; font-weight:bold;">1/2 ${item.nombre.split(' (')[0]}</div>`;
+                    htmlExtras += `<div style="font-size:0.8em; color:#0d6efd; margin-left:5px; font-weight:bold;">1/2 ${item.mitad_nombre}</div>`;
                 }
                 if (item.removidos_nombres && item.removidos_nombres.length > 0) {
                     item.removidos_nombres.forEach(n => {
-                        htmlExtras += `<div style="font-size:0.75em; color:#dc3545; margin-left:5px; font-weight:bold;">- SIN ${n}</div>`;
+                        htmlExtras += `<div style="font-size:0.8em; color:#dc3545; margin-left:5px; font-weight:bold;">- SIN ${n}</div>`;
                     });
                 }
 
@@ -797,25 +954,25 @@
                 sumaUsd += subtotalItem;
                 
                 const fila = document.createElement('div');
-                fila.style.cssText = "display: grid; grid-template-columns: 2fr 0.5fr 1fr 0.5fr 30px; padding: 8px 0; border-bottom: 1px solid #eee; font-size: 0.9em; align-items: center;";
+                fila.style.cssText = "display: grid; grid-template-columns: 2fr 0.5fr 1fr 0.5fr 35px; padding: 10px 0; border-bottom: 1px solid #eee; font-size: 1em; align-items: center;";
                 const checked = item.para_llevar ? 'checked' : '';
-                const etiquetaLlevar = item.para_llevar ? '<div style="font-size:0.7em; color:#e67e22; font-weight:bold;"><i class="fas fa-box"></i> Para Llevar</div>' : '';
+                const etiquetaLlevar = item.para_llevar ? '<div style="font-size:0.75em; color:#e67e22; font-weight:bold;"><i class="fas fa-box"></i> Para Llevar</div>' : '';
 
                 fila.innerHTML = `
                     <div style="display:flex; flex-direction:column; padding-right:5px;">
                         <span style="font-weight:500;">${item.nombre}</span>
                         ${htmlExtras} ${etiquetaLlevar}
-                        <div style="display:flex; gap:5px; margin-top:4px;">
-                            <button onclick="abrirModalExtras(${index})" style="background:#f0f2f5; border:1px solid #ccc; border-radius:10px; font-size:0.75em; cursor:pointer; padding:2px 8px; color:#555;"><i class="fas fa-plus-circle" style="color:#d63384;"></i> Extras</button>
-                            <button onclick="abrirModalPersonalizar(${index})" style="background:#f0f2f5; border:1px solid #ccc; border-radius:10px; font-size:0.75em; cursor:pointer; padding:2px 8px; color:#555;"><i class="fas fa-magic" style="color:#0d6efd;"></i> Personalizar</button>
+                        <div style="display:flex; gap:5px; margin-top:5px;">
+                            <button onclick="abrirModalExtras(${index})" style="background:#f0f2f5; border:1px solid #ccc; border-radius:10px; font-size:0.8em; cursor:pointer; padding:3px 9px; color:#555;"><i class="fas fa-plus-circle" style="color:#d63384;"></i> Extras</button>
+                            <button onclick="abrirModalPersonalizar(${index})" style="background:#f0f2f5; border:1px solid #ccc; border-radius:10px; font-size:0.8em; cursor:pointer; padding:3px 9px; color:#555;"><i class="fas fa-magic" style="color:#0d6efd;"></i> Personalizar</button>
                         </div>
                     </div>
                     <span style="text-align: center;">x${item.cantidad}</span>
                     <span style="text-align: right; font-weight:bold;">$${subtotalItem.toFixed(2)}</span>
                     <div style="text-align: center;" title="Marcar para llevar">
-                        <input type="checkbox" onchange="toggleParaLlevar(${index})" ${checked} style="transform: scale(1.3); cursor: pointer; accent-color: #e67e22;">
+                        <input type="checkbox" onchange="toggleParaLlevar(${index})" ${checked} style="transform: scale(1.4); cursor: pointer; accent-color: #e67e22;">
                     </div>
-                    <button onclick="eliminarDelCarrito(${index})" style="background:none; border:none; color:#dc3545; cursor:pointer; font-size: 1.1em;"><i class="fas fa-times"></i></button>
+                    <button onclick="eliminarDelCarrito(${index})" style="background:none; border:none; color:#dc3545; cursor:pointer; font-size: 1.25em;"><i class="fas fa-times"></i></button>
                 `;
                 contenedor.appendChild(fila);
             });
@@ -871,11 +1028,11 @@
             .then(result => {
                 if(result.status === 'ok') {
                     if (result.imprimir) {
-                        Swal.fire({ icon: 'success', title: '¡Mesa Guardada!', text: 'Enviando a cocina...', showConfirmButton: false, timer: 1000 });
-                        setTimeout(() => { window.location.href = "{% url 'index' %}"; }, 800); 
+                        Swal.fire({ icon: 'success', title: '¡Mesa Guardada!', text: 'Enviando a cocina...', showConfirmButton: false, timer: 400 });
+                        setTimeout(() => { window.location.href = "{% url 'index' %}"; }, 200); 
                     } else {
-                        Swal.fire({ icon: 'info', title: 'Mesa Actualizada', text: 'Sin cambios en la orden. No se imprime ticket nuevo.', showConfirmButton: false, timer: 1500 });
-                        setTimeout(() => { window.location.href = "{% url 'index' %}"; }, 1200); 
+                        Swal.fire({ icon: 'info', title: 'Mesa Actualizada', text: 'Sin cambios en la orden. No se imprime ticket nuevo.', showConfirmButton: false, timer: 500 });
+                        setTimeout(() => { window.location.href = "{% url 'index' %}"; }, 300); 
                     }
                 } else if (result.status === 'warning_stock' || (result.message && result.message.includes('STOCK_INSUFICIENTE'))) {
                     let mensajeError = result.message.replace('STOCK_INSUFICIENTE|', '').replace(/\n/g, '<br>');
@@ -1178,7 +1335,7 @@
                     icon: 'success', 
                     title: msgExito, 
                     showConfirmButton: false, 
-                    timer: 2000 
+                    timer: 500 
                 }).then(() => { 
                     window.location.href = "{% url 'index' %}"; 
                 });
@@ -1282,7 +1439,9 @@
                         method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }, body: JSON.stringify({ motivo: result.value })
                     })
                     .then(r => r.json()).then(data => {
-                        if(data.status === 'ok') { Swal.fire('Eliminado', 'La mesa ha sido liberada.', 'success').then(() => { window.location.href = "{% url 'index' %}"; }); } 
+                        if(data.status === 'ok') { 
+                            Swal.fire({icon: 'success', title: 'Eliminado', text: 'La mesa ha sido liberada.', showConfirmButton: false, timer: 500}).then(() => { window.location.href = "{% url 'index' %}"; }); 
+                        } 
                         else { Swal.fire('Error', data.message, 'error'); }
                     });
                 }

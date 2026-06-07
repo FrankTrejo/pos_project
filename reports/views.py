@@ -5,6 +5,8 @@ from datetime import timedelta
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import Paginator
 from .models import AuditoriaEliminacion, AuditoriaConfiguracion
+import csv
+from django.http import HttpResponse
 
 # Importamos modelos de ambas aplicaciones (Inventario y Ventas)
 from inventory.models import Insumo, MovimientoInventario
@@ -234,6 +236,47 @@ def reporte_ventas_detalle(request):
         total_periodo = ventas_list.filter(anulada=False).aggregate(Sum('total'))['total__sum'] or 0
         total_propina = ventas_list.filter(anulada=False).aggregate(Sum('propina'))['propina__sum'] or 0
 
+    # Detectamos si el usuario presionó el botón de exportar
+    if request.GET.get('exportar') == 'csv':
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="ventas_detalle_{fecha_inicio}_al_{fecha_fin}.csv"'
+        
+        # Formato UTF-8 BOM para que Excel detecte acentos
+        response.write(u'\ufeff'.encode('utf8'))
+        writer = csv.writer(response, delimiter=';')
+        
+        writer.writerow(['Fecha', 'Hora', 'N Factura', 'Mesero', 'Productos', 'Metodo Pago', 'Estado', 'Propina ($)', 'Total ($)'])
+        
+        for v in ventas_list:
+            mesero_nombre = v.mesero.username.title() if v.mesero else "Sin Asignar"
+            
+            prods = []
+            for d in v.detalles.all():
+                prods.append(f"{d.cantidad}x {d.nombre_producto}")
+            productos_str = " | ".join(prods)
+            
+            if v.pagos.exists():
+                pagos_list = [f"{p.get_metodo_display()} (${p.monto})" for p in v.pagos.all()]
+                pagos_str = " + ".join(pagos_list)
+            else:
+                pagos_str = v.get_metodo_pago_display()
+                
+            estado_str = "ANULADA" if v.anulada else "COBRADA"
+            
+            writer.writerow([
+                v.fecha.strftime("%d/%m/%Y"),
+                v.fecha.strftime("%H:%M"),
+                v.codigo_factura,
+                mesero_nombre,
+                productos_str,
+                pagos_str,
+                estado_str,
+                f"{float(v.propina):.4f}".replace('.', ','),
+                f"{float(v.total):.2f}".replace('.', ',')
+            ])
+            
+        return response
+
     paginator = Paginator(ventas_list, 10)
     page_number = request.GET.get('page')
     ventas = paginator.get_page(page_number)
@@ -245,53 +288,6 @@ def reporte_ventas_detalle(request):
         'total_periodo': total_periodo,
         'total_propina': total_propina,
         'estado_filtro': estado_filtro # Pasamos esto para pintar los botones
-    }
-    return render(request, 'reports/sales_detail_report.html', context)
-    # 1. Filtros de Fecha
-    fecha_inicio = request.GET.get('fecha_inicio', timezone.now().strftime('%Y-%m-%d'))
-    fecha_fin = request.GET.get('fecha_fin', timezone.now().strftime('%Y-%m-%d'))
-
-    # 2. Consulta General (Trae TODAS para la lista, incluidas anuladas)
-    # Esto se mantiene igual para que en la tabla veas las filas rojas
-    ventas = Venta.objects.filter(
-        fecha__date__range=[fecha_inicio, fecha_fin]
-    ).select_related('mesero').prefetch_related(
-        'detalles', 
-        'pagos'    
-    ).order_by('-fecha')
-
-    # 3. CÁLCULO CORREGIDO: 
-    # Aplicamos .filter(anulada=False) ANTES de sumar.
-    # Así el dinero de las anuladas no entra en la suma final.
-    total_periodo = ventas.filter(anulada=False).aggregate(Sum('total'))['total__sum'] or 0
-
-    context = {
-        'ventas': ventas,
-        'fecha_inicio': fecha_inicio,
-        'fecha_fin': fecha_fin,
-        'total_periodo': total_periodo
-    }
-    return render(request, 'reports/sales_detail_report.html', context)
-    # 1. Filtros de Fecha
-    fecha_inicio = request.GET.get('fecha_inicio', timezone.now().strftime('%Y-%m-%d'))
-    fecha_fin = request.GET.get('fecha_fin', timezone.now().strftime('%Y-%m-%d'))
-
-    # 2. Consulta Optimizada (Trae ventas + sus productos + sus pagos en un solo viaje)
-    ventas = Venta.objects.filter(
-        fecha__date__range=[fecha_inicio, fecha_fin]
-    ).select_related('mesero').prefetch_related(
-        'detalles', # Trae los productos
-        'pagos'     # Trae el desglose de pagos
-    ).order_by('-fecha')
-
-    # 3. Totales del período
-    total_periodo = ventas.aggregate(Sum('total'))['total__sum'] or 0
-
-    context = {
-        'ventas': ventas,
-        'fecha_inicio': fecha_inicio,
-        'fecha_fin': fecha_fin,
-        'total_periodo': total_periodo
     }
     return render(request, 'reports/sales_detail_report.html', context)
 
@@ -320,3 +316,66 @@ def reporte_insumos_agotados(request):
     return render(request, 'reports/insumos_agotados.html', {
         'insumos': insumos_criticos
     })
+
+@staff_member_required
+def reporte_propinas(request):
+    fecha_inicio = request.GET.get('fecha_inicio', timezone.now().strftime('%Y-%m-%d'))
+    fecha_fin = request.GET.get('fecha_fin', timezone.now().strftime('%Y-%m-%d'))
+
+    ventas_list = Venta.objects.filter(
+        fecha__date__range=[fecha_inicio, fecha_fin],
+        propina__gt=0,
+        anulada=False
+    ).select_related('mesero').order_by('-fecha')
+
+    tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
+    tasa_valor = float(tasa_obj.precio) if tasa_obj else 0
+
+    # Detectamos si el usuario presionó el botón de exportar
+    if request.GET.get('exportar') == 'csv':
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="propinas_{fecha_inicio}_al_{fecha_fin}.csv"'
+        
+        # Le agregamos el formato BOM para que Excel lea los caracteres en español sin problemas (UTF-8)
+        response.write(u'\ufeff'.encode('utf8'))
+        writer = csv.writer(response, delimiter=';')
+        
+        # Escribimos las cabeceras
+        writer.writerow(['Fecha', 'Hora', 'N Factura', 'Mesa', 'Mesero', 'Tasa (Bs/$)', 'Propina ($)', 'Propina (Bs)'])
+        
+        # Escribimos los datos, cambiando el punto decimal por coma para Excel en español
+        for v in ventas_list:
+            mesero_nombre = v.mesero.username.title() if v.mesero else "Sin Asignar"
+            propina_bs = float(v.propina) * tasa_valor
+            writer.writerow([
+                v.fecha.strftime("%d/%m/%Y"),
+                v.fecha.strftime("%H:%M"),
+                v.codigo_factura,
+                f"Mesa {v.mesa_numero}",
+                mesero_nombre,
+                f"{tasa_valor:.2f}".replace('.', ','),
+                f"{float(v.propina):.4f}".replace('.', ','),
+                f"{propina_bs:.2f}".replace('.', ',')
+            ])
+            
+        return response
+
+    total_propina = ventas_list.aggregate(Sum('propina'))['propina__sum'] or 0
+    total_propina_bs = float(total_propina) * tasa_valor
+
+    paginator = Paginator(ventas_list, 10)
+    page_number = request.GET.get('page')
+    ventas = paginator.get_page(page_number)
+    
+    for v in ventas:
+        v.propina_bs = float(v.propina) * tasa_valor
+
+    context = {
+        'ventas': ventas,
+        'fecha_inicio': fecha_inicio,
+        'fecha_fin': fecha_fin,
+        'total_propina': total_propina,
+        'total_propina_bs': total_propina_bs,
+        'tasa': tasa_valor
+    }
+    return render(request, 'reports/propinas_report.html', context)

@@ -270,7 +270,7 @@ class MovimientoInventario(models.Model):
     nota = models.CharField(max_length=255, blank=True, null=True)
 
 # --- SEÑAL DE ACTUALIZACIÓN DE STOCK ---
-@receiver(post_save, sender=MovimientoInventario)
+@receiver(post_save, sender=MovimientoInventario, dispatch_uid="actualizar_stock_conversion_unico")
 def actualizar_stock_conversion(sender, instance, created, **kwargs):
     if created:
         insumo = instance.insumo
@@ -308,7 +308,9 @@ def actualizar_stock_conversion(sender, instance, created, **kwargs):
         if insumo.stock_actual < 0:
             insumo.stock_actual = Decimal('0')
 
-        insumo.save()
+        # Usamos update en lugar de save() para actualizar el stock sin disparar las señales de Insumo.
+        # Esto evita recalcular los costos de los productos innecesariamente y reduce el tiempo de facturación de forma masiva.
+        Insumo.objects.filter(pk=insumo.pk).update(stock_actual=insumo.stock_actual)
 
 class ConsumoInterno(models.Model):
     TIPOS = [

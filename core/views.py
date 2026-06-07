@@ -1,4 +1,4 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from .models import Configuracion
 # Importamos los formularios que arreglamos antes
@@ -59,8 +59,8 @@ def conf_economia(request):
     else:
         form = CostoAdicionalForm()
     
-    return render(request, 'core/config_economia.html', {
-        'form': form, 
+    return render(request, 'core/configuracion_economia.html', {
+        'form_costo': form, 
         'titulo': 'Costos Adicionales / Economía',
         'costos': costos
     })
@@ -124,4 +124,19 @@ def conf_procesos(request):
     
     return render(request, 'core/configuracion_form.html', {
         'form': form, 'titulo': 'Automatización y Procesos', 'icono': 'fas fa-cogs', 'tasa_scraped': tasa_scraped
+    })
+
+def costo_indirecto_edit(request, pk):
+    costo = get_object_or_404(CostoAdicional, pk=pk)
+    if request.method == 'POST':
+        form = CostoAdicionalForm(request.POST, instance=costo)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Costo '{costo.nombre}' actualizado correctamente.")
+            return redirect('conf_economia')
+    else:
+        form = CostoAdicionalForm(instance=costo)
+    
+    return render(request, 'core/configuracion_form.html', {
+        'form': form, 'titulo': f'Editar Costo: {costo.nombre}', 'icono': 'fas fa-edit'
     })

@@ -108,6 +108,11 @@
                             <div class="extra">- SIN {{ rem.nombre }}</div>
                         {% endfor %}
                     {% endif %}
+                    {% if item.removidos_detalles and item.removidos_detalles.exists %}
+                        {% for r in item.removidos_detalles.all %}
+                            <div class="extra">- SIN {{ r.porcion_display }}{{ r.insumo.nombre|default:r.nombre_insumo }}</div>
+                        {% endfor %}
+                    {% endif %}
                 </td>
                 <td class="c-tot">
                     ${{ item.subtotal_usd }}<br>

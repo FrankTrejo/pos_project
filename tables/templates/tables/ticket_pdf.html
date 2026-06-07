@@ -4,7 +4,7 @@
     <style>
         @page {
             size: 80mm 200mm; /* Tamaño ticket estándar */
-            margin: 5mm;
+            margin: 2mm;
         }
         body { 
             font-family: sans-serif; 
@@ -152,7 +152,18 @@
                 <td class="cant">{{ item.cantidad }}</td>
                 
                 <td class="prod">
-                    {% if item.mitad_producto %}
+                    {% if item.cuarto_2_producto %}
+                        4 CUARTOS 
+                        {% if item.producto.tamano != 'UNI' %}
+                             <span class="tamano">({{ item.producto.get_tamano_display|upper }})</span>
+                        {% endif %}
+                        <div class="lista-extras" style="border-top: none; padding-top: 0; margin-top: 2px;">
+                            <div class="item-extra">>> 1/4 {{ item.producto.nombre|upper }}</div>
+                            <div class="item-extra">>> 1/4 {{ item.cuarto_2_producto.nombre|upper }}</div>
+                            <div class="item-extra">>> 1/4 {{ item.cuarto_3_producto.nombre|upper }}</div>
+                            <div class="item-extra">>> 1/4 {{ item.cuarto_4_producto.nombre|upper }}</div>
+                        </div>
+                    {% elif item.mitad_producto %}
                         MITAD 
                         {% if item.producto.tamano != 'UNI' %}
                              <span class="tamano">({{ item.producto.get_tamano_display|upper }})</span>
@@ -182,6 +193,13 @@
                     {% if item.ingredientes_removidos and item.ingredientes_removidos.exists %}
                         <div class="lista-extras">
                             {% for rem in item.ingredientes_removidos.all %}<div class="item-extra" style="color: #dc3545;"><span class="label-extra">>> SIN:</span> {{ rem.nombre|upper }}</div>{% endfor %}
+                        </div>
+                    {% endif %}
+                    {% if item.removidos_detalles and item.removidos_detalles.exists %}
+                        <div class="lista-extras">
+                            {% for r in item.removidos_detalles.all %}
+                                <div class="item-extra" style="color: #dc3545;"><span class="label-extra">>> SIN:</span> {{ r.porcion_display }}{{ r.insumo.nombre|upper|default:r.nombre_insumo|upper }}</div>
+                            {% endfor %}
                         </div>
                     {% endif %}
 

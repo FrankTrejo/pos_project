@@ -15,7 +15,7 @@
             <h3 style="color: var(--primary-blue);">👨‍🍳 Comida de Personal</h3>
             <p style="font-size: 0.9em; color: #666;">Selecciona el tamaño base y agrega los extras exactos.</p>
             
-            <form method="POST">
+            <form method="POST" onsubmit="mostrarAlertaImpresion()">
                 {% csrf_token %}
                 <input type="hidden" name="tipo_accion" value="PERSONAL">
                 
@@ -80,7 +80,7 @@
             <h3 style="color: #e67e22;">🎁 Cortesía de la Casa</h3>
             <p style="font-size: 0.9em; color: #666;">Descuenta la receta completa del producto.</p>
             
-            <form method="POST">
+            <form method="POST" onsubmit="mostrarAlertaImpresion()">
                 {% csrf_token %}
                 <input type="hidden" name="tipo_accion" value="REGALO">
                 
@@ -113,6 +113,7 @@
                             <th style="padding: 12px; text-align: left;">Responsable</th>
                             <th style="padding: 12px; text-align: left;">Descripción</th>
                             <th style="padding: 12px; text-align: right;">Costo Est.</th>
+                            <th style="padding: 12px; text-align: center;">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -133,10 +134,25 @@
                             <td style="padding: 10px;">{{ item.usuario.username|title }}</td>
                             <td style="padding: 10px;">{{ item.descripcion }}</td>
                             <td style="padding: 10px; text-align: right; color: #d63031;">-${{ item.costo_estimado }}</td>
+                            <td style="padding: 10px; text-align: center;">
+                                <button type="button" onclick="abrirDocumentoPDF('{{ item.id }}')" style="padding: 5px 10px; background-color: #17a2b8; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 0.85em; margin-right: 5px;" title="Ver Documento PDF">
+                                    <i class="fas fa-print"></i> Imprimir
+                                </button>
+                                {% if "[ANULADO]" not in item.descripcion %}
+                                <form action="{% url 'anular_consumo_interno' item.id %}" method="POST" style="display:inline;" onsubmit="return confirm('¿Estás seguro de anular esta salida y devolver los productos al inventario?');">
+                                    {% csrf_token %}
+                                    <button type="submit" style="padding: 5px 10px; background-color: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 0.85em;">
+                                        <i class="fas fa-ban"></i> Anular
+                                    </button>
+                                </form>
+                                {% else %}
+                                <span style="padding: 5px 10px; background-color: #6c757d; color: white; border-radius: 3px; display: inline-block; font-size: 0.85em;">Anulado</span>
+                                {% endif %}
+                            </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="5" style="padding: 20px; text-align: center; color: #999;">
+                            <td colspan="6" style="padding: 20px; text-align: center; color: #999;">
                                 No hay registros recientes.
                             </td>
                         </tr>
@@ -201,5 +217,41 @@
             });
         }
     });
+
+    // Función para la barra de búsqueda de ingredientes extras
+    function filtrarIngredientes() {
+        let input = document.getElementById('buscador-ingredientes');
+        let filter = input.value.toLowerCase();
+        let rows = document.querySelectorAll('.item-ingrediente');
+        
+        rows.forEach(row => {
+            let nombreIngrediente = row.querySelector('td').textContent.toLowerCase();
+            if (nombreIngrediente.includes(filter)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+
+    // Alerta de carga al guardar y mandar a la tickera física
+    function mostrarAlertaImpresion() {
+        Swal.fire({
+            title: 'Imprimiendo...',
+            text: 'Enviando documento a la tickera de cocina',
+            icon: 'info',
+            allowOutsideClick: false,
+            showConfirmButton: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+    }
+
+    // Alerta al abrir el documento PDF desde el historial
+    function abrirDocumentoPDF(id) {
+        Swal.fire({ icon: 'success', title: 'Generando Documento', text: 'Abriendo PDF para impresión...', showConfirmButton: false, timer: 1000 });
+        setTimeout(() => { window.open(`/inventory/comanda-interna/${id}/pdf/`, '_blank'); }, 800);
+    }
 </script>
 {% endblock %}

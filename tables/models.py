@@ -227,14 +227,19 @@ class CostoAsignadoProducto(models.Model):
             # (Valor / 100) * CostoReceta
             return (self.valor_aplicado / 100) * self.producto.costo_receta
         
-@receiver([post_save, post_delete], sender=IngredienteProducto)
+# SEÑAL 3: Si se edita un Costo Adicional Maestro -> Actualizar el valor en TODOS los productos
+@receiver(post_save, sender=CostoAdicional, dispatch_uid="update_costos_asignados_unico")
+def update_costos_asignados(sender, instance, **kwargs):
+    CostoAsignadoProducto.objects.filter(costo_adicional=instance).update(valor_aplicado=instance.valor_defecto)
+
+@receiver([post_save, post_delete], sender=IngredienteProducto, dispatch_uid="update_costo_receta_unico")
 def update_costo_por_receta(sender, instance, **kwargs):
     # 'instance' es el IngredienteProducto
     if instance.producto:
         instance.producto.actualizar_costo_receta()
 
 # SEÑAL 2: Si cambia el precio del INSUMO en Inventario -> Actualizar TODOS los productos que lo usen
-@receiver(post_save, sender=Insumo)
+@receiver(post_save, sender=Insumo, dispatch_uid="update_costo_insumo_unico")
 def update_costo_por_insumo(sender, instance, **kwargs):
     # 'instance' es el Insumo (ej: Harina) que acaba de cambiar de precio
     
@@ -265,8 +270,9 @@ class Venta(models.Model):
     mesa_numero = models.IntegerField()
 
     # --- CAMPOS NUEVOS PARA EL FLUJO DE CAJA ---
-    monto_recibido = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="Cuánto dinero entregó el cliente")
-    propina = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="Monto excedente asignado a propina")
+    monto_recibido = models.DecimalField(max_digits=12, decimal_places=4, default=0, help_text="Cuánto dinero entregó el cliente")
+    propina = models.DecimalField(max_digits=12, decimal_places=4, default=0, help_text="Monto excedente asignado a propina")
+
     # El vuelto se calcula: (monto_recibido - total - propina)
 
     # === PEGAR ESTO AQUÍ ===
@@ -292,6 +298,12 @@ class DetalleVenta(models.Model):
     mitad_producto = models.ForeignKey(Producto, on_delete=models.SET_NULL, null=True, blank=True, related_name='mitad_ventas')
     nombre_mitad = models.CharField(max_length=100, blank=True, null=True)
     ingredientes_removidos = models.ManyToManyField(Insumo, blank=True)
+    cuarto_2_producto = models.ForeignKey(Producto, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    nombre_cuarto_2 = models.CharField(max_length=100, blank=True, null=True)
+    cuarto_3_producto = models.ForeignKey(Producto, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    nombre_cuarto_3 = models.CharField(max_length=100, blank=True, null=True)
+    cuarto_4_producto = models.ForeignKey(Producto, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    nombre_cuarto_4 = models.CharField(max_length=100, blank=True, null=True)
 
     def __str__(self):
         return f"{self.cantidad}x {self.nombre_producto}"
@@ -338,10 +350,38 @@ class DetalleOrden(models.Model):
     # --- PERSONALIZACIÓN ---
     mitad_producto = models.ForeignKey(Producto, on_delete=models.SET_NULL, null=True, blank=True, related_name='detalles_como_mitad')
     ingredientes_removidos = models.ManyToManyField(Insumo, blank=True)
+    cuarto_2_producto = models.ForeignKey(Producto, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    cuarto_3_producto = models.ForeignKey(Producto, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    cuarto_4_producto = models.ForeignKey(Producto, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
     
     @property
     def subtotal(self):
         return self.cantidad * self.precio_unitario
+        
+class DetalleOrdenRemovido(models.Model):
+    detalle_orden = models.ForeignKey(DetalleOrden, on_delete=models.CASCADE, related_name='removidos_detalles')
+    insumo = models.ForeignKey(Insumo, on_delete=models.PROTECT)
+    porcion = models.DecimalField(max_digits=4, decimal_places=2, default=1.00)
+
+    @property
+    def porcion_display(self):
+        if self.porcion == Decimal('0.25'): return "1/4 "
+        elif self.porcion == Decimal('0.50'): return "1/2 "
+        elif self.porcion == Decimal('0.75'): return "3/4 "
+        return ""
+        
+class DetalleVentaRemovido(models.Model):
+    detalle_venta = models.ForeignKey(DetalleVenta, on_delete=models.CASCADE, related_name='removidos_detalles')
+    insumo = models.ForeignKey(Insumo, on_delete=models.SET_NULL, null=True)
+    nombre_insumo = models.CharField(max_length=100)
+    porcion = models.DecimalField(max_digits=4, decimal_places=2, default=1.00)
+
+    @property
+    def porcion_display(self):
+        if self.porcion == Decimal('0.25'): return "1/4 "
+        elif self.porcion == Decimal('0.50'): return "1/2 "
+        elif self.porcion == Decimal('0.75'): return "3/4 "
+        return ""
 
 class DetalleOrdenExtra(models.Model):
     detalle_orden = models.ForeignKey(DetalleOrden, on_delete=models.CASCADE, related_name='extras_elegidos')

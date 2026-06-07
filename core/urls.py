@@ -10,4 +10,6 @@ urlpatterns = [
     path('configuracion/economia/', views.conf_economia, name='conf_economia'),
     path('configuracion/visual/', views.conf_visual, name='conf_visual'),
     path('configuracion/procesos/', views.conf_procesos, name='conf_procesos'),
+    path('configuracion/costo-editar/<int:pk>/', views.costo_indirecto_edit, name='costo_indirecto_edit'),
+
 ]

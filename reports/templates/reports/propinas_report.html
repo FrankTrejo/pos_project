@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}- Reporte de Propinas{% endblock %}
+
+{% block content %}
+<style>
+    /* Estilos para el botón de Excel */
+    .btn-excel {
+        background-color: #198754 !important;
+        border-color: #198754 !important;
+        cursor: pointer;
+    }
+    .btn-excel:hover {
+        background-color: #157347 !important; /* Verde más oscuro al pasar el ratón */
+        border-color: #146c43 !important;
+    }
+</style>
+<div style="padding: 20px; max-width: 1200px; margin: 0 auto;">
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
+        <div>
+            <a href="{% url 'reportes_index' %}" style="color: #666; text-decoration: none; font-size: 0.9em;">
+                <i class="fas fa-arrow-left"></i> Volver a Reportes
+            </a>
+            <h2 style="color: var(--primary-blue); margin: 5px 0 0 0;">
+                <i class="fas fa-hand-holding-usd"></i> Reporte de Propinas
+            </h2>
+        </div>
+
+        <form method="GET" style="background: white; padding: 10px; border-radius: 8px; border: 1px solid #ddd; display: flex; gap: 10px; align-items: center;">
+            <label style="font-weight: bold; font-size: 0.9em;">Desde:</label>
+            <input type="date" name="fecha_inicio" value="{{ fecha_inicio }}" class="form-input" style="padding: 5px;">
+            
+            <label style="font-weight: bold; font-size: 0.9em;">Hasta:</label>
+            <input type="date" name="fecha_fin" value="{{ fecha_fin }}" class="form-input" style="padding: 5px;">
+            
+            <button type="submit" class="add-btn" style="padding: 6px 15px;">
+                <i class="fas fa-search"></i>
+            </button>
+            <button type="submit" name="exportar" value="csv" class="add-btn btn-excel" onclick="animarBotonExcel(this)" style="padding: 6px 15px; transition: all 0.2s ease;" title="Exportar a Excel">
+                <i class="fas fa-file-excel"></i> Excel
+            </button>
+        </form>
+    </div>
+
+    <div style="background: #e3f2fd; color: #0d47a1; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #bbdefb; display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 1.1em;">Tasa Ref: <b>Bs. {{ tasa|floatformat:2 }}</b></span>
+        <div style="text-align: right;">
+            <span style="font-size: 1.4em; font-weight: bold;">Total Propinas: ${{ total_propina|floatformat:4 }}</span>
+            <br>
+            <span style="font-size: 1em; color: #1565c0;">(Bs. {{ total_propina_bs|floatformat:2 }})</span>
+        </div>
+    </div>
+
+    <div class="card-style" style="padding: 0; overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
+            <thead>
+                <tr style="background: #343a40; color: white; text-align: left;">
+                    <th style="padding: 12px;">Fecha / Hora</th>
+                    <th style="padding: 12px;">N° Factura</th>
+                    <th style="padding: 12px;">Mesa</th>
+                    <th style="padding: 12px;">Mesero</th>
+                    <th style="padding: 12px; text-align: right;">Tasa (Bs/$)</th>
+                    <th style="padding: 12px; text-align: right;">Propina ($)</th>
+                    <th style="padding: 12px; text-align: right;">Propina (Bs)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for venta in ventas %}
+                <tr style="border-bottom: 1px solid #eee;">
+                    
+                    <td style="padding: 12px; white-space: nowrap; vertical-align: middle;">
+                        <div style="font-weight: bold;">{{ venta.fecha|date:"d/m/Y" }}</div>
+                        <small style="color: #666;">{{ venta.fecha|date:"H:i A" }}</small>
+                    </td>
+
+                    <td style="padding: 12px; vertical-align: middle;">
+                        <span style="background: #eee; padding: 3px 8px; border-radius: 4px; font-family: monospace; font-weight: bold; color: #333;">
+                            {{ venta.codigo_factura }}
+                        </span>
+                    </td>
+
+                    <td style="padding: 12px; vertical-align: middle;">
+                        Mesa {{ venta.mesa_numero }}
+                    </td>
+
+                    <td style="padding: 12px; vertical-align: middle;">
+                        {% if venta.mesero %}
+                            <i class="fas fa-user-tie" style="color: #888;"></i> {{ venta.mesero.username|title }}
+                        {% else %}
+                            <span style="color: #999;">--</span>
+                        {% endif %}
+                    </td>
+
+                    <td style="padding: 12px; text-align: right; vertical-align: middle;">
+                        Bs. {{ tasa|floatformat:2 }}
+                    </td>
+
+                    <td style="padding: 12px; text-align: right; vertical-align: middle;">
+                        <b style="color: #28a745; font-size: 1.1em;">${{ venta.propina|floatformat:4 }}</b>
+                    </td>
+
+                    <td style="padding: 12px; text-align: right; vertical-align: middle; color: #666;">
+                        <span style="font-size: 0.9em;">
+                            Bs. {{ venta.propina_bs|floatformat:2 }}
+                        </span>
+                    </td>
+
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" style="padding: 30px; text-align: center; color: #999;">
+                        No se encontraron propinas en este rango de fechas.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    {% if ventas.has_other_pages %}
+    <div style="margin-top: 20px; display: flex; justify-content: center; align-items: center; gap: 10px;">
+        {% if ventas.has_previous %}
+            <a href="?page=1&fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}" style="padding: 8px 15px; border: 1px solid #ddd; border-radius: 4px; text-decoration: none; color: #333; background: white;">&laquo; Primero</a>
+            <a href="?page={{ ventas.previous_page_number }}&fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}" style="padding: 8px 15px; border: 1px solid #ddd; border-radius: 4px; text-decoration: none; color: #333; background: white;">Anterior</a>
+        {% endif %}
+
+        <span style="padding: 8px 15px; background: #343a40; color: white; border-radius: 4px; font-weight: bold;">
+            Página {{ ventas.number }} de {{ ventas.paginator.num_pages }}
+        </span>
+
+        {% if ventas.has_next %}
+            <a href="?page={{ ventas.next_page_number }}&fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}" style="padding: 8px 15px; border: 1px solid #ddd; border-radius: 4px; text-decoration: none; color: #333; background: white;">Siguiente</a>
+            <a href="?page={{ ventas.paginator.num_pages }}&fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}" style="padding: 8px 15px; border: 1px solid #ddd; border-radius: 4px; text-decoration: none; color: #333; background: white;">Último &raquo;</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    // Animación para el botón de exportar a Excel
+    function animarBotonExcel(btn) {
+        // Guardamos el contenido original
+        const contenidoOriginal = btn.innerHTML;
+        // Cambiamos el icono por un spinner girando
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exportando...';
+        btn.style.transform = 'scale(0.95)'; // Efecto de hundimiento
+        
+        // Restauramos el botón después de 2 segundos (tiempo estimado para que inicie la descarga)
+        setTimeout(() => {
+            btn.innerHTML = contenidoOriginal;
+            btn.style.transform = 'scale(1)'; // Restaura el tamaño
+        }, 2000);
+    }
+</script>
+{% endblock %}
