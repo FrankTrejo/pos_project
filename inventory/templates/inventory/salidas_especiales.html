@@ -25,11 +25,11 @@
                         <input type="text" name="empleado_nombre" class="form-control" placeholder="Nombre..." required style="width: 100%;">
                     </div>
                     <div>
-                        <label style="font-weight: bold; font-size: 0.9em;">Tamaño Base:</label>
-                        <select name="tamano_pizza" class="form-control" style="width: 100%;" required>
-                            <option value="IND">Individual</option>
-                            <option value="MED">Mediana</option>
-                            <option value="FAM">Familiar</option>
+                        <label style="font-weight: bold; font-size: 0.9em;">Producto Base:</label>
+                        <select name="producto_base" class="form-control" style="width: 100%;" required>
+                            {% for prod in productos %}
+                                <option value="{{ prod.id }}" {% if 'MARGARITA' in prod.nombre|upper %}selected{% endif %}>{{ prod.nombre }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                 </div>
@@ -40,36 +40,21 @@
                        style="width: 100%; padding: 6px; margin-bottom: 5px; border: 1px solid #ccc; border-radius: 4px;"
                        onkeyup="filtrarIngredientes()">
 
-                <div id="lista-ingredientes" style="max-height: 250px; overflow-y: auto; border: 1px solid #ddd; background: #fff;">
-                    <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
-                        <thead style="background: #f1f1f1; position: sticky; top: 0;">
-                            <tr>
-                                <th style="padding: 5px; text-align: left;">Insumo</th>
-                                <th style="padding: 5px; text-align: right;">Cant. Extra</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for ing in ingredientes %}
-                            <tr class="item-ingrediente" style="border-bottom: 1px solid #eee;">
-                                <td style="padding: 5px;">
-                                    {{ ing.nombre }} <small style="color: #888;">({{ ing.unidad.codigo }})</small>
-                                </td>
-                                <td style="padding: 5px; text-align: right;">
-                                    <input type="hidden" name="extra_id" value="{{ ing.id }}">
-                                    <input type="number" name="extra_cantidad" class="input-cantidad" 
-                                           placeholder="0" step="0.01" min="0"
-                                           style="width: 70px; text-align: right; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr><td colspan="2" style="padding: 10px; text-align: center;">No hay insumos disponibles.</td></tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                <div id="lista-ingredientes" style="max-height: 250px; overflow-y: auto; border: 1px solid #ddd; background: #fff; padding: 10px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px;">
+                        {% for ing in ingredientes %}
+                        <label class="item-ingrediente" style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; border: 1px solid #eee; border-radius: 6px; background: #fdfdfd; margin: 0; transition: background 0.2s;">
+                            <input type="checkbox" name="extra_id" value="{{ ing.id }}" style="transform: scale(1.2); margin: 0;">
+                            <span style="font-size: 0.9em; color: #444;">{{ ing.nombre }}</span>
+                        </label>
+                        {% empty %}
+                        <div style="grid-column: 1/-1; text-align: center; color: #999;">No hay extras configurados.</div>
+                        {% endfor %}
+                    </div>
                 </div>
 
                 <div style="background: #e8f5e9; padding: 10px; margin-top: 10px; border-radius: 5px; font-size: 0.85em; color: #2e7d32;">
-                    <i class="fas fa-info-circle"></i> Se descontará automáticamente la receta de la <b>Margarita</b> del tamaño seleccionado + los extras que indiques aquí.
+                    <i class="fas fa-info-circle"></i> Se descontará automáticamente la receta del producto base + las porciones preconfiguradas de los extras marcados.
                 </div>
 
                 <button type="submit" class="action-btn" style="width: 100%; margin-top: 15px;">Registrar Consumo</button>
@@ -135,10 +120,10 @@
                             <td style="padding: 10px;">{{ item.descripcion }}</td>
                             <td style="padding: 10px; text-align: right; color: #d63031;">-${{ item.costo_estimado }}</td>
                             <td style="padding: 10px; text-align: center;">
+                                {% if "[ANULADO]" not in item.descripcion %}
                                 <button type="button" onclick="abrirDocumentoPDF('{{ item.id }}')" style="padding: 5px 10px; background-color: #17a2b8; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 0.85em; margin-right: 5px;" title="Ver Documento PDF">
                                     <i class="fas fa-print"></i> Imprimir
                                 </button>
-                                {% if "[ANULADO]" not in item.descripcion %}
                                 <form action="{% url 'anular_consumo_interno' item.id %}" method="POST" style="display:inline;" onsubmit="return confirm('¿Estás seguro de anular esta salida y devolver los productos al inventario?');">
                                     {% csrf_token %}
                                     <button type="submit" style="padding: 5px 10px; background-color: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 0.85em;">
@@ -225,11 +210,14 @@
         let rows = document.querySelectorAll('.item-ingrediente');
         
         rows.forEach(row => {
-            let nombreIngrediente = row.querySelector('td').textContent.toLowerCase();
-            if (nombreIngrediente.includes(filter)) {
-                row.style.display = '';
-            } else {
-                row.style.display = 'none';
+            let span = row.querySelector('span');
+            if (span) {
+                let nombreIngrediente = span.textContent.toLowerCase();
+                if (nombreIngrediente.includes(filter)) {
+                    row.style.display = 'flex';
+                } else {
+                    row.style.display = 'none';
+                }
             }
         });
     }

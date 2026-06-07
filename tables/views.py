@@ -375,6 +375,110 @@ def product_pricing(request, pk):
     return render(request, 'products/product_pricing.html', context)
 
 @staff_member_required
+def bulk_recipe_update(request):
+    if request.method == 'POST':
+        insumo_id = request.POST.get('insumo_id')
+        cantidad_str = request.POST.get('cantidad')
+        producto_ids = request.POST.getlist('productos')
+        
+        if not insumo_id or not cantidad_str or not producto_ids:
+            messages.error(request, "Debe seleccionar un ingrediente, una cantidad y al menos un producto de la lista.")
+            return redirect('bulk_recipe_update')
+            
+        try:
+            cantidad = Decimal(cantidad_str.replace(',', '.'))
+            insumo = get_object_or_404(Insumo, id=insumo_id)
+            
+            with transaction.atomic():
+                for p_id in producto_ids:
+                    producto = Producto.objects.get(id=p_id)
+                    ing_prod, created = IngredienteProducto.objects.get_or_create(
+                        producto=producto,
+                        insumo=insumo,
+                        defaults={'cantidad': cantidad}
+                    )
+                    if not created:
+                        ing_prod.cantidad = cantidad
+                        ing_prod.save()
+                    
+            messages.success(request, f"¡Éxito! Se actualizó '{insumo.nombre}' a {cantidad} {insumo.unidad.codigo} en {len(producto_ids)} productos.")
+            return redirect('product_list')
+            
+        except Exception as e:
+            messages.error(request, f"Error técnico: {e}")
+            return redirect('bulk_recipe_update')
+
+    context = {
+        'categorias': Categoria.objects.all(),
+        'tamanos': Producto.OPCIONES_TAMANO,
+        'productos': Producto.objects.all().select_related('categoria').order_by('nombre'),
+        'insumos': Insumo.objects.all().order_by('nombre'),
+    }
+    return render(request, 'products/bulk_recipe_update.html', context)
+
+@staff_member_required
+def bulk_cost_update(request):
+    if request.method == 'POST':
+        accion = request.POST.get('accion', 'aplicar')
+        costo_id = request.POST.get('costo_id')
+        valor_str = request.POST.get('valor_aplicado')
+        producto_ids = request.POST.getlist('productos')
+        
+        if not costo_id or not producto_ids:
+            messages.error(request, "Debe seleccionar un costo adicional y al menos un producto de la lista.")
+            return redirect('bulk_cost_update')
+            
+        if accion == 'aplicar' and not valor_str:
+            messages.error(request, "Debe ingresar un valor a aplicar.")
+            return redirect('bulk_cost_update')
+            
+        try:
+            costo_adicional = get_object_or_404(CostoAdicional, id=costo_id)
+            
+            with transaction.atomic():
+                if accion == 'eliminar':
+                    CostoAsignadoProducto.objects.filter(
+                        producto_id__in=producto_ids,
+                        costo_adicional=costo_adicional
+                    ).delete()
+                    messages.success(request, f"¡Éxito! Se ELIMINÓ el costo '{costo_adicional.nombre}' de los {len(producto_ids)} productos seleccionados.")
+                else:
+                    valor = Decimal(valor_str.replace(',', '.'))
+                    agregados = 0
+                    omitidos = 0
+                    
+                    for p_id in producto_ids:
+                        producto = Producto.objects.get(id=p_id)
+                        
+                        # Verificamos si ya existe para no duplicarlo ni sobreescribirlo
+                        existe = CostoAsignadoProducto.objects.filter(producto=producto, costo_adicional=costo_adicional).exists()
+                        
+                        if not existe:
+                            CostoAsignadoProducto.objects.create(producto=producto, costo_adicional=costo_adicional, valor_aplicado=valor)
+                            agregados += 1
+                        else:
+                            omitidos += 1
+                            
+                    mensaje = f"¡Éxito! Se aplicó el costo '{costo_adicional.nombre}' a {agregados} producto(s)."
+                    if omitidos > 0:
+                        mensaje += f" Se omitieron {omitidos} porque ya lo tenían."
+                    messages.success(request, mensaje)
+
+            return redirect('product_list')
+            
+        except Exception as e:
+            messages.error(request, f"Error técnico: {e}")
+            return redirect('bulk_cost_update')
+
+    context = {
+        'categorias': Categoria.objects.all(),
+        'tamanos': Producto.OPCIONES_TAMANO,
+        'productos': Producto.objects.all().select_related('categoria').order_by('nombre'),
+        'costos_adicionales': CostoAdicional.objects.all().order_by('nombre'),
+    }
+    return render(request, 'products/bulk_cost_update.html', context)
+
+@staff_member_required
 def product_delete(request, pk):
     producto = get_object_or_404(Producto, pk=pk)
     if request.method == 'POST':

@@ -20,9 +20,12 @@ urlpatterns = [
     
     # 3. PASO 2: Receta (Ingredientes)
     path('productos/receta/<int:pk>/', views.recipe_manager, name='recipe_manager'),
+    path('productos/receta-masiva/', views.bulk_recipe_update, name='bulk_recipe_update'),
+
     
     # 4. PASO 3: Precio (Nuevo)
     path('productos/precio/<int:pk>/', views.product_pricing, name='product_pricing'),
+    path('productos/costo-masivo/', views.bulk_cost_update, name='bulk_cost_update'),
     path('productos/eliminar/<int:pk>/', views.product_delete, name='product_delete'),
     path('mesa/<int:table_id>/grabar/', views.grabar_mesa_ajax, name='grabar_mesa'),
     path('orden/<int:orden_id>/pdf/', views.generar_ticket_pdf, name='generar_ticket_pdf'),

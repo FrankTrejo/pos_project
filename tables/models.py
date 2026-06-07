@@ -58,7 +58,9 @@ class Producto(models.Model):
     # imagen = models.ImageField(upload_to='productos/', blank=True, null=True)
 
     def __str__(self):
-        return f"{self.nombre} ({self.tamano})"
+        if self.tamano == 'UNI':
+            return self.nombre
+        return f"{self.nombre} ({self.get_tamano_display()})"
 
     # --- LÓGICA DE COSTOS AUTOMÁTICA ---
     @property
@@ -97,7 +99,9 @@ class Producto(models.Model):
     costo_materia_prima = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Costo Ingredientes ($)")
 
     def __str__(self):
-        return f"{self.nombre} ({self.tamano})"
+        if self.tamano == 'UNI':
+            return self.nombre
+        return f"{self.nombre} ({self.get_tamano_display()})"
     # COSTO 2: Suma de Costos Adicionales (Mano de obra, gas, etc)
     @property
     def costo_indirectos_total(self):
