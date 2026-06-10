@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}- Reporte de Pagos{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div style="padding: 20px; max-width: 1000px; margin: 0 auto;">
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div>
+            <a href="{% url 'reportes_index' %}" style="color: #666; text-decoration: none; font-size: 0.9em;"><i class="fas fa-arrow-left"></i> Volver a Reportes</a>
+            <h2 style="color: var(--primary-blue); margin-top: 5px;"><i class="fas fa-cash-register"></i> Reporte de Métodos de Pago</h2>
+        </div>
+        
+        <form method="GET" style="background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; gap: 10px; align-items: center;">
+            <label style="font-size: 0.9em; font-weight: bold;">Desde:</label>
+            <input type="date" name="fecha_inicio" value="{{ fecha_inicio }}" style="border:1px solid #ddd; padding:5px; border-radius:4px;">
+            <label style="font-size: 0.9em; font-weight: bold;">Hasta:</label>
+            <input type="date" name="fecha_fin" value="{{ fecha_fin }}" style="border:1px solid #ddd; padding:5px; border-radius:4px;">
+            <button type="submit" class="add-btn" style="padding: 6px 15px;">Filtrar</button>
+        </form>
+    </div>
+
+    <!-- Tarjetas KPI Resumen -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px;">
+        <div class="card-style" style="border-left: 4px solid #28a745; padding: 15px;">
+            <div style="color: #666; font-size: 0.85em;">Total General ($)</div>
+            <div style="font-size: 1.4em; font-weight: bold; color: #333;">${{ total_general_dolares|floatformat:2 }}</div>
+        </div>
+
+        <div class="card-style" style="border-left: 4px solid #17a2b8; padding: 15px;">
+            <div style="color: #666; font-size: 0.85em;">Total General (Bs)</div>
+            <div style="font-size: 1.4em; font-weight: bold; color: #333;">Bs {{ total_general_bs|floatformat:2 }}</div>
+        </div>
+
+        <div class="card-style" style="border-left: 4px solid var(--primary-blue); padding: 15px;">
+            <div style="color: #666; font-size: 0.85em;">Total de Operaciones</div>
+            <div style="font-size: 1.4em; font-weight: bold; color: #333;">{{ total_transacciones }}</div>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start;">
+        
+        <div class="card-style" style="height: 400px; display:flex; justify-content:center;">
+            <canvas id="pagosChart"></canvas>
+        </div>
+
+        <div class="card-style" style="overflow-y: auto; max-height: 400px; padding: 0;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: #343a40; color: white; text-align: left;">
+                        <th style="padding: 15px;">Método de Pago</th>
+                        <th style="padding: 15px; text-align: center;">Ventas</th>
+                        <th style="padding: 15px; text-align: right;">Total ($)</th>
+                        <th style="padding: 15px; text-align: right;">Total (Bs)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in resultados %}
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding: 15px; font-weight:bold; color: #555;">{{ row.metodo_nombre }}</td>
+                        <td style="padding: 15px; text-align: center;">
+                            <span style="background: #e9ecef; padding: 3px 8px; border-radius: 12px; font-size: 0.9em;">{{ row.transacciones }}</span>
+                        </td>
+                        <td style="padding: 15px; color: #28a745; text-align: right; font-weight: bold;">${{ row.total_dolares|floatformat:2 }}</td>
+                        <td style="padding: 15px; color: #17a2b8; text-align: right; font-weight: bold;">Bs {{ row.total_bs|floatformat:2 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" style="padding:30px; text-align:center; color: #999;">No hay pagos registrados en este rango de fechas.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const ctx = document.getElementById('pagosChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: {{ labels|safe }},
+            datasets: [{
+                label: 'Ingresos ($)',
+                data: {{ values|safe }},
+                backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#858796', '#5a5c69', '#2e59d9'],
+                borderWidth: 2,
+                borderColor: '#ffffff'
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, cutout: '65%' }
+    });
+</script>
+{% endblock %}

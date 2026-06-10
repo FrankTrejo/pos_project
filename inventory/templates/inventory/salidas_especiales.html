@@ -1,175 +1,211 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container" style="padding: 20px;">
-    <div style="margin-bottom: 15px;">
+<div style="padding: 20px; max-width: 1200px; margin: 0 auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+        <div>
          <a href="{% url 'panel_control' %}" style="text-decoration: none; color: #666; font-weight: bold; display: inline-flex; align-items: center; gap: 5px;">
             <i class="fas fa-arrow-left"></i> Volver al Dashboard
         </a>
+            <h2 style="color: var(--primary-blue); margin: 5px 0 0 0; font-size: 1.8em;">
+                <i class="fas fa-hand-holding-heart"></i> Consumo Interno y Salidas
+            </h2>
+        </div>
     </div>
-    <h2><i class="fas fa-hand-holding-heart"></i> Consumo Interno y Salidas</h2>
     
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 25px; margin-bottom: 30px;">
         
-        <div class="card-style" style="padding: 20px;">
-            <h3 style="color: var(--primary-blue);">👨‍🍳 Comida de Personal</h3>
-            <p style="font-size: 0.9em; color: #666;">Selecciona el tamaño base y agrega los extras exactos.</p>
+        <!-- COMIDA DE PERSONAL -->
+        <div class="card-style" style="border-top: 4px solid var(--primary-blue); padding: 25px;">
+            <h3 style="color: var(--primary-blue); margin-top: 0; margin-bottom: 5px;"><i class="fas fa-user-chef"></i> Comida de Personal</h3>
+            <p style="font-size: 0.9em; color: #666; margin-bottom: 20px;">Selecciona el empleado, el plato base y los ingredientes extra.</p>
             
             <form method="POST" onsubmit="mostrarAlertaImpresion()">
                 {% csrf_token %}
                 <input type="hidden" name="tipo_accion" value="PERSONAL">
                 
-                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 15px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
                     <div>
-                        <label style="font-weight: bold; font-size: 0.9em;">Empleado:</label>
-                        <input type="text" name="empleado_nombre" class="form-control" placeholder="Nombre..." required style="width: 100%;">
+                        <label style="font-weight: 600; font-size: 0.9em; color: #444; margin-bottom: 5px; display: block;">Empleado:</label>
+                        <input type="text" name="empleado_nombre" class="form-control" placeholder="Nombre del personal..." required style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
                     </div>
                     <div>
-                        <label style="font-weight: bold; font-size: 0.9em;">Producto Base:</label>
-                        <select name="producto_base" class="form-control" style="width: 100%;" required>
+                        <label style="font-weight: 600; font-size: 0.9em; color: #444; margin-bottom: 5px; display: block;">Producto Base:</label>
+                        <select name="producto_base" class="form-control" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;" required>
+                            <option value="">-- Seleccionar --</option>
                             {% for prod in productos %}
-                                <option value="{{ prod.id }}" {% if 'MARGARITA' in prod.nombre|upper %}selected{% endif %}>{{ prod.nombre }}</option>
+                                <option value="{{ prod.id }}" {% if 'COMIDA' in prod.nombre|upper %}selected{% endif %}>{{ prod.nombre }} {% if prod.tamano != 'UNI' %}({{ prod.get_tamano_display }}){% endif %}</option>
                             {% endfor %}
                         </select>
                     </div>
                 </div>
 
-                <label style="font-weight: bold; font-size: 0.9em;">Ingredientes Extra (Opcional):</label>
-                
-                <input type="text" id="buscador-ingredientes" placeholder="🔍 Buscar ingrediente..." 
-                       style="width: 100%; padding: 6px; margin-bottom: 5px; border: 1px solid #ccc; border-radius: 4px;"
-                       onkeyup="filtrarIngredientes()">
+                <label style="font-weight: 600; font-size: 0.9em; color: #444; margin-bottom: 8px; display: block;">Ingredientes Extra (Opcional):</label>
+                <div style="position: relative; margin-bottom: 10px;">
+                    <i class="fas fa-search" style="position: absolute; left: 12px; top: 12px; color: #aaa;"></i>
+                    <input type="text" id="buscador-ingredientes" placeholder="Buscar ingrediente..." 
+                           style="width: 100%; padding: 10px 10px 10px 35px; border: 1px solid #ddd; border-radius: 8px;"
+                           onkeyup="filtrarIngredientes()">
+                </div>
 
-                <div id="lista-ingredientes" style="max-height: 250px; overflow-y: auto; border: 1px solid #ddd; background: #fff; padding: 10px;">
-                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px;">
+                <div id="lista-ingredientes" style="max-height: 200px; overflow-y: auto; border: 1px solid #eee; background: #fcfcfc; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px;">
                         {% for ing in ingredientes %}
-                        <label class="item-ingrediente" style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; border: 1px solid #eee; border-radius: 6px; background: #fdfdfd; margin: 0; transition: background 0.2s;">
-                            <input type="checkbox" name="extra_id" value="{{ ing.id }}" style="transform: scale(1.2); margin: 0;">
-                            <span style="font-size: 0.9em; color: #444;">{{ ing.nombre }}</span>
+                        <label class="item-ingrediente" style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 10px; border: 1px solid #e0e0e0; border-radius: 6px; background: #fff; margin: 0; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                            <input type="checkbox" name="extra_id" value="{{ ing.id }}" style="transform: scale(1.1); margin: 0; accent-color: var(--primary-blue);">
+                            <span style="font-size: 0.85em; color: #444; font-weight: 500;">{{ ing.nombre }}</span>
                         </label>
                         {% empty %}
-                        <div style="grid-column: 1/-1; text-align: center; color: #999;">No hay extras configurados.</div>
+                        <div style="grid-column: 1/-1; text-align: center; color: #999; padding: 20px 0;">No hay extras configurados.</div>
                         {% endfor %}
                     </div>
                 </div>
 
-                <div style="background: #e8f5e9; padding: 10px; margin-top: 10px; border-radius: 5px; font-size: 0.85em; color: #2e7d32;">
-                    <i class="fas fa-info-circle"></i> Se descontará automáticamente la receta del producto base + las porciones preconfiguradas de los extras marcados.
+                <div style="background: #e3f2fd; border-left: 4px solid #0d6efd; padding: 12px 15px; margin-bottom: 20px; border-radius: 4px; font-size: 0.85em; color: #084298;">
+                    <i class="fas fa-info-circle"></i> El sistema descontará la receta del producto base más las porciones preconfiguradas de los extras marcados.
                 </div>
 
-                <button type="submit" class="action-btn" style="width: 100%; margin-top: 15px;">Registrar Consumo</button>
+                <button type="submit" class="add-btn" style="width: 100%; padding: 12px; font-size: 1.05em; background-color: var(--primary-blue); border: none;"><i class="fas fa-utensils"></i> Registrar Consumo</button>
             </form>
         </div>
 
-        <div class="card-style" style="padding: 20px;">
-            <h3 style="color: #e67e22;">🎁 Cortesía de la Casa</h3>
-            <p style="font-size: 0.9em; color: #666;">Descuenta la receta completa del producto.</p>
+        <!-- CORTESÍA / REGALO -->
+        <div class="card-style" style="border-top: 4px solid #e67e22; padding: 25px; height: fit-content;">
+            <h3 style="color: #e67e22; margin-top: 0; margin-bottom: 5px;"><i class="fas fa-gift"></i> Cortesía de la Casa</h3>
+            <p style="font-size: 0.9em; color: #666; margin-bottom: 20px;">Descuenta del inventario la receta completa del producto regalado.</p>
             
             <form method="POST" onsubmit="mostrarAlertaImpresion()">
                 {% csrf_token %}
                 <input type="hidden" name="tipo_accion" value="REGALO">
                 
-                <label>Seleccionar Producto:</label>
-                <select name="producto_regalo" class="form-control" style="width: 100%; margin-bottom: 10px;" required>
+                <div style="margin-bottom: 15px;">
+                    <label style="font-weight: 600; font-size: 0.9em; color: #444; margin-bottom: 5px; display: block;">Producto a Regalar:</label>
+                    <select name="producto_regalo" class="form-control" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;" required>
+                        <option value="">-- Seleccionar --</option>
                     {% for prod in productos %}
-                        <option value="{{ prod.id }}">{{ prod.nombre }}</option>
+                            <option value="{{ prod.id }}">{{ prod.nombre }} {% if prod.tamano != 'UNI' %}({{ prod.get_tamano_display }}){% endif %}</option>
                     {% endfor %}
-                </select>
+                    </select>
+                </div>
 
-                <label>Motivo / Destinatario:</label>
-                <input type="text" name="nota" class="form-control" placeholder="Ej: Mesa 4, Amigo del dueño..." required style="width: 100%; margin-bottom: 15px;">
+                <div style="margin-bottom: 20px;">
+                    <label style="font-weight: 600; font-size: 0.9em; color: #444; margin-bottom: 5px; display: block;">Motivo / Destinatario:</label>
+                    <input type="text" name="nota" class="form-control" placeholder="Ej: Mesa 4, Amigo del dueño, Disculpa por retraso..." required style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+                </div>
 
-                <button type="submit" class="action-btn" style="width: 100%; background-color: #e67e22;">Registrar Regalo</button>
+                <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px 15px; margin-bottom: 20px; border-radius: 4px; font-size: 0.85em; color: #856404;">
+                    <i class="fas fa-exclamation-triangle"></i> Esta acción se registrará en el historial y afectará el costo estimado.
+                </div>
+
+                <button type="submit" class="add-btn" style="width: 100%; padding: 12px; font-size: 1.05em; background-color: #e67e22; border: none;"><i class="fas fa-gift"></i> Registrar Cortesía</button>
             </form>
         </div>
 
     </div>
-        <div style="margin-top: 40px;">
-            <h3 style="color: #444; border-bottom: 2px solid #ddd; padding-bottom: 10px;">
-                <i class="fas fa-history"></i> Historial Reciente
-            </h3>
 
-            <div class="card-style" style="padding: 0; overflow-x: auto;">
-                <table style="width: 100%; border-collapse: collapse;">
-                    <thead style="background: #f8f9fa; color: #444;">
-                        <tr>
-                            <th style="padding: 12px; text-align: left;">Fecha</th>
-                            <th style="padding: 12px; text-align: left;">Tipo</th>
-                            <th style="padding: 12px; text-align: left;">Responsable</th>
-                            <th style="padding: 12px; text-align: left;">Descripción</th>
-                            <th style="padding: 12px; text-align: right;">Costo Est.</th>
-                            <th style="padding: 12px; text-align: center;">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in historial %}
-                        <tr style="border-bottom: 1px solid #eee;">
-                            <td style="padding: 10px;">{{ item.fecha|date:"d/m/Y H:i" }}</td>
+    <!-- HISTORIAL -->
+    <div>
+        <h3 style="color: #444; border-bottom: 2px solid #ddd; padding-bottom: 10px; margin-bottom: 20px;">
+            <i class="fas fa-history"></i> Historial Reciente de Salidas
+        </h3>
+
+        <div class="card-style" style="padding: 0; overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
+                <thead style="background: #f8f9fa; color: #444; border-bottom: 2px solid #eee;">
+                    <tr>
+                        <th style="padding: 12px 15px; text-align: left;">Fecha / Hora</th>
+                        <th style="padding: 12px 15px; text-align: left;">Tipo</th>
+                        <th style="padding: 12px 15px; text-align: left;">Responsable</th>
+                        <th style="padding: 12px 15px; text-align: left;">Descripción</th>
+                        <th style="padding: 12px 15px; text-align: right;">Costo Est. ($)</th>
+                        <th style="padding: 12px 15px; text-align: center;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in historial %}
+                    <tr style="border-bottom: 1px solid #eee; transition: background 0.2s;">
+                        <td style="padding: 12px 15px; white-space: nowrap;">
+                            <div style="font-weight: bold; color: #333;">{{ item.fecha|date:"d/m/Y" }}</div>
+                            <small style="color: #888;">{{ item.fecha|date:"H:i A" }}</small>
+                        </td>
                             
-                            <td style="padding: 10px;">
-                                {% if item.tipo == 'PERSONAL' %}
-                                    <span style="background: #d1ecf1; color: #0c5460; padding: 3px 8px; border-radius: 10px; font-size: 0.85em;">Personal</span>
-                                {% elif item.tipo == 'CORTESIA' %}
-                                    <span style="background: #fff3cd; color: #856404; padding: 3px 8px; border-radius: 10px; font-size: 0.85em;">Cortesía</span>
-                                {% else %}
-                                    <span style="background: #f8d7da; color: #721c24; padding: 3px 8px; border-radius: 10px; font-size: 0.85em;">Merma</span>
-                                {% endif %}
-                            </td>
+                        <td style="padding: 12px 15px;">
+                            {% if item.tipo == 'PERSONAL' %}
+                                <span style="background: #e3f2fd; color: #0d6efd; padding: 4px 12px; border-radius: 12px; font-size: 0.85em; font-weight: bold;"><i class="fas fa-user-chef"></i> Personal</span>
+                            {% elif item.tipo == 'CORTESIA' %}
+                                <span style="background: #fdf2e9; color: #e67e22; padding: 4px 12px; border-radius: 12px; font-size: 0.85em; font-weight: bold;"><i class="fas fa-gift"></i> Cortesía</span>
+                            {% else %}
+                                <span style="background: #f8d7da; color: #dc3545; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold;"><i class="fas fa-trash"></i> Merma</span>
+                            {% endif %}
+                        </td>
 
-                            <td style="padding: 10px;">{{ item.usuario.username|title }}</td>
-                            <td style="padding: 10px;">{{ item.descripcion }}</td>
-                            <td style="padding: 10px; text-align: right; color: #d63031;">-${{ item.costo_estimado }}</td>
-                            <td style="padding: 10px; text-align: center;">
-                                {% if "[ANULADO]" not in item.descripcion %}
-                                <button type="button" onclick="abrirDocumentoPDF('{{ item.id }}')" style="padding: 5px 10px; background-color: #17a2b8; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 0.85em; margin-right: 5px;" title="Ver Documento PDF">
-                                    <i class="fas fa-print"></i> Imprimir
+                        <td style="padding: 12px 15px; color: #555;"><i class="fas fa-user" style="color: #ccc;"></i> {{ item.usuario.username|title }}</td>
+                        <td style="padding: 12px 15px; color: {% if '[ANULADO]' in item.descripcion %}#999{% else %}#333{% endif %}; font-weight: 500;">
+                            {% if '[ANULADO]' in item.descripcion %}
+                                <del>{{ item.descripcion }}</del>
+                            {% else %}
+                                {{ item.descripcion }}
+                            {% endif %}
+                        </td>
+                        <td style="padding: 12px 15px; text-align: right;">
+                            {% if '[ANULADO]' in item.descripcion %}
+                                <del style="color: #999;">${{ item.costo_estimado }}</del>
+                            {% else %}
+                                <span style="color: #dc3545; font-weight: bold;">-${{ item.costo_estimado }}</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 12px 15px; text-align: center; white-space: nowrap;">
+                            {% if "[ANULADO]" not in item.descripcion %}
+                            <button type="button" onclick="abrirDocumentoPDF('{{ item.id }}')" style="padding: 6px 12px; background-color: #17a2b8; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: bold; margin-right: 5px;" title="Ver Documento PDF">
+                                <i class="fas fa-print"></i>
+                            </button>
+                            <form action="{% url 'anular_consumo_interno' item.id %}" method="POST" style="display:inline;" onsubmit="return confirm('¿Estás seguro de anular esta salida y devolver los productos al inventario?');">
+                                {% csrf_token %}
+                                <button type="submit" style="padding: 6px 12px; background-color: #dc3545; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: bold;" title="Anular y Devolver">
+                                    <i class="fas fa-ban"></i>
                                 </button>
-                                <form action="{% url 'anular_consumo_interno' item.id %}" method="POST" style="display:inline;" onsubmit="return confirm('¿Estás seguro de anular esta salida y devolver los productos al inventario?');">
-                                    {% csrf_token %}
-                                    <button type="submit" style="padding: 5px 10px; background-color: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 0.85em;">
-                                        <i class="fas fa-ban"></i> Anular
-                                    </button>
-                                </form>
-                                {% else %}
-                                <span style="padding: 5px 10px; background-color: #6c757d; color: white; border-radius: 3px; display: inline-block; font-size: 0.85em;">Anulado</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="6" style="padding: 20px; text-align: center; color: #999;">
-                                No hay registros recientes.
-                            </td>
-                        </tr>
+                            </form>
+                            {% else %}
+                            <span style="padding: 4px 10px; background-color: #f8f9fa; color: #6c757d; border: 1px solid #ddd; border-radius: 6px; display: inline-block; font-size: 0.85em; font-weight: bold;">Anulado</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" style="padding: 30px; text-align: center; color: #999;">
+                            <i class="fas fa-inbox" style="font-size: 2em; margin-bottom: 10px; opacity: 0.5;"></i><br>
+                            No hay registros recientes.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            
+            {% if historial.has_other_pages %}
+            <div class="card-footer bg-white border-top" style="padding: 15px;">
+                <nav>
+                    <ul class="pagination pagination-sm m-0 justify-content-center" style="display:flex; list-style:none; padding:0; margin:0; gap:5px;">
+                        {% if historial.has_previous %}
+                        <li class="page-item"><a class="page-link" href="?page={{ historial.previous_page_number }}" style="padding:6px 12px; text-decoration:none; border:1px solid #ddd; border-radius: 4px; color: #333;">&laquo;</a></li>
+                        {% endif %}
+                        {% for i in historial.paginator.page_range %}
+                            {% if historial.number == i %}
+                            <li class="page-item active"><span class="page-link" style="padding:6px 12px; background:var(--primary-blue); color:white; border-radius:4px; border:1px solid var(--primary-blue);">{{ i }}</span></li>
+                            {% else %}
+                            <li class="page-item"><a class="page-link" href="?page={{ i }}" style="padding:6px 12px; text-decoration:none; border:1px solid #ddd; border-radius: 4px; color: #333;">{{ i }}</a></li>
+                            {% endif %}
                         {% endfor %}
-                    </tbody>
-                </table>
-                {% if historial.has_other_pages %}
-                <div class="card-footer bg-white border-top">
-                    <nav>
-                        <ul class="pagination pagination-sm m-0 justify-content-center" style="display:flex; list-style:none; padding:10px; gap:5px;">
-                            {% if historial.has_previous %}
-                            <li class="page-item"><a class="page-link" href="?page={{ historial.previous_page_number }}" style="padding:5px 10px; text-decoration:none; border:1px solid #ddd;">&laquo;</a></li>
-                            {% endif %}
-                            {% for i in historial.paginator.page_range %}
-                                {% if historial.number == i %}
-                                <li class="page-item active"><span class="page-link" style="padding:5px 10px; background:#0d6efd; color:white; border-radius:4px;">{{ i }}</span></li>
-                                {% else %}
-                                <li class="page-item"><a class="page-link" href="?page={{ i }}" style="padding:5px 10px; text-decoration:none; border:1px solid #ddd;">{{ i }}</a></li>
-                                {% endif %}
-                            {% endfor %}
-                            {% if historial.has_next %}
-                            <li class="page-item"><a class="page-link" href="?page={{ historial.next_page_number }}" style="padding:5px 10px; text-decoration:none; border:1px solid #ddd;">&raquo;</a></li>
-                            {% endif %}
-                        </ul>
-                    </nav>
-                </div>
-                {% endif %}
+                        {% if historial.has_next %}
+                        <li class="page-item"><a class="page-link" href="?page={{ historial.next_page_number }}" style="padding:6px 12px; text-decoration:none; border:1px solid #ddd; border-radius: 4px; color: #333;">&raquo;</a></li>
+                        {% endif %}
+                    </ul>
+                </nav>
             </div>
+            {% endif %}
         </div>
-
     </div>
 </div>
+
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     window.addEventListener('load', function() {

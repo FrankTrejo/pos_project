@@ -19,6 +19,8 @@ urlpatterns = [
     # 4. Movimientos y Operaciones
     path('movimiento/nuevo/', views.add_movement, name='add_movement'),
     path('movimiento/', views.inventory_move, name='inventory_move'), # Esta parece redundante con la de arriba, revisa cuál usas
+    path('inventario/carga-masiva/', views.carga_masiva_inventario, name='carga_masiva_inventario'),
+
     
     # 5. Edición y Eliminación
     path('editar/<int:pk>/', views.insumo_edit, name='insumo_edit'),

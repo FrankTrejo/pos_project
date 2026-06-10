@@ -159,7 +159,8 @@ def table_order_view(request, table_id):
                 'cuarto_4_id': cuarto_4_id,
                 'cuarto_4_nombre': cuarto_4_nombre,
                 'removidos': removidos,
-                'removidos_nombres': removidos_nombres
+                'removidos_nombres': removidos_nombres,
+                'es_nuevo': not detalle.impreso
             })
 
     carrito_json = json.dumps(carrito_recuperado, cls=DjangoJSONEncoder)
@@ -744,7 +745,8 @@ def grabar_mesa_ajax(request, table_id):
                         producto=prod_obj,
                         cantidad=cant,
                         precio_unitario=precio,
-                        es_para_llevar=item.get('para_llevar', False)
+                        es_para_llevar=item.get('para_llevar', False),
+                        impreso=not item.get('es_nuevo', False)
                     )
                     
                     mitad_id = item.get('mitad_id')

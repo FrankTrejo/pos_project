@@ -245,19 +245,6 @@
                     </div>
                 </div>
 
-                <div class="payment-item" id="item-zelle">
-                    <div class="payment-item-header" onclick="togglePaymentMethod('zelle')">
-                        <div class="icon-label">
-                            <i class="fas fa-university text-primary"></i>
-                            <span>Zelle (USD)</span>
-                        </div>
-                        <span class="entered-badge" id="badge-zelle" style="display:none;">$0.00</span>
-                    </div>
-                    <div class="payment-item-body">
-                        <input type="number" id="input-zelle" class="payment-input" placeholder="Monto en USD" step="0.01">
-                    </div>
-                </div>
-
                 <div class="payment-item" id="item-pm">
                     <div class="payment-item-header" onclick="togglePaymentMethod('pm')">
                         <div class="icon-label">
@@ -871,7 +858,9 @@
             let precioFloat = parseFloat(precio);
             let nombreDisplay = nombre;
             if(tamano !== 'UNI') nombreDisplay += ` (${tamano})`;
-            let existente = carrito.find(item => item.id == id && item.nombre == nombreDisplay && !item.mitad_id && !item.cuarto_2_id && (!item.removidos || item.removidos.length === 0));
+            
+            // Solo agrupamos si es un producto NUEVO. Si ya estaba en la orden (impreso), creamos línea aparte.
+            let existente = carrito.find(item => item.id == id && item.nombre == nombreDisplay && !item.mitad_id && !item.cuarto_2_id && (!item.removidos || item.removidos.length === 0) && item.es_nuevo);
             if (existente) { 
                 existente.cantidad++; 
             } else {
@@ -879,7 +868,8 @@
                     id: id, nombre: nombreDisplay, precio: precioFloat, cantidad: 1,
                     tamano_codigo: tamano, para_llevar: false, extras: [],
                     mitad_id: null, mitad_nombre: null, removidos: [], removidos_nombres: [],
-                    cuarto_2_id: null, cuarto_2_nombre: null, cuarto_3_id: null, cuarto_3_nombre: null, cuarto_4_id: null, cuarto_4_nombre: null
+                    cuarto_2_id: null, cuarto_2_nombre: null, cuarto_3_id: null, cuarto_3_nombre: null, cuarto_4_id: null, cuarto_4_nombre: null,
+                    es_nuevo: true
                 });
             }
             carritoModificado = true;
@@ -957,10 +947,11 @@
                 fila.style.cssText = "display: grid; grid-template-columns: 2fr 0.5fr 1fr 0.5fr 35px; padding: 10px 0; border-bottom: 1px solid #eee; font-size: 1em; align-items: center;";
                 const checked = item.para_llevar ? 'checked' : '';
                 const etiquetaLlevar = item.para_llevar ? '<div style="font-size:0.75em; color:#e67e22; font-weight:bold;"><i class="fas fa-box"></i> Para Llevar</div>' : '';
+                const etiquetaNuevo = item.es_nuevo ? '<span style="background: #198754; color: white; font-size: 0.65em; padding: 2px 5px; border-radius: 4px; margin-left: 5px; font-weight: bold;">NUEVO</span>' : '';
 
                 fila.innerHTML = `
                     <div style="display:flex; flex-direction:column; padding-right:5px;">
-                        <span style="font-weight:500;">${item.nombre}</span>
+                        <span style="font-weight:500;">${item.nombre} ${etiquetaNuevo}</span>
                         ${htmlExtras} ${etiquetaLlevar}
                         <div style="display:flex; gap:5px; margin-top:5px;">
                             <button onclick="abrirModalExtras(${index})" style="background:#f0f2f5; border:1px solid #ccc; border-radius:10px; font-size:0.8em; cursor:pointer; padding:3px 9px; color:#555;"><i class="fas fa-plus-circle" style="color:#d63384;"></i> Extras</button>
@@ -1220,7 +1211,6 @@
 
         function calcularResumenPago() {
             const efecUsd = parseFloat(document.getElementById('input-efectivo-usd').value) || 0;
-            const zelle = parseFloat(document.getElementById('input-zelle').value) || 0;
             const pmBs = parseFloat(document.getElementById('input-pm-bs').value) || 0;
             const puntoBs = parseFloat(document.getElementById('input-punto-bs').value) || 0;
             const efecBs = parseFloat(document.getElementById('input-efectivo-bs').value) || 0;
@@ -1231,7 +1221,7 @@
             document.getElementById('hint-efectivo-bs-usd').innerText = `USD: $${(efecBs / TASA_CAMBIO).toFixed(2)}`;
 
             // Totales en USD
-            const totalPagadoUsd = efecUsd + zelle + (pmBs/TASA_CAMBIO) + (puntoBs/TASA_CAMBIO) + (efecBs/TASA_CAMBIO);
+            const totalPagadoUsd = efecUsd + (pmBs/TASA_CAMBIO) + (puntoBs/TASA_CAMBIO) + (efecBs/TASA_CAMBIO);
             const restante = totalMesaFacturacion - totalPagadoUsd;
 
             // Elementos del DOM
@@ -1272,7 +1262,7 @@
                 btn.disabled = false;
             }
 
-            montosPagos = { efecUsd, zelle, pmBs, puntoBs, efecBs, totalPagadoUsd, restante };
+            montosPagos = { efecUsd, pmBs, puntoBs, efecBs, totalPagadoUsd, restante };
         }
 
         async function confirmarPago() {
@@ -1309,7 +1299,6 @@
 
         let lista = [];
         if(montosPagos.efecUsd > 0) lista.push({ metodo: 'EFECTIVO_USD', monto: montosPagos.efecUsd });
-        if(montosPagos.zelle > 0) lista.push({ metodo: 'ZELLE', monto: montosPagos.zelle });
         if(montosPagos.pmBs > 0) lista.push({ metodo: 'PAGO_MOVIL', monto: montosPagos.pmBs / TASA_CAMBIO, referencia: document.getElementById('ref-pm').value });
         if(montosPagos.puntoBs > 0) lista.push({ metodo: 'PUNTO', monto: montosPagos.puntoBs / TASA_CAMBIO, referencia: document.getElementById('ref-punto').value });
         if(montosPagos.efecBs > 0) lista.push({ metodo: 'EFECTIVO_BS', monto: montosPagos.efecBs / TASA_CAMBIO });

@@ -43,15 +43,15 @@
     }
     /* Estilos para los botones de filtro */
     .btn-filtro {
-        padding: 8px 16px;
+        padding: 5px 12px;
         text-decoration: none;
-        border-radius: 20px;
+        border-radius: 15px;
         border: 1px solid #ccc;
         color: #666;
         font-weight: 500;
         background: white;
         transition: all 0.2s;
-        font-size: 0.9em;
+        font-size: 0.85em;
     }
     .btn-filtro:hover {
         background: #f0f0f0;
@@ -89,28 +89,28 @@
 
 <div style="padding: 20px; max-width: 1400px; margin: 0 auto;">
     
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
         <div>
-            <a href="{% url 'reportes_index' %}" style="color: #666; text-decoration: none; font-size: 0.9em;">
+            <a href="{% url 'reportes_index' %}" style="color: #666; text-decoration: none; font-size: 0.85em;">
                 <i class="fas fa-arrow-left"></i> Volver a Reportes
             </a>
-            <h2 style="color: var(--primary-blue); margin: 5px 0 0 0;">
+            <h2 style="color: var(--primary-blue); margin: 5px 0 0 0; font-size: 1.5em;">
                 <i class="fas fa-file-invoice-dollar"></i> Reporte Detallado de Ventas
             </h2>
         </div>
 
-        <form method="GET" style="background: white; padding: 10px; border-radius: 8px; border: 1px solid #ddd; display: flex; gap: 10px; align-items: center;">
+        <form method="GET" style="background: white; padding: 8px; border-radius: 8px; border: 1px solid #ddd; display: flex; gap: 10px; align-items: center;">
             <input type="hidden" name="estado" value="{{ estado_filtro }}">
-            <label style="font-weight: bold; font-size: 0.9em;">Desde:</label>
-            <input type="date" name="fecha_inicio" value="{{ fecha_inicio }}" class="form-input" style="padding: 5px;">
+            <label style="font-weight: bold; font-size: 0.85em;">Desde:</label>
+            <input type="date" name="fecha_inicio" value="{{ fecha_inicio }}" class="form-input" style="padding: 4px; font-size: 0.85em;">
             
-            <label style="font-weight: bold; font-size: 0.9em;">Hasta:</label>
-            <input type="date" name="fecha_fin" value="{{ fecha_fin }}" class="form-input" style="padding: 5px;">
+            <label style="font-weight: bold; font-size: 0.85em;">Hasta:</label>
+            <input type="date" name="fecha_fin" value="{{ fecha_fin }}" class="form-input" style="padding: 4px; font-size: 0.85em;">
             
-            <button type="submit" class="add-btn" style="padding: 6px 15px;">
+            <button type="submit" class="add-btn" style="padding: 4px 12px; font-size: 0.9em;">
                 <i class="fas fa-search"></i>
             </button>
-            <button type="submit" name="exportar" value="csv" class="add-btn btn-excel" onclick="animarBotonExcel(this)" style="padding: 6px 15px; transition: all 0.2s ease;" title="Exportar a Excel">
+            <button type="submit" name="exportar" value="csv" class="add-btn btn-excel" onclick="animarBotonExcel(this)" style="padding: 4px 12px; font-size: 0.9em; transition: all 0.2s ease;" title="Exportar a Excel">
                 <i class="fas fa-file-excel"></i> Excel
             </button>
         </form>
@@ -132,7 +132,7 @@
         </script>
     {% endif %}
 
-    <div style="margin: 20px 0; display: flex; gap: 10px;">
+    <div style="margin: 10px 0; display: flex; gap: 8px;">
         
         <a href="?fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}&estado=todas" 
            class="btn-filtro {% if estado_filtro == 'todas' %}active{% endif %}">
@@ -151,16 +151,16 @@
 
     </div>
 
-    <div style="background: #e3f2fd; color: #0d47a1; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #bbdefb; display: flex; justify-content: space-between; align-items: center;">
-        <span style="font-size: 1.1em;">Mostrando <b>{{ ventas.count }}</b> transacciones</span>
+    <div style="background: #e3f2fd; color: #0d47a1; padding: 8px 12px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #bbdefb; display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 0.9em;">Mostrando <b>{{ ventas.count }}</b> transacciones</span>
         <div style="text-align: right;">
-            <span style="font-size: 1.4em; font-weight: bold; display: block;">
+            <span style="font-size: 1.1em; font-weight: bold; display: block;">
                 {% if estado_filtro == 'anuladas' %} Total Anulado: {% else %} Total Facturado: {% endif %}
-                ${{ total_periodo|floatformat:2 }}
+                ${{ total_periodo|floatformat:2 }} <span style="color: #17a2b8; font-size: 0.9em; margin-left: 5px;">(Bs. {{ total_periodo_bs|floatformat:2 }})</span>
             </span>
             {% if total_propina > 0 %}
-            <span style="font-size: 1.1em; font-weight: bold; color: #198754; display: block; margin-top: 5px;">
-                <i class="fas fa-hand-holding-usd"></i> Propinas Recibidas: ${{ total_propina|floatformat:4 }}
+            <span style="font-size: 0.9em; font-weight: bold; color: #198754; display: block; margin-top: 2px;">
+                <i class="fas fa-hand-holding-usd"></i> Propinas: ${{ total_propina|floatformat:4 }}
             </span>
             {% endif %}
         </div>
@@ -173,10 +173,11 @@
                     <th style="padding: 12px;">Fecha / Hora</th>
                     <th style="padding: 12px;">N° Factura</th>
                     <th style="padding: 12px;">Mesero</th>
-                    <th style="padding: 12px; width: 25%;">Productos</th>
-                    <th style="padding: 12px;">Métodos de Pago</th>
-                    <th style="padding: 12px;">Estado</th> <th style="padding: 12px; text-align: right;">Total ($)</th>
-                    <th style="padding: 12px; text-align: center;">Acciones</th> </tr>
+                    <th style="padding: 12px;">Estado</th> 
+                    <th style="padding: 12px; text-align: right;">Propina ($)</th>
+                    <th style="padding: 12px; text-align: right;">Total ($)</th>
+                    <th style="padding: 12px; text-align: center;">Acciones</th> 
+                </tr>
             </thead>
             <tbody>
                 {% for venta in ventas %}
@@ -202,48 +203,6 @@
                     </td>
 
                     <td style="padding: 12px; vertical-align: top;">
-                        <ul style="margin: 0; padding-left: 15px; list-style-type: square;">
-                            {% for det in venta.detalles.all %}
-                                <li style="margin-bottom: 2px;">
-                                    {% if det.mitad_producto %}
-                                        <b>{{ det.cantidad }}</b> MITAD/MITAD (1/2 {{ det.nombre_producto }} + 1/2 {{ det.nombre_mitad }})
-                                    {% else %}
-                                        <b>{{ det.cantidad }}</b> {{ det.nombre_producto }}
-                                    {% endif %}
-                                    
-                                    {% if det.extras.exists %}
-                                        <br>
-                                        <small style="color: #666; font-style: italic;">
-                                            {% for extra in det.extras.all %}
-                                                [+{{ extra.nombre_extra }}]
-                                            {% endfor %}
-                                        </small>
-                                    {% endif %}
-                                </li>
-                            {% endfor %}
-                        </ul>
-                    </td>
-
-                    <td style="padding: 12px; vertical-align: top;">
-                        {% if venta.pagos.exists %}
-                            {% for pago in venta.pagos.all %}
-                                <div style="margin-bottom: 3px;">
-                                    <span style="font-weight: 600; font-size: 0.85em;">{{ pago.get_metodo_display }}:</span>
-                                    ${{ pago.monto }}
-                                </div>
-                            {% endfor %}
-                        {% else %}
-                            {{ venta.get_metodo_pago_display }}
-                        {% endif %}
-                        
-                        {% if venta.propina > 0 %}
-                            <div style="margin-top: 5px; color: #198754; font-size: 0.85em; font-weight: bold;">
-                                <i class="fas fa-hand-holding-usd"></i> Propina: ${{ venta.propina|floatformat:4 }}
-                            </div>
-                        {% endif %}
-                    </td>
-
-                    <td style="padding: 12px; vertical-align: top;">
                         {% if venta.anulada %}
                             <span class="badge bg-danger">ANULADA</span>
                             {% if venta.motivo_anulacion %}
@@ -258,19 +217,32 @@
 
                     <td style="padding: 12px; text-align: right; vertical-align: top;">
                         {% if venta.anulada %}
+                            <del style="color: #999;">${{ venta.propina|floatformat:2 }}</del>
+                        {% else %}
+                            <span style="color: #198754;">${{ venta.propina|floatformat:2 }}</span>
+                            {% if venta.propina > 0 %}
+                            <div style="font-size: 0.85em; color: #666; margin-top: 2px;">Bs. {{ venta.propina_bs|floatformat:2 }}</div>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+
+                    <td style="padding: 12px; text-align: right; vertical-align: top;">
+                        {% if venta.anulada %}
                             <del style="color: #999;">${{ venta.total|floatformat:2 }}</del>
+                            <div style="font-size: 0.85em; color: #999; margin-top: 2px;"><del>Bs. {{ venta.total_bs|floatformat:2 }}</del></div>
                         {% else %}
                             <b style="color: #28a745; font-size: 1.1em;">${{ venta.total|floatformat:2 }}</b>
+                            <div style="font-size: 0.85em; color: #666; margin-top: 2px; font-weight: 500;">Bs. {{ venta.total_bs|floatformat:2 }}</div>
                         {% endif %}
                     </td>
 
                     <td style="padding: 12px; text-align: center; vertical-align: top;">
                         <div style="display: flex; gap: 10px; justify-content: center;">
                             
-                            <a href="{% url 'generar_factura_pdf' venta.id %}" target="_blank" title="Ver Factura PDF" 
-                               style="color: #dc3545; font-size: 1.2em;">
-                                <i class="fas fa-file-pdf"></i>
-                            </a>
+                            <button onclick="abrirModalDetalle('{% url 'detalle_venta' venta.id %}')" title="Ver Detalles de Venta" 
+                               style="background: none; border: none; cursor: pointer; color: var(--primary-blue); font-size: 1.2em; padding: 0;">
+                                <i class="fas fa-eye"></i>
+                            </button>
 
                             {% if not venta.anulada %}
                                 <button onclick="abrirModalAnular('{{ venta.id }}', '{{ venta.codigo_factura }}')" 
@@ -285,7 +257,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="8" style="padding: 30px; text-align: center; color: #999;">
+                    <td colspan="7" style="padding: 30px; text-align: center; color: #999;">
                         No se encontraron ventas en este rango de fechas.
                     </td>
                 </tr>
@@ -348,6 +320,18 @@
     </div>
 </div>
 
+<div id="modalDetalleOverlay" class="modal-overlay">
+    <div class="modal-content" style="width: 800px; max-width: 95%; max-height: 90vh; overflow-y: auto; text-align: left; padding: 0;">
+        <div style="background: var(--primary-blue); color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10;">
+            <h3 style="margin: 0; font-size: 1.2em;"><i class="fas fa-receipt"></i> Detalles de Factura</h3>
+            <button onclick="cerrarModalDetalle()" style="background: none; border: none; color: white; font-size: 1.5em; cursor: pointer;">&times;</button>
+        </div>
+        <div id="modalDetalleContent" style="padding: 10px;">
+            <!-- Contenido dinámico -->
+        </div>
+    </div>
+</div>
+
 <script>
     function abrirModalAnular(id, codigo) {
         // Ponemos el número de factura en el texto
@@ -359,17 +343,52 @@
         document.getElementById('formAnular').action = "/venta/anular/" + id + "/"; 
         
         document.getElementById('modalAnular').style.display = 'flex';
+        document.body.style.overflow = 'hidden'; // Oculta el scroll de la página de fondo
     }
 
     function cerrarModalAnular() {
         document.getElementById('modalAnular').style.display = 'none';
+        document.body.style.overflow = ''; // Restaura el scroll
     }
 
-    // Cerrar si hacen click fuera del modal
+    function abrirModalDetalle(url) {
+        document.getElementById('modalDetalleOverlay').style.display = 'flex';
+        document.getElementById('modalDetalleContent').innerHTML = '<div style="padding: 50px; text-align: center;"><i class="fas fa-spinner fa-spin fa-3x" style="color: #0d6efd;"></i><p style="margin-top: 15px; color: #555;">Cargando detalles...</p></div>';
+        document.body.style.overflow = 'hidden'; // Oculta el scroll de la página de fondo
+        
+        fetch(url)
+        .then(response => response.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const content = doc.getElementById('detalle-contenido-unico');
+            
+            if (content) {
+                // Ocultamos el link de 'Volver al reporte' porque ya estamos en un modal
+                const backLink = content.querySelector('.volver-link-wrapper');
+                if (backLink) backLink.style.display = 'none';
+                const mainContainer = content.querySelector('.contenedor-principal-detalle');
+                if (mainContainer) mainContainer.style.padding = '0';
+                
+                document.getElementById('modalDetalleContent').innerHTML = content.innerHTML;
+            } else {
+                document.getElementById('modalDetalleContent').innerHTML = '<div style="padding: 30px; text-align: center; color: #dc3545;"><i class="fas fa-exclamation-circle fa-2x"></i><p>No se pudo cargar el detalle.</p></div>';
+            }
+        })
+        .catch(err => {
+            document.getElementById('modalDetalleContent').innerHTML = '<div style="padding: 30px; text-align: center; color: #dc3545;"><i class="fas fa-exclamation-circle fa-2x"></i><p>Error de conexión al cargar los detalles.</p></div>';
+        });
+    }
+
+    function cerrarModalDetalle() {
+        document.getElementById('modalDetalleOverlay').style.display = 'none';
+        document.getElementById('modalDetalleContent').innerHTML = ''; // Limpiar memoria
+        document.body.style.overflow = ''; // Restaura el scroll
+    }
+
     window.onclick = function(event) {
-        if (event.target == document.getElementById('modalAnular')) {
-            cerrarModalAnular();
-        }
+        if (event.target == document.getElementById('modalAnular')) cerrarModalAnular();
+        if (event.target == document.getElementById('modalDetalleOverlay')) cerrarModalDetalle();
     }
 
     // Animación para el botón de exportar a Excel

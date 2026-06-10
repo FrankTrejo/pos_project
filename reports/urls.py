@@ -12,5 +12,5 @@ urlpatterns = [
     path('insumos-agotados/', views.reporte_insumos_agotados, name='reporte_insumos_agotados'),
     path('historial-tasas/', views.historial_tasas_bcv, name='historial_tasas_bcv'),
     path('propinas/', views.reporte_propinas, name='reporte_propinas'),
-
+    path('venta/<int:venta_id>/detalle/', views.detalle_venta_view, name='detalle_venta'),
 ]

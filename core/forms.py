@@ -6,28 +6,33 @@ from tables.models import CostoAdicional
 class ConfigIdentidadForm(forms.ModelForm):
     class Meta:
         model = Configuracion
-        fields = ['nombre_empresa', 'rif', 'direccion', 'telefono']
+        fields = ['nombre_empresa', 'rif', 'direccion', 'telefono', 'pm_banco', 'pm_telefono', 'pm_cedula']
         widgets = {
             'direccion': forms.Textarea(attrs={'rows': 3}),
+            'pm_banco': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Banesco (0134)'}),
+            'pm_telefono': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: 04141234567'}),
+            'pm_cedula': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: V12345678'}),
         }
 
 # 3. FORMULARIO VISUAL Y TÉCNICO (AQUÍ AGREGUÉ LA CONFIGURACIÓN DE IMPRESIÓN)
 class ConfigVisualForm(forms.ModelForm):
     class Meta:
         model = Configuracion
-        # Agregamos: impresora_ticket, ancho_papel, auto_imprimir
-        fields = ['logo', 'mensaje_ticket', 'impresora_ticket', 'ancho_papel', 'auto_imprimir']
+        # Agregamos los campos visuales nuevos
+        fields = ['logo', 'mensaje_ticket', 'impresora_ticket', 'ancho_papel', 'auto_imprimir', 'usar_logo_impresora']
         
         widgets = {
             'mensaje_ticket': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Mensaje al pie del ticket'}),
             'impresora_ticket': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nombre exacto de la impresora'}),
             'ancho_papel': forms.NumberInput(attrs={'class': 'form-control'}),
             'auto_imprimir': forms.CheckboxInput(attrs={'class': 'form-check-input', 'style': 'width: 20px; height: 20px;'}),
+            'usar_logo_impresora': forms.CheckboxInput(attrs={'class': 'form-check-input', 'style': 'width: 20px; height: 20px;'}),
         }
         labels = {
             'impresora_ticket': 'Nombre de Impresora (PC)',
             'ancho_papel': 'Ancho del Papel (mm)',
-            'auto_imprimir': '¿Imprimir Automáticamente?'
+            'auto_imprimir': '¿Imprimir Automáticamente?',
+            'usar_logo_impresora': '¿Enviar comando de Logo Térmico?'
         }
 
 class CostoAdicionalForm(forms.ModelForm):

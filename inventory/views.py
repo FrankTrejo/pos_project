@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.admin.views.decorators import staff_member_required
+from django.views.decorators.cache import never_cache
 from django.contrib import messages
 from .models import Insumo, MovimientoInventario, CategoriaInsumo, IngredienteCompuesto, ConsumoInterno
 from .forms import InsumoForm, ComponenteForm, MovimientoInventarioForm
@@ -55,7 +56,7 @@ def inventory_index(request):
         'insumos': insumos,
         'categorias': categorias,
         'alertas_stock': alertas_stock,
-        'valor_inventario': valor_inventario,
+        'valor_total': valor_inventario,
         'q': query,
         'estado': estado,
         'tipo': tipo,
@@ -1140,3 +1141,52 @@ def anular_consumo_interno(request, consumo_id):
             messages.error(request, f"Error al anular: {e}")
             
     return redirect('salidas_especiales')
+
+@staff_member_required
+@never_cache
+def carga_masiva_inventario(request):
+    # Traemos todos los insumos base (excluyendo recetas) ordenados por categoría y nombre
+    insumos = Insumo.objects.filter(es_insumo_compuesto=False).order_by('categoria__nombre', 'nombre')
+
+    if request.method == 'POST':
+        nota_general = request.POST.get('nota_general', 'Carga Masiva de Inventario')
+        movimientos_creados = 0
+
+        try:
+            with transaction.atomic():
+                for insumo in insumos:
+                    # Buscamos en el POST el campo correspondiente a este insumo
+                    cantidad_str = request.POST.get(f'cantidad_insumo_{insumo.id}')
+                    
+                    if cantidad_str:
+                        try:
+                            cantidad = Decimal(cantidad_str)
+                        except:
+                            cantidad = Decimal('0')
+
+                        if cantidad > 0:
+                            # Costo de la entrada basado en su costo unitario actual
+                            costo_total_movimiento = cantidad * insumo.costo_unitario
+                            MovimientoInventario.objects.create(
+                                insumo=insumo,
+                                tipo='ENTRADA',
+                                cantidad=cantidad,
+                                usuario=request.user,
+                                nota=f"{nota_general} (Carga Masiva)",
+                                costo_unitario_movimiento=costo_total_movimiento
+                            )
+                            movimientos_creados += 1
+                            
+                if movimientos_creados > 0:
+                    messages.success(request, f"¡Carga exitosa! Se ingresó stock a {movimientos_creados} insumos.")
+                else:
+                    messages.warning(request, "No se ingresó ninguna cantidad mayor a 0. No se hicieron cambios.")
+                
+                return redirect('inventory_index')
+
+        except Exception as e:
+            messages.error(request, f"Error durante la carga masiva: {str(e)}")
+
+    return render(request, 'inventory/carga_masiva.html', {
+        'insumos': insumos
+    })

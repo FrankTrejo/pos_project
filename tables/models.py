@@ -262,7 +262,6 @@ class Venta(models.Model):
         ('EFECTIVO_BS', 'Efectivo (Bs)'),
         ('PAGO_MOVIL', 'Pago Móvil'),
         ('PUNTO', 'Punto de Venta'),
-        ('ZELLE', 'Zelle'),
         ('MIXTO', 'Mixto'),
     ]
     
@@ -350,6 +349,7 @@ class DetalleOrden(models.Model):
 
     # --- NUEVO CAMPO ---
     es_para_llevar = models.BooleanField(default=False, verbose_name="¿Para Llevar?")
+    impreso = models.BooleanField(default=False, verbose_name="¿Ya impreso en comanda?")
 
     # --- PERSONALIZACIÓN ---
     mitad_producto = models.ForeignKey(Producto, on_delete=models.SET_NULL, null=True, blank=True, related_name='detalles_como_mitad')
@@ -409,7 +409,6 @@ class Pago(models.Model):
         ('EFECTIVO_BS', 'Efectivo (Bs)'), # Opcional, si quieres registrarlo separado
         ('PAGO_MOVIL', 'Pago Móvil'),
         ('PUNTO', 'Punto de Venta'),
-        ('ZELLE', 'Zelle'),
     ]
     
     venta = models.ForeignKey(Venta, on_delete=models.CASCADE, related_name='pagos')

@@ -11,6 +11,7 @@ urlpatterns = [
     path('dashboard/', include('dashboard.urls')),
     path('inventory/', include('inventory.urls')),
     path('reportes/', include('reports.urls')),
+    path('venta/<int:venta_id>/', include('reports.urls')), # Nueva ruta para el detalle de venta
     path('maestros/', include('maestros.urls')),
     path('core/', include('core.urls')),
     

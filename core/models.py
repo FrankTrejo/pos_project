@@ -9,6 +9,11 @@ class Configuracion(models.Model):
     mensaje_ticket = models.CharField(max_length=200, default="¡Gracias por su compra!", help_text="Mensaje al final de la factura")
     logo = models.ImageField(upload_to='logos/', blank=True, null=True)
 
+    # --- DATOS PAGO MÓVIL ---
+    pm_banco = models.CharField(max_length=50, blank=True, verbose_name="Banco Pago Móvil")
+    pm_telefono = models.CharField(max_length=20, blank=True, verbose_name="Teléfono Pago Móvil")
+    pm_cedula = models.CharField(max_length=20, blank=True, verbose_name="Cédula/RIF Pago Móvil")
+
     # --- 2. MONEDA E IMPUESTOS ---
     tasa_dolar = models.DecimalField(max_digits=10, decimal_places=2, default=40.00, verbose_name="Tasa BCV ($)")
     
@@ -26,6 +31,7 @@ class Configuracion(models.Model):
     impresora_ticket = models.CharField(max_length=100, blank=True, default="", verbose_name="Nombre Impresora (Referencia)", help_text="Nombre de la impresora predeterminada en el sistema operativo")
     ancho_papel = models.IntegerField(default=80, verbose_name="Ancho Papel (mm)", help_text="Estándar: 80mm o 58mm")
     auto_imprimir = models.BooleanField(default=True, verbose_name="¿Impresión Automática?", help_text="Si se marca, el sistema intentará imprimir sin preguntar al cerrar la venta.")
+    usar_logo_impresora = models.BooleanField(default=False, verbose_name="¿Imprimir logo en ticket?", help_text="El logo debe estar pre-cargado en la memoria de la impresora térmica (NV Logo).")
 
     # --- 5. CONFIGURACIÓN DE EMPAQUES (NUEVO) ---
     caja_individual = models.ForeignKey('inventory.Insumo', related_name='config_caja_ind', on_delete=models.SET_NULL, null=True, blank=True, limit_choices_to={'es_insumo_compuesto': False}, verbose_name="Empaque Individual")

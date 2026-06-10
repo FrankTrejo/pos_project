@@ -1,0 +1,174 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}- Detalle Venta #{{ venta.codigo_factura }}{% endblock %}
+
+{% block content %}
+<div id="detalle-contenido-unico">
+<style>
+    .detail-card {
+        background-color: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+        padding: 15px;
+        margin-bottom: 15px;
+        font-size: 0.9em;
+    }
+    .detail-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 10px;
+    }
+    .detail-item {
+        margin-bottom: 10px;
+    }
+    .detail-item span {
+        font-weight: bold;
+        color: #555;
+    }
+    .table-details {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+    }
+    .table-details th {
+        background-color: #f8f9fa;
+        padding: 8px;
+        text-align: left;
+        border-bottom: 2px solid #ddd;
+    }
+    .table-details td {
+        padding: 8px;
+        border-bottom: 1px solid #eee;
+        vertical-align: top;
+    }
+    .extra-item {
+        font-size: 0.85em;
+        color: #666;
+        margin-left: 10px;
+    }
+    .status-badge {
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-weight: bold;
+        font-size: 0.9em;
+    }
+</style>
+
+<div class="contenedor-principal-detalle" style="padding: 10px; max-width: 900px; margin: 0 auto;">
+    <div class="volver-link-wrapper" style="margin-bottom: 20px;">
+        <a href="javascript:history.back()" style="color: #666; text-decoration: none; font-weight: bold;">
+            <i class="fas fa-arrow-left"></i> Volver al reporte
+        </a>
+    </div>
+
+    <div class="detail-card">
+        <div class="detail-header">
+            <div>
+                <h2 style="color: var(--primary-blue); margin: 0; font-size: 1.5em;">Factura #{{ venta.codigo_factura }}</h2>
+                <div style="color: #888; font-size: 0.9em; margin-top: 5px;">{{ venta.fecha|date:"d/m/Y H:i A" }}</div>
+            </div>
+            <div>
+                {% if venta.anulada %}
+                    <span class="status-badge" style="background-color: #f8d7da; color: #842029;">ANULADA</span>
+                {% else %}
+                    <span class="status-badge" style="background-color: #d1e7dd; color: #0f5132;">COBRADA</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+            <div>
+                <div class="detail-item"><span>Mesero:</span> {{ venta.mesero.username|title|default:"Sin Asignar" }}</div>
+                <div class="detail-item"><span>Mesa:</span> {{ venta.mesa_numero }}</div>
+                {% if venta.anulada and venta.motivo_anulacion %}
+                <div class="detail-item" style="color: #dc3545;"><span>Motivo Anulación:</span> "{{ venta.motivo_anulacion }}"</div>
+                <div class="detail-item" style="color: #dc3545;"><span>Anulada por:</span> {{ venta.usuario_anulacion.username }} el {{ venta.fecha_anulacion|date:"d/m/Y H:i" }}</div>
+                {% endif %}
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 1.6em; font-weight: bold; color: {% if venta.anulada %}#999{% else %}#28a745{% endif %};">
+                    ${{ venta.total|floatformat:2 }}
+                </div>
+                <div style="color: #666;">
+                    Total pagado
+                </div>
+            </div>
+        </div>
+
+        <h3 style="color: #444; border-bottom: 2px solid #eee; padding-bottom: 5px; margin-top: 15px; margin-bottom: 10px; font-size: 1.1em;">Productos</h3>
+        <table class="table-details">
+            <thead>
+                <tr>
+                    <th>Cant.</th>
+                    <th>Descripción</th>
+                    <th style="text-align: right;">Subtotal</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in venta.detalles.all %}
+                <tr>
+                    <td style="font-weight: bold;">{{ item.cantidad }}</td>
+                    <td>
+                        {{ item.nombre_producto }}
+                        
+                        {% if item.extras.exists %}
+                            <div style="margin-top: 5px;">
+                            {% for extra in item.extras.all %}
+                                <div class="extra-item">+ {{ extra.nombre_extra }} (${{ extra.precio|floatformat:2 }})</div>
+                            {% endfor %}
+                            </div>
+                        {% endif %}
+                    </td>
+                    <td style="text-align: right; font-weight: bold;">${{ item.subtotal|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <h3 style="color: #444; border-bottom: 2px solid #eee; padding-bottom: 5px; margin-top: 15px; margin-bottom: 10px; font-size: 1.1em;">Pagos Registrados</h3>
+        <table class="table-details">
+            <thead>
+                <tr>
+                    <th>Método</th>
+                    <th>Referencia</th>
+                    <th style="text-align: right;">Monto ($)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if venta.pagos.exists %}
+                    {% for pago in venta.pagos.all %}
+                    <tr>
+                        <td style="font-weight: bold;">{{ pago.get_metodo_display }}</td>
+                        <td>{{ pago.referencia|default:"-" }}</td>
+                        <td style="text-align: right;">${{ pago.monto|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td style="font-weight: bold;">{{ venta.get_metodo_pago_display }}</td>
+                        <td>-</td>
+                        <td style="text-align: right;">${{ venta.monto_recibido|floatformat:2 }}</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+
+        <div style="margin-top: 15px; background-color: #f8f9fa; padding: 10px; border-radius: 8px; text-align: right;">
+            <div style="margin-bottom: 5px;"><span style="color: #666; font-weight: bold;">Monto Entregado:</span> ${{ venta.monto_recibido|floatformat:2 }}</div>
+            {% if venta.propina > 0 %}
+            <div style="color: #198754; font-weight: bold; margin-bottom: 5px;">Propina: ${{ venta.propina|floatformat:2 }} <small>(Bs. {{ propina_bs|floatformat:2 }})</small></div>
+            {% endif %}
+            {% with vuelto=venta.monto_recibido|add:"-"|add:venta.total|add:"-"|add:venta.propina %}
+            {% if vuelto > 0 %}
+            <div style="color: #0dcaf0; font-weight: bold;">Vuelto Entregado: ${{ vuelto|floatformat:2 }}</div>
+            {% endif %}
+            {% endwith %}
+        </div>
+    </div>
+</div>
+</div>
+{% endblock %}

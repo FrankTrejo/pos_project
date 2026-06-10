@@ -60,6 +60,13 @@
             </aside>
 
             <main class="main-content-area">
+                <!-- Botón para alternar la barra lateral -->
+                <div style="margin-bottom: 15px;">
+                    <button id="toggleSidebarBtn" class="sidebar-toggle-btn" title="Ocultar/Mostrar Menú">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                </div>
+
                 {% block content %}
                 {% endblock %}
 
@@ -116,6 +123,28 @@
             window.open(urlPdf, '_blank');
         }
     }
+
+    // --- LÓGICA PARA OCULTAR/MOSTRAR LA BARRA LATERAL ---
+    document.addEventListener("DOMContentLoaded", function() {
+        const toggleBtn = document.getElementById("toggleSidebarBtn");
+        const sidebar = document.querySelector(".sidebar");
+
+        // 1. Revisar si el menú estaba oculto previamente (Memoria del navegador)
+        if (localStorage.getItem("sidebar_oculta") === "true") {
+            sidebar.classList.add("collapsed");
+        }
+
+        if (toggleBtn && sidebar) {
+            toggleBtn.addEventListener("click", function() {
+                sidebar.classList.toggle("collapsed");
+                if (sidebar.classList.contains("collapsed")) {
+                    localStorage.setItem("sidebar_oculta", "true");
+                } else {
+                    localStorage.setItem("sidebar_oculta", "false");
+                }
+            });
+        }
+    });
 </script>
 </body>
 </html>

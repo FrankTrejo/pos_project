@@ -1,16 +1,18 @@
-from django.shortcuts import render
-from django.db.models import Sum, Count, F
+from django.shortcuts import render, get_object_or_404
+from django.db.models import Sum, Count, F, ExpressionWrapper, DecimalField
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, datetime   
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import Paginator
 from .models import AuditoriaEliminacion, AuditoriaConfiguracion
 import csv
+import math
+from decimal import Decimal
 from django.http import HttpResponse
 
 # Importamos modelos de ambas aplicaciones (Inventario y Ventas)
 from inventory.models import Insumo, MovimientoInventario
-from tables.models import Venta, DetalleVenta, TasaBCV
+from tables.models import Venta, DetalleVenta, TasaBCV, Pago
 
 # 1. MENÚ PRINCIPAL DE REPORTES (Centro de Mando)
 @staff_member_required
@@ -202,8 +204,10 @@ def historial_tasas_bcv(request):
 @staff_member_required
 def reporte_ventas_detalle(request):
     # 1. Filtros de Fecha
-    fecha_inicio = request.GET.get('fecha_inicio', timezone.now().strftime('%Y-%m-%d'))
-    fecha_fin = request.GET.get('fecha_fin', timezone.now().strftime('%Y-%m-%d'))
+    # Por defecto, siempre mostrar HOY al ingresar al reporte
+    hoy_str = timezone.localtime().date().strftime('%Y-%m-%d')
+    fecha_inicio = request.GET.get('fecha_inicio', hoy_str)
+    fecha_fin = request.GET.get('fecha_fin', hoy_str)
     
     # 2. Capturamos el filtro de estado (todas, validas, anuladas)
     estado_filtro = request.GET.get('estado', 'todas') # Por defecto 'todas'
@@ -235,6 +239,11 @@ def reporte_ventas_detalle(request):
         # Aquí mostramos la lista completa, pero el total SUMA SOLO LO REAL (No anulado)
         total_periodo = ventas_list.filter(anulada=False).aggregate(Sum('total'))['total__sum'] or 0
         total_propina = ventas_list.filter(anulada=False).aggregate(Sum('propina'))['propina__sum'] or 0
+
+    # Calcular equivalente en bolívares usando la tasa actual
+    tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
+    tasa_valor = float(tasa_obj.precio) if tasa_obj else 0
+    total_periodo_bs = float(total_periodo) * tasa_valor
 
     # Detectamos si el usuario presionó el botón de exportar
     if request.GET.get('exportar') == 'csv':
@@ -281,15 +290,51 @@ def reporte_ventas_detalle(request):
     page_number = request.GET.get('page')
     ventas = paginator.get_page(page_number)
 
+    # Agregamos el cálculo en Bs a cada venta de esta página
+    for v in ventas:
+        v.total_bs = float(v.total) * tasa_valor
+        v.propina_bs = float(v.propina) * tasa_valor
+
     context = {
         'ventas': ventas,
         'fecha_inicio': fecha_inicio,
         'fecha_fin': fecha_fin,
         'total_periodo': total_periodo,
+        'total_periodo_bs': total_periodo_bs,
         'total_propina': total_propina,
         'estado_filtro': estado_filtro # Pasamos esto para pintar los botones
     }
     return render(request, 'reports/sales_detail_report.html', context)
+
+@staff_member_required
+def detalle_venta_view(request, venta_id):
+    venta = get_object_or_404(
+        Venta.objects.select_related('mesero')
+                     .prefetch_related('detalles__producto', 
+                                       'detalles__mitad_producto', 
+                                       'detalles__ingredientes_removidos',
+                                       'detalles__cuarto_2_producto',
+                                       'detalles__cuarto_3_producto',
+                                       'detalles__cuarto_4_producto',
+                                       'detalles__extras',
+                                       'pagos'), 
+        id=venta_id
+    )
+
+    tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
+    tasa_valor = float(tasa_obj.precio) if tasa_obj else 0
+
+    # Calcular total de la propina en bolívares
+    propina_bs = float(venta.propina) * tasa_valor
+
+    context = {
+        'venta': venta,
+        'tasa_bcv_actual': tasa_valor,
+        'propina_bs': propina_bs
+    }
+
+    return render(request, 'reports/venta_detalle.html', context)
+
 
 # reports/views.py
 from django.shortcuts import render
@@ -319,8 +364,9 @@ def reporte_insumos_agotados(request):
 
 @staff_member_required
 def reporte_propinas(request):
-    fecha_inicio = request.GET.get('fecha_inicio', timezone.now().strftime('%Y-%m-%d'))
-    fecha_fin = request.GET.get('fecha_fin', timezone.now().strftime('%Y-%m-%d'))
+    hoy_str = timezone.localtime().date().strftime('%Y-%m-%d')
+    fecha_inicio = request.GET.get('fecha_inicio', hoy_str)
+    fecha_fin = request.GET.get('fecha_fin', hoy_str)
 
     ventas_list = Venta.objects.filter(
         fecha__date__range=[fecha_inicio, fecha_fin],
@@ -379,3 +425,87 @@ def reporte_propinas(request):
         'tasa': tasa_valor
     }
     return render(request, 'reports/propinas_report.html', context)
+
+def ventas_pago(request):
+    # 1. POR DEFECTO: Siempre mostrar HOY al ingresar
+    hoy_str = timezone.localtime().date().strftime('%Y-%m-%d')
+    fecha_inicio_str = request.GET.get('fecha_inicio', hoy_str)
+    fecha_fin_str = request.GET.get('fecha_fin', hoy_str)
+
+    fecha_inicio = datetime.strptime(fecha_inicio_str, '%Y-%m-%d').date()
+    fecha_fin = datetime.strptime(fecha_fin_str, '%Y-%m-%d').date()
+
+    inicio_datetime = timezone.make_aware(datetime.combine(fecha_inicio, datetime.min.time()))
+    fin_datetime = timezone.make_aware(datetime.combine(fecha_fin, datetime.max.time()))
+
+    # 2. Consultar directamente el modelo "Pago" (No las Ventas) para obtener la fracción exacta.
+    # Excluimos los pagos de ventas anuladas.
+    pagos = Pago.objects.filter(
+        venta__fecha__range=(inicio_datetime, fin_datetime),
+        venta__anulada=False
+    )
+
+    # 3. Agrupar por método de pago
+    datos_pagos = pagos.values('metodo').annotate(
+        transacciones=Count('id'),
+        total_dolares=Sum('monto')
+    ).order_by('-total_dolares')
+    
+    # Obtenemos la tasa actual
+    tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
+    tasa_valor = float(tasa_obj.precio) if tasa_obj else 0
+
+    # 4. Procesar para la vista y gráfico
+    resultados = []
+    labels = []
+    values = []
+    
+    total_general_dolares = 0
+    total_general_bs = 0
+    total_transacciones = 0
+
+    # Nombres legibles en caso de que la BD guarde claves como 'PAGO_MOVIL'
+    nombres_metodos = {
+        'EFECTIVO_USD': 'Efectivo ($)',
+        'EFECTIVO_BS': 'Efectivo (Bs)',
+        'PUNTO': 'Punto de Venta',
+        'PAGO_MOVIL': 'Pago Móvil',
+        'BINANCE': 'Binance',
+        'TRANSFERENCIA': 'Transferencia'
+    }
+
+    for p in datos_pagos:
+        metodo_raw = p['metodo']
+        metodo_nombre = nombres_metodos.get(metodo_raw, str(metodo_raw).replace('_', ' ').title())
+        
+        total_usd = float(p['total_dolares'] or 0)
+        total_bs = total_usd * tasa_valor
+        
+        resultados.append({
+            'metodo_nombre': metodo_nombre,
+            'transacciones': p['transacciones'],
+            'total_dolares': total_usd,
+            'total_bs': total_bs,
+        })
+        
+        labels.append(metodo_nombre)
+        values.append(total_usd)
+        
+        total_general_dolares += total_usd
+        total_general_bs += total_bs
+        total_transacciones += p['transacciones']
+
+    context = {
+        'titulo': 'Reporte de Métodos de Pago',
+        'fecha_inicio': fecha_inicio_str,
+        'fecha_fin': fecha_fin_str,
+        'resultados': resultados,
+        'total_general_dolares': total_general_dolares,
+        'total_general_bs': total_general_bs,
+        'total_transacciones': total_transacciones,
+        'labels': labels,
+        'values': values,
+    }
+
+    # Apuntamos a la nueva plantilla especializada
+    return render(request, 'reports/payment_methods_report.html', context)

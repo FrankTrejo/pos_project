@@ -43,7 +43,7 @@
         align-items: center;
     }
     .search-input {
-        flex: 2;
+        flex: 4;
         padding: 12px 15px;
         border-radius: 8px;
         border: 1px solid #ddd;
@@ -51,10 +51,11 @@
     }
     .filter-select {
         flex: 1;
-        padding: 12px 15px;
+        max-width: 220px;
+        padding: 10px 12px;
         border-radius: 8px;
         border: 1px solid #ddd;
-        font-size: 1rem;
+        font-size: 0.9rem;
         background-color: #fff;
         cursor: pointer;
     }
@@ -128,6 +129,9 @@
         </button>
         <a href="{% url 'inventory_index' %}" style="background: #6c757d; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; text-decoration: none; display: inline-flex; align-items: center;" title="Limpiar Filtros">
             <i class="fas fa-eraser"></i>
+        </a>
+        <a href="{% url 'carga_masiva_inventario' %}" style="background: #198754; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; text-decoration: none; display: inline-flex; align-items: center; margin-left: auto; gap: 8px;" title="Realizar Carga Masiva">
+            <i class="fas fa-boxes"></i> Carga Masiva
         </a>
     </form>
 
