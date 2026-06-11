@@ -845,7 +845,7 @@ def grabar_mesa_ajax(request, table_id):
                     orden.save()
             else:
                 # Si no mandamos a tickera pero actualizamos, igual guardamos el flag si venía True de antes
-                if not orden.impreso:
+                if debe_imprimir and not orden.impreso:
                     orden.impreso = True
                     orden.save()
 
@@ -1025,9 +1025,8 @@ def facturar_mesa_ajax(request, table_id):
             if not orden:
                 return JsonResponse({'status': 'error', 'message': 'No hay orden.'})
 
-            if not orden.impreso:
-                from .utils_impresora import imprimir_comanda
-                imprimir_comanda(orden)
+            from .utils_impresora import imprimir_comanda
+            imprimir_comanda(orden)
 
             # --- 1. RECALCULAR TOTALES REALES (Base + Extras) ---
             total_venta_real = 0

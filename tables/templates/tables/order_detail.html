@@ -1094,7 +1094,7 @@
         const esPrimeraVez = '{{ orden_activa.impreso|yesno:"true,false"|default:"false" }}' === 'false';
         const debeImprimir = esPrimeraVez || carritoModificado;
 
-        const data = { carrito: carrito, mesero: meseroNombre, imprimir_ticket: debeImprimir };
+        const data = { carrito: carrito, mesero: meseroNombre, imprimir: false, imprimir_ticket: debeImprimir, ignorar_stock: ignorarStock };
 
         // Hacemos el llamado a la vista grabar_mesa_ajax
         fetch("{% url 'grabar_mesa' table.id %}", {

@@ -150,6 +150,19 @@ def mandar_a_tickera(venta):
         t += f"{'TOTAL USD:':<16}{'$':>8}{total_usd:>8.2f}\n"
         t += f"{'TOTAL Bs.:':<16}{'Bs.':>6}{total_bs:>10.2f}\n"
         t += "--------------------------------\n"
+        
+        pagos = venta.pagos.all()
+        if pagos.exists():
+            t += "FORMAS DE PAGO:\n"
+            for pago in pagos:
+                metodo_nombre = pago.get_metodo_display()[:14]
+                t += f"  {metodo_nombre:<14}{'$':>8}{to_decimal(pago.monto):>8.2f}\n"
+            t += "--------------------------------\n"
+        else:
+            metodo_nombre = venta.get_metodo_pago_display()[:14]
+            t += f"PAGO: {metodo_nombre}\n"
+            t += "--------------------------------\n"
+            
         t += f"{'RECIBIDO USD:':<16}{'$':>8}{monto_recibido:>8.2f}\n"
         
         if vuelto_usd > 0:
@@ -245,6 +258,9 @@ def imprimir_precuenta(orden, tasa_valor_ignorado):
             if config.pm_telefono: t += f"TELF:  {config.pm_telefono}\n"
             if config.pm_cedula: t += f"C.I:   {config.pm_cedula}\n"
             
+        t += "--------------------------------\n"
+        t += "MONTO RECIBIDO: ________________\n\n"
+        t += "REFERENCIA:     ________________\n"
         t += "--------------------------------\n"
         t += " LA PROPINA NO ESTA INCLUIDA  \n"
         t += "\n\n\x1D\x56\x41\x10"
