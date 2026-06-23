@@ -4,7 +4,7 @@ from django.utils import timezone
 from datetime import timedelta, datetime   
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import Paginator
-from .models import AuditoriaEliminacion, AuditoriaConfiguracion
+from .models import AuditoriaEliminacion, AuditoriaConfiguracion, CuadreCaja
 import csv
 import math
 from decimal import Decimal
@@ -80,7 +80,7 @@ def ventas_mesero(request):
     fecha_fin = request.GET.get('fecha_fin', timezone.now().strftime('%Y-%m-%d'))
 
     # Agrupamos ventas por Mesero
-    data = (Venta.objects.filter(fecha__date__range=[fecha_inicio, fecha_fin])
+    data = (Venta.objects.filter(fecha__date__range=[fecha_inicio, fecha_fin], anulada=False)
             .values('mesero__username')
             .annotate(total_vendido=Sum('total'), total_ordenes=Count('id'))
             .order_by('-total_vendido'))
@@ -108,7 +108,7 @@ def ventas_producto(request):
     fecha_fin = request.GET.get('fecha_fin', timezone.now().strftime('%Y-%m-%d'))
 
     # Agrupamos detalles por Producto (Top 10)
-    data_qs = (DetalleVenta.objects.filter(venta__fecha__date__range=[fecha_inicio, fecha_fin])
+    data_qs = (DetalleVenta.objects.filter(venta__fecha__date__range=[fecha_inicio, fecha_fin], venta__anulada=False)
             .values('nombre_producto', 'nombre_mitad')
             .annotate(cantidad_total=Sum('cantidad'), dinero_generado=Sum('subtotal'))
             .order_by('-cantidad_total')[:10])
@@ -141,33 +141,6 @@ def ventas_producto(request):
         'fecha_inicio': fecha_inicio, 
         'fecha_fin': fecha_fin,
         'is_product_report': True # Bandera para ajustar la tabla HTML
-    }
-    return render(request, 'reports/generic_sales_report.html', context)
-
-# 5. REPORTE VENTAS X MÉTODO DE PAGO
-@staff_member_required
-def ventas_pago(request):
-    fecha_inicio = request.GET.get('fecha_inicio', (timezone.now() - timedelta(days=30)).strftime('%Y-%m-%d'))
-    fecha_fin = request.GET.get('fecha_fin', timezone.now().strftime('%Y-%m-%d'))
-
-    # Agrupamos por método de pago
-    data = (Venta.objects.filter(fecha__date__range=[fecha_inicio, fecha_fin])
-            .values('metodo_pago')
-            .annotate(total_vendido=Sum('total'), transacciones=Count('id'))
-            .order_by('-total_vendido'))
-
-    labels = [item['metodo_pago'] for item in data]
-    values = [float(item['total_vendido']) for item in data]
-    data = Paginator(data, 10).get_page(request.GET.get('page'))
-
-    context = {
-        'titulo': 'Ventas por Método de Pago',
-        'data_tabla': data,
-        'labels': labels,
-        'values': values,
-        'tipo_chart': 'pie', # Gráfico de Torta
-        'fecha_inicio': fecha_inicio, 
-        'fecha_fin': fecha_fin
     }
     return render(request, 'reports/generic_sales_report.html', context)
 
@@ -426,36 +399,78 @@ def reporte_propinas(request):
     }
     return render(request, 'reports/propinas_report.html', context)
 
+@staff_member_required
 def ventas_pago(request):
     # 1. POR DEFECTO: Siempre mostrar HOY al ingresar
     hoy_str = timezone.localtime().date().strftime('%Y-%m-%d')
     fecha_inicio_str = request.GET.get('fecha_inicio', hoy_str)
     fecha_fin_str = request.GET.get('fecha_fin', hoy_str)
 
-    fecha_inicio = datetime.strptime(fecha_inicio_str, '%Y-%m-%d').date()
-    fecha_fin = datetime.strptime(fecha_fin_str, '%Y-%m-%d').date()
+    # 1. Filtrar estrictamente las VENTAS VÁLIDAS (Excluyendo las anuladas)
+    ventas_validas = Venta.objects.filter(
+        fecha__date__range=[fecha_inicio_str, fecha_fin_str],
+        anulada=False
+    ).prefetch_related('pagos')
 
-    inicio_datetime = timezone.make_aware(datetime.combine(fecha_inicio, datetime.min.time()))
-    fin_datetime = timezone.make_aware(datetime.combine(fecha_fin, datetime.max.time()))
-
-    # 2. Consultar directamente el modelo "Pago" (No las Ventas) para obtener la fracción exacta.
-    # Excluimos los pagos de ventas anuladas.
-    pagos = Pago.objects.filter(
-        venta__fecha__range=(inicio_datetime, fin_datetime),
-        venta__anulada=False
-    )
-
-    # 3. Agrupar por método de pago
-    datos_pagos = pagos.values('metodo').annotate(
-        transacciones=Count('id'),
-        total_dolares=Sum('monto')
-    ).order_by('-total_dolares')
-    
     # Obtenemos la tasa actual
     tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
     tasa_valor = float(tasa_obj.precio) if tasa_obj else 0
 
-    # 4. Procesar para la vista y gráfico
+    # Diccionario para acumular resultados
+    resultados_dict = {}
+    
+    nombres_metodos = {
+        'EFECTIVO_USD': 'Efectivo ($)',
+        'EFECTIVO_BS': 'Efectivo (Bs)',
+        'PUNTO': 'Punto de Venta',
+        'PAGO_MOVIL': 'Pago Móvil',
+        'ZELLE': 'Zelle',
+        'BINANCE': 'Binance',
+        'TRANSFERENCIA': 'Transferencia',
+        'MIXTO': 'Mixto (Legacy)'
+    }
+
+    # 2. Procesar cada venta individualmente para distribuir exactamente "venta.total"
+    for venta in ventas_validas:
+        pagos = venta.pagos.all()
+        
+        if pagos.exists():
+            # Ordenamos los pagos: los electrónicos primero, el efectivo de último.
+            # Esto asume que si hay vuelto/cambio, se da en efectivo.
+            pagos_ordenados = sorted(pagos, key=lambda p: 1 if 'EFECTIVO' in p.metodo else 0)
+            
+            monto_restante = float(venta.total)
+            
+            for pago in pagos_ordenados:
+                metodo_raw = pago.metodo
+                metodo_nombre = nombres_metodos.get(metodo_raw, str(metodo_raw).replace('_', ' ').title())
+                
+                monto_pago = float(pago.monto)
+                # Solo tomamos lo necesario para cubrir la venta, ignorando vueltos o propinas
+                monto_a_sumar = min(monto_pago, monto_restante)
+                
+                if monto_a_sumar > 0:
+                    if metodo_nombre not in resultados_dict:
+                        resultados_dict[metodo_nombre] = {'transacciones': 0, 'total_dolares': 0}
+                    
+                    resultados_dict[metodo_nombre]['transacciones'] += 1
+                    resultados_dict[metodo_nombre]['total_dolares'] += monto_a_sumar
+                    
+                    monto_restante -= monto_a_sumar
+                    
+        else:
+            # Ventas antiguas (legacy) que no tienen detalle de pagos
+            metodo_raw = venta.metodo_pago
+            metodo_nombre = nombres_metodos.get(metodo_raw, str(metodo_raw).replace('_', ' ').title())
+            monto_a_sumar = float(venta.total)
+            
+            if metodo_nombre not in resultados_dict:
+                resultados_dict[metodo_nombre] = {'transacciones': 0, 'total_dolares': 0}
+                
+            resultados_dict[metodo_nombre]['transacciones'] += 1
+            resultados_dict[metodo_nombre]['total_dolares'] += monto_a_sumar
+
+    # Formatear para la vista
     resultados = []
     labels = []
     values = []
@@ -464,26 +479,14 @@ def ventas_pago(request):
     total_general_bs = 0
     total_transacciones = 0
 
-    # Nombres legibles en caso de que la BD guarde claves como 'PAGO_MOVIL'
-    nombres_metodos = {
-        'EFECTIVO_USD': 'Efectivo ($)',
-        'EFECTIVO_BS': 'Efectivo (Bs)',
-        'PUNTO': 'Punto de Venta',
-        'PAGO_MOVIL': 'Pago Móvil',
-        'BINANCE': 'Binance',
-        'TRANSFERENCIA': 'Transferencia'
-    }
-
-    for p in datos_pagos:
-        metodo_raw = p['metodo']
-        metodo_nombre = nombres_metodos.get(metodo_raw, str(metodo_raw).replace('_', ' ').title())
-        
-        total_usd = float(p['total_dolares'] or 0)
+    for metodo_nombre, data in resultados_dict.items():
+        total_usd = data['total_dolares']
         total_bs = total_usd * tasa_valor
-        
+        transacciones = data['transacciones']
+
         resultados.append({
             'metodo_nombre': metodo_nombre,
-            'transacciones': p['transacciones'],
+            'transacciones': transacciones,
             'total_dolares': total_usd,
             'total_bs': total_bs,
         })
@@ -493,7 +496,10 @@ def ventas_pago(request):
         
         total_general_dolares += total_usd
         total_general_bs += total_bs
-        total_transacciones += p['transacciones']
+        total_transacciones += transacciones
+
+    # Ordenar de mayor a menor ingreso
+    resultados = sorted(resultados, key=lambda x: x['total_dolares'], reverse=True)
 
     context = {
         'titulo': 'Reporte de Métodos de Pago',
@@ -509,3 +515,76 @@ def ventas_pago(request):
 
     # Apuntamos a la nueva plantilla especializada
     return render(request, 'reports/payment_methods_report.html', context)
+
+@staff_member_required
+def cuadre_caja_list(request):
+    cuadres = CuadreCaja.objects.all().order_by('-fecha_hora')
+    paginator = Paginator(cuadres, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    return render(request, 'reports/cuadre_caja_list.html', {'cuadres': page_obj})
+
+@staff_member_required
+def cuadre_caja_nuevo(request):
+    from django.utils.dateparse import parse_date
+    
+    hoy = timezone.localtime().date()
+    fecha_str = request.GET.get('fecha', hoy.strftime('%Y-%m-%d'))
+    fecha_obj = parse_date(fecha_str) if fecha_str else hoy
+
+    # 1. Obtener ventas y pagos válidos de esa fecha
+    ventas_validas = Venta.objects.filter(fecha__date=fecha_obj, anulada=False)
+    pagos = Pago.objects.filter(venta__in=ventas_validas)
+
+    # 2. Calcular valores del sistema
+    sistema_efectivo_usd = pagos.filter(metodo='EFECTIVO_USD').aggregate(Sum('monto'))['monto__sum'] or 0
+    sistema_efectivo_bs = pagos.filter(metodo='EFECTIVO_BS').aggregate(Sum('monto'))['monto__sum'] or 0
+    sistema_electronico_bs = pagos.filter(metodo__in=['PUNTO', 'PAGO_MOVIL', 'TRANSFERENCIA']).aggregate(Sum('monto'))['monto__sum'] or 0
+    sistema_electronico_usd = pagos.filter(metodo__in=['ZELLE', 'BINANCE']).aggregate(Sum('monto'))['monto__sum'] or 0
+
+    # Sumar ventas legacy que no tengan pagos registrados (por retrocompatibilidad)
+    tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
+    tasa_valor = float(tasa_obj.precio) if tasa_obj else 0
+    
+    ventas_legacy = ventas_validas.filter(pagos__isnull=True)
+    for v in ventas_legacy:
+        if v.metodo_pago == 'EFECTIVO_USD':
+            sistema_efectivo_usd += v.total
+        elif v.metodo_pago == 'EFECTIVO_BS':
+            sistema_efectivo_bs += v.total * Decimal(str(tasa_valor))
+
+    if request.method == 'POST':
+        fisico_efectivo_usd = Decimal(request.POST.get('fisico_efectivo_usd', '0').replace(',', '.'))
+        fisico_efectivo_bs = Decimal(request.POST.get('fisico_efectivo_bs', '0').replace(',', '.'))
+        fisico_electronico_bs = Decimal(request.POST.get('fisico_electronico_bs', '0').replace(',', '.'))
+        fisico_electronico_usd = Decimal(request.POST.get('fisico_electronico_usd', '0').replace(',', '.'))
+        notas = request.POST.get('notas', '')
+
+        CuadreCaja.objects.create(
+            fecha_cuadre=fecha_obj,
+            usuario=request.user,
+            sistema_efectivo_usd=sistema_efectivo_usd,
+            fisico_efectivo_usd=fisico_efectivo_usd,
+            sistema_efectivo_bs=sistema_efectivo_bs,
+            fisico_efectivo_bs=fisico_efectivo_bs,
+            sistema_electronico_bs=sistema_electronico_bs,
+            fisico_electronico_bs=fisico_electronico_bs,
+            sistema_electronico_usd=sistema_electronico_usd,
+            fisico_electronico_usd=fisico_electronico_usd,
+            notas=notas
+        )
+        
+        from django.contrib import messages
+        messages.success(request, "¡Cuadre de caja guardado exitosamente!")
+        from django.shortcuts import redirect
+        return redirect('cuadre_caja_list')
+
+    context = {
+        'fecha_obj': fecha_obj,
+        'fecha_str': fecha_str,
+        'sistema_efectivo_usd': float(sistema_efectivo_usd),
+        'sistema_efectivo_bs': float(sistema_efectivo_bs),
+        'sistema_electronico_bs': float(sistema_electronico_bs),
+        'sistema_electronico_usd': float(sistema_electronico_usd),
+    }
+    return render(request, 'reports/cuadre_caja_form.html', context)

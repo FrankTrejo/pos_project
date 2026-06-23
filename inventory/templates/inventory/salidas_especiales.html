@@ -91,6 +91,23 @@
                 <div style="margin-bottom: 20px;">
                     <label style="font-weight: 600; font-size: 0.9em; color: #444; margin-bottom: 5px; display: block;">Motivo / Destinatario:</label>
                     <input type="text" name="nota" class="form-control" placeholder="Ej: Mesa 4, Amigo del dueño, Disculpa por retraso..." required style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+                    
+                    <label style="font-weight: 600; font-size: 0.9em; color: #444; margin-bottom: 8px; display: block; margin-top: 15px;">Excluir Categorías del Descuento:</label>
+                    <div style="margin-bottom: 15px; padding: 15px; background: #fff3cd; border: 1px solid #ffeeba; border-radius: 5px;">
+                        <p style="font-size: 0.85em; color: #856404; margin-top: 0; margin-bottom: 10px;">
+                            Selecciona las categorías de insumos que <b>NO</b> deseas descontar del inventario al entregar esta cortesía (Ej: Bebidas, Empaques).
+                        </p>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px;">
+                            {% for cat in categorias_insumo %}
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 5px; border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; margin: 0;">
+                                <input type="checkbox" name="categorias_excluidas" value="{{ cat.id }}" style="transform: scale(1.1); margin: 0; accent-color: #e67e22;">
+                                <span style="font-size: 0.85em; color: #444; font-weight: 500;">{{ cat.nombre }}</span>
+                            </label>
+                            {% empty %}
+                            <div style="font-size: 0.85em; color: #888;">No hay categorías registradas.</div>
+                            {% endfor %}
+                        </div>
+                    </div>
                 </div>
 
                 <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px 15px; margin-bottom: 20px; border-radius: 4px; font-size: 0.85em; color: #856404;">
@@ -237,6 +254,28 @@
                 }
             });
         }
+
+        // --- GUARDAR ESTADO DE CHECKBOXES EN LOCALSTORAGE ---
+        const checkboxesCategorias = document.querySelectorAll('input[name="categorias_excluidas"]');
+        const savedCategorias = JSON.parse(localStorage.getItem('categorias_excluidas_salidas')) || [];
+        
+        checkboxesCategorias.forEach(chk => {
+            // 1. Restaurar el estado guardado al cargar la página
+            if (savedCategorias.includes(chk.value)) {
+                chk.checked = true;
+            }
+            
+            // 2. Escuchar cambios y guardar automáticamente
+            chk.addEventListener('change', function() {
+                let currentSaved = JSON.parse(localStorage.getItem('categorias_excluidas_salidas')) || [];
+                if (this.checked && !currentSaved.includes(this.value)) {
+                    currentSaved.push(this.value);
+                } else if (!this.checked) {
+                    currentSaved = currentSaved.filter(val => val !== this.value);
+                }
+                localStorage.setItem('categorias_excluidas_salidas', JSON.stringify(currentSaved));
+            });
+        });
     });
 
     // Función para la barra de búsqueda de ingredientes extras

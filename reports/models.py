@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 # ... tus otros modelos si los hay ...
 
@@ -26,3 +27,38 @@ class AuditoriaConfiguracion(models.Model):
 
     def __str__(self):
         return f"{self.fecha.strftime('%d/%m/%Y %H:%M')} - {self.accion}"
+    
+class CuadreCaja(models.Model):
+    fecha_hora = models.DateTimeField(auto_now_add=True)
+    fecha_cuadre = models.DateField(default=timezone.now)
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    
+    # Efectivo
+    sistema_efectivo_usd = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    fisico_efectivo_usd = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    
+    sistema_efectivo_bs = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    fisico_efectivo_bs = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    
+    # Electrónicos
+    sistema_electronico_bs = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    fisico_electronico_bs = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    
+    sistema_electronico_usd = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    fisico_electronico_usd = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    
+    notas = models.TextField(blank=True, null=True)
+
+    class Meta:
+        ordering = ['-fecha_hora']
+
+    def __str__(self):
+        return f"Cuadre #{self.id} - {self.fecha_cuadre.strftime('%d/%m/%Y')}"
+
+    @property
+    def diferencia_efectivo_usd(self):
+        return self.fisico_efectivo_usd - self.sistema_efectivo_usd
+
+    @property
+    def diferencia_efectivo_bs(self):
+        return self.fisico_efectivo_bs - self.sistema_efectivo_bs

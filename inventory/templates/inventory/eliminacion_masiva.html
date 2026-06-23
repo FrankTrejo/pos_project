@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="app-container">
+    <div class="app-header">
+        <h1>Eliminación Masiva de Ingredientes en Recetas</h1>
+        <a href="{% url 'inventory_index' %}" class="btn-secondary">Volver al Inventario</a>
+    </div>
+
+    <div class="card-style">
+        <form method="POST">
+            {% csrf_token %}
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <h3 class="panel-title">1. Selecciona las Recetas (Pizzas)</h3>
+                    <p class="text-muted small">Selecciona las recetas de las cuales deseas eliminar ingredientes.</p>
+                    <div class="card-style-inner" style="max-height: 400px; overflow-y: auto;">
+                        {% for receta in recetas %}
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="recetas" value="{{ receta.id }}" id="receta_{{ receta.id }}">
+                            <label class="form-check-label" for="receta_{{ receta.id }}">
+                                {{ receta.nombre }}
+                            </label>
+                        </div>
+                        {% empty %}
+                        <p>No hay recetas registradas.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <h3 class="panel-title">2. Selecciona los Ingredientes a Eliminar</h3>
+                    <p class="text-muted small">Selecciona los ingredientes que deseas quitar de las recetas marcadas.</p>
+                    <div class="card-style-inner" style="max-height: 400px; overflow-y: auto;">
+                        {% for ingrediente in ingredientes %}
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="ingredientes" value="{{ ingrediente.id }}" id="ingrediente_{{ ingrediente.id }}">
+                            <label class="form-check-label" for="ingrediente_{{ ingrediente.id }}">
+                                {{ ingrediente.nombre }} <span class="badge bg-secondary">{{ ingrediente.categoria.nombre }}</span>
+                            </label>
+                        </div>
+                        {% empty %}
+                        <p>No hay ingredientes registrados.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 text-center">
+                <div class="alert alert-warning d-inline-block">
+                    <strong>¡Atención!</strong> Esta acción eliminará los ingredientes seleccionados de <strong>todas</strong> las recetas marcadas. Si una receta no tiene el ingrediente, simplemente será ignorada.
+                </div>
+                <br>
+                <button type="submit" class="add-btn mt-2" onclick="return confirm('¿Estás seguro de que deseas eliminar estos ingredientes de las recetas seleccionadas?');">
+                    <i class="fas fa-trash"></i> Ejecutar Eliminación Masiva
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

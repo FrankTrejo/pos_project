@@ -32,6 +32,7 @@ class Configuracion(models.Model):
     ancho_papel = models.IntegerField(default=80, verbose_name="Ancho Papel (mm)", help_text="Estándar: 80mm o 58mm")
     auto_imprimir = models.BooleanField(default=True, verbose_name="¿Impresión Automática?", help_text="Si se marca, el sistema intentará imprimir sin preguntar al cerrar la venta.")
     usar_logo_impresora = models.BooleanField(default=False, verbose_name="¿Imprimir logo en ticket?", help_text="El logo debe estar pre-cargado en la memoria de la impresora térmica (NV Logo).")
+    abrir_caja_registradora = models.BooleanField(default=True, verbose_name="¿Abrir Gaveta de Dinero?", help_text="Si se marca, la impresora enviará el pulso para abrir la caja al generar la factura.")
 
     # --- 5. CONFIGURACIÓN DE EMPAQUES (NUEVO) ---
     caja_individual = models.ForeignKey('inventory.Insumo', related_name='config_caja_ind', on_delete=models.SET_NULL, null=True, blank=True, limit_choices_to={'es_insumo_compuesto': False}, verbose_name="Empaque Individual")

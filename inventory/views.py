@@ -671,20 +671,18 @@ BASE_PERSONAL = [
 ]
 
 # inventory/views.py
-@staff_member_required
 def salidas_especiales_view(request):
     # 1. Traer datos para el formulario
-    from tables.models import Producto
-    productos = Producto.objects.all().order_by('nombre')
-    # Traemos todos los insumos que no son recetas para los extras
-    ingredientes_extra = Insumo.objects.filter(es_insumo_compuesto=False).order_by('nombre')
-    
-    # Historial reciente con paginación
-    from django.core.paginator import Paginator
-    historial_list = ConsumoInterno.objects.all().order_by('-fecha')
-    paginator = Paginator(historial_list, 10)
-    page_number = request.GET.get('page')
-    historial = paginator.get_page(page_number)
+    productos_qs = Producto.objects.all().order_by('nombre')
+    productos = []
+    for p in productos_qs:
+        if p.tamano != 'UNI':
+            p.nombre = f"{p.nombre} ({p.get_tamano_display()})"
+        productos.append(p)
+        
+    # Traemos todos los insumos configurados como extras
+    ingredientes_extra = Insumo.objects.filter(es_extra=True).order_by('nombre')
+    categorias_insumo = CategoriaInsumo.objects.all().order_by('nombre')
 
     if request.method == 'POST':
         tipo_accion = request.POST.get('tipo_accion')
@@ -692,30 +690,26 @@ def salidas_especiales_view(request):
 
         try:
             with transaction.atomic():
-                costo_total = 0
-                registro = None
+                costo_total_operacion = 0
 
-                # ==========================================
-                # CASO 1: COMIDA DE PERSONAL
-                # ==========================================
                 if tipo_accion == 'PERSONAL':
-                    tamano = request.POST.get('tamano_pizza') # 'IND', 'MED', 'FAM'
                     empleado = request.POST.get('empleado_nombre')
+                    producto_base_id = request.POST.get('producto_base')
 
-                    # A) BUSCAR LA RECETA BASE (La Margarita del tamaño elegido)
-                    producto_base = Producto.objects.filter(nombre__icontains='MARGARITA', tamano=tamano).first()
+                    producto_base = Producto.objects.filter(id=producto_base_id).first()
 
                     if not producto_base:
-                        messages.error(request, f"Error: No existe una 'Pizza Margarita' tamaño {tamano} para usar de base.")
+                        messages.error(request, "Error: Debe seleccionar un producto base.")
                         return redirect('salidas_especiales')
 
+                    nombre_base = f"{producto_base.nombre} ({producto_base.get_tamano_display()})" if producto_base.tamano != 'UNI' else producto_base.nombre
                     registro = ConsumoInterno.objects.create(
                         tipo='PERSONAL',
                         usuario=request.user,
-                        descripcion=f"Personal: {empleado} ({producto_base.nombre} {producto_base.get_tamano_display()})"
+                        descripcion=f"Personal: {empleado} ({nombre_base})"
                     )
 
-                    # B) DESCONTAR LA BASE (Según receta de Margarita)
+                    # Descontar la receta del producto base
                     for componente in producto_base.ingredientes.all():
                         MovimientoInventario.objects.create(
                             insumo=componente.insumo,
@@ -725,79 +719,98 @@ def salidas_especiales_view(request):
                             usuario=request.user,
                             nota=f"Base Personal #{registro.id}"
                         )
-                        costo_total += (componente.insumo.costo_unitario * componente.cantidad)
+                        costo_total_operacion += (componente.insumo.costo_unitario * componente.cantidad)
 
-                    # C) DESCONTAR LOS EXTRAS (Cantidades exactas enviadas del form)
+                    # Descontar los extras marcados
                     ids_extras = request.POST.getlist('extra_id')
-                    cantidades_extras = request.POST.getlist('extra_cantidad')
-
-                    for i, insumo_id in enumerate(ids_extras):
-                        cantidad_texto = cantidades_extras[i]
-                        if cantidad_texto and float(cantidad_texto) > 0:
-                            cantidad = Decimal(cantidad_texto)
-                            insumo = Insumo.objects.get(id=insumo_id)
+                    
+                    for insumo_id in ids_extras:
+                        insumo_extra = Insumo.objects.get(id=insumo_id)
+                        
+                        from tables.models import PrecioExtra
+                        precio_obj = PrecioExtra.objects.filter(
+                            insumo=insumo_extra, 
+                            tamano=producto_base.tamano
+                        ).first()
+                        
+                        cantidad = insumo_extra.cantidad_porcion_extra
+                        if precio_obj and precio_obj.cantidad > 0:
+                            cantidad = precio_obj.cantidad
                             
+                        if cantidad > 0:
                             MovimientoInventario.objects.create(
-                                insumo=insumo,
+                                insumo=insumo_extra,
                                 tipo='SALIDA',
                                 cantidad=cantidad,
-                                unidad_movimiento=insumo.unidad,
+                                unidad_movimiento=insumo_extra.unidad,
                                 usuario=request.user,
                                 nota=f"Extra Personal #{registro.id}"
                             )
-                            costo_total += (insumo.costo_unitario * cantidad)
+                            costo_total_operacion += (insumo_extra.costo_unitario * cantidad)
 
-                # ==========================================
-                # CASO 2: REGALO / CORTESÍA
-                # ==========================================
                 elif tipo_accion == 'REGALO':
-                    prod_id = request.POST.get('producto_regalo')
-                    prod_obj = Producto.objects.get(id=prod_id)
+                    producto_id = request.POST.get('producto_regalo')
+                    producto = Producto.objects.get(id=producto_id)
+                    categorias_excluidas = request.POST.getlist('categorias_excluidas')
                     
+                    nombre_prod = f"{producto.nombre} ({producto.get_tamano_display()})" if producto.tamano != 'UNI' else producto.nombre
                     registro = ConsumoInterno.objects.create(
                         tipo='CORTESIA',
                         usuario=request.user,
-                        descripcion=f"Regalo: {prod_obj.nombre} - {nota}"
+                        descripcion=f"Regalo: {nombre_prod} - {nota}"
                     )
 
-                    for ing in prod_obj.ingredientes.all():
+                    # Descontar receta del producto
+                    for ing in producto.ingredientes.all():
+                        # Si la categoría del insumo fue seleccionada para no descontarse, la ignoramos
+                        if ing.insumo.categoria and str(ing.insumo.categoria.id) in categorias_excluidas:
+                            continue
+
                         MovimientoInventario.objects.create(
-                            insumo=ing.insumo, tipo='SALIDA', cantidad=ing.cantidad,
-                            unidad_movimiento=ing.insumo.unidad, usuario=request.user,
+                            insumo=ing.insumo,
+                            tipo='SALIDA',
+                            cantidad=ing.cantidad,
+                            unidad_movimiento=ing.insumo.unidad,
+                            usuario=request.user,
                             nota=f"Regalo #{registro.id}"
                         )
-                        costo_total += (ing.insumo.costo_unitario * ing.cantidad)
+                        costo_total_operacion += (ing.insumo.costo_unitario * ing.cantidad)
 
-                if registro:
-                    # Guardamos costo final
-                    registro.costo_estimado = costo_total
-                    registro.save()
+                # Guardar costo final
+                registro.costo_estimado = costo_total_operacion
+                registro.save()
 
-                    # --- IMPRESIÓN TICKERA ---
-                    try:
-                        from tables.utils_impresora import imprimir_consumo_interno
-                        imprimir_consumo_interno(registro)
-                    except Exception as e_print:
-                        print(f"Error tickera: {e_print}")
-                    
-                    messages.success(request, f"Salida registrada exitosamente.")
-                    
-                    # Redirigimos pasando el ID para imprimir el PDF visualmente
-                    from django.urls import reverse
-                    url_base = reverse('salidas_especiales')
-                    return redirect(f"{url_base}?print_id={registro.id}")
+                # --- IMPRESIÓN TICKERA ---
+                try:
+                    from tables.utils_impresora import imprimir_consumo_interno
+                    imprimir_consumo_interno(registro)
+                except Exception as e_print:
+                    print(f"Error tickera: {e_print}")
+
+                messages.success(request, "Salida registrada e inventario actualizado.")
+                
+                from django.urls import reverse
+                url_base = reverse('salidas_especiales')
+                return redirect(f"{url_base}?print_id={registro.id}")
 
         except Exception as e:
-            messages.error(request, f"Error técnico: {str(e)}")
+            messages.error(request, f"Error: {str(e)}")
+            return redirect('salidas_especiales')
+
+    # --- PAGINACIÓN ---
+    from django.core.paginator import Paginator
+    historial_list = ConsumoInterno.objects.all().order_by('-fecha')
+    paginator = Paginator(historial_list, 10)
+    page_number = request.GET.get('page')
+    historial = paginator.get_page(page_number)
 
     return render(request, 'inventory/salidas_especiales.html', {
         'productos': productos,
         'ingredientes': ingredientes_extra,
+        'categorias_insumo': categorias_insumo,
         'historial': historial
     })
 
-from django.template.loader import get_template
-from xhtml2pdf import pisa
 from django.template.loader import get_template
 from xhtml2pdf import pisa
 from django.http import HttpResponse
@@ -944,4 +957,48 @@ def carga_masiva_inventario(request):
 
     return render(request, 'inventory/carga_masiva.html', {
         'insumos': insumos
+    })
+
+@staff_member_required
+@never_cache
+def eliminacion_masiva_receta(request):
+    # Traemos todas las recetas (insumos compuestos)
+    recetas = Insumo.objects.filter(es_insumo_compuesto=True).order_by('nombre')
+    # Traemos todos los ingredientes (insumos no compuestos)
+    ingredientes = Insumo.objects.filter(es_insumo_compuesto=False).order_by('categoria__nombre', 'nombre')
+
+    if request.method == 'POST':
+        recetas_ids = request.POST.getlist('recetas')
+        ingredientes_ids = request.POST.getlist('ingredientes')
+
+        if not recetas_ids or not ingredientes_ids:
+            messages.error(request, "Debes seleccionar al menos una receta y un ingrediente.")
+            return redirect('eliminacion_masiva_receta')
+
+        try:
+            with transaction.atomic():
+                # Eliminamos las combinaciones seleccionadas
+                eliminados, _ = IngredienteCompuesto.objects.filter(
+                    insumo_padre_id__in=recetas_ids,
+                    insumo_hijo_id__in=ingredientes_ids
+                ).delete()
+
+                # Forzamos el recálculo del costo de las recetas afectadas
+                for receta_id in recetas_ids:
+                    receta = Insumo.objects.get(id=receta_id)
+                    receta.calcular_costo_desde_subreceta()
+
+                if eliminados > 0:
+                    messages.success(request, f"¡Éxito! Se eliminaron {eliminados} ingredientes de las recetas seleccionadas.")
+                else:
+                    messages.warning(request, "No se encontró ninguno de los ingredientes seleccionados en las recetas elegidas. No se eliminó nada.")
+                    
+                return redirect('inventory_index')
+
+        except Exception as e:
+            messages.error(request, f"Error durante la eliminación masiva: {str(e)}")
+
+    return render(request, 'inventory/eliminacion_masiva.html', {
+        'recetas': recetas,
+        'ingredientes': ingredientes
     })

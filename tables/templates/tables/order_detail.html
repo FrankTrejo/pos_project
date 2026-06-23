@@ -72,7 +72,7 @@
                             data-nombre="{{ prod.nombre|lower }}"
                             data-codigo="{{ prod.codigo|lower|default:'' }}"
                             style="cursor: pointer; padding: 5px; text-align: center; border: 1px solid #ddd; transition: transform 0.1s; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%;"
-                            onclick="agregarAlCarrito('{{ prod.id }}', '{{ prod.nombre }}', '{{ prod.precio }}', '{{ prod.tamano }}')">
+                            onclick="agregarAlCarrito('{{ prod.id }}', '{{ prod.nombre|escapejs }}', '{{ prod.precio }}', '{{ prod.tamano }}')">
                             
                             <div style="font-size: 0.65em; color: #888; margin-bottom: 2px;">
                                 Cód: {{ prod.id }}
@@ -855,7 +855,7 @@
 
         // --- FUNCIONES DEL CARRITO ---
         function agregarAlCarrito(id, nombre, precio, tamano) {
-            let precioFloat = parseFloat(precio);
+            let precioFloat = parseFloat(String(precio).replace(',', '.'));
             let nombreDisplay = nombre;
             if(tamano !== 'UNI') nombreDisplay += ` (${tamano})`;
             
@@ -1094,7 +1094,7 @@
         const esPrimeraVez = '{{ orden_activa.impreso|yesno:"true,false"|default:"false" }}' === 'false';
         const debeImprimir = esPrimeraVez || carritoModificado;
 
-        const data = { carrito: carrito, mesero: meseroNombre, imprimir: false, imprimir_ticket: debeImprimir, ignorar_stock: ignorarStock };
+        const data = { carrito: carrito, mesero: meseroNombre, imprimir_ticket: debeImprimir };
 
         // Hacemos el llamado a la vista grabar_mesa_ajax
         fetch("{% url 'grabar_mesa' table.id %}", {

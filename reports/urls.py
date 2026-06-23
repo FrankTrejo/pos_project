@@ -13,4 +13,7 @@ urlpatterns = [
     path('historial-tasas/', views.historial_tasas_bcv, name='historial_tasas_bcv'),
     path('propinas/', views.reporte_propinas, name='reporte_propinas'),
     path('venta/<int:venta_id>/detalle/', views.detalle_venta_view, name='detalle_venta'),
+    path('cuadre/', views.cuadre_caja_list, name='cuadre_caja_list'),
+    path('cuadre/nuevo/', views.cuadre_caja_nuevo, name='cuadre_caja_nuevo'),
+
 ]

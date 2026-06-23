@@ -18,8 +18,9 @@ class ConfigIdentidadForm(forms.ModelForm):
 class ConfigVisualForm(forms.ModelForm):
     class Meta:
         model = Configuracion
-        # Agregamos los campos visuales nuevos
-        fields = ['logo', 'mensaje_ticket', 'impresora_ticket', 'ancho_papel', 'auto_imprimir', 'usar_logo_impresora']
+        # Agregamos: impresora_ticket, ancho_papel, auto_imprimir, usar_logo_impresora, abrir_caja_registradora
+        fields = ['logo', 'mensaje_ticket', 'impresora_ticket', 'ancho_papel', 'auto_imprimir', 'usar_logo_impresora', 'abrir_caja_registradora']
+
         
         widgets = {
             'mensaje_ticket': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Mensaje al pie del ticket'}),
@@ -27,12 +28,14 @@ class ConfigVisualForm(forms.ModelForm):
             'ancho_papel': forms.NumberInput(attrs={'class': 'form-control'}),
             'auto_imprimir': forms.CheckboxInput(attrs={'class': 'form-check-input', 'style': 'width: 20px; height: 20px;'}),
             'usar_logo_impresora': forms.CheckboxInput(attrs={'class': 'form-check-input', 'style': 'width: 20px; height: 20px;'}),
+            'abrir_caja_registradora': forms.CheckboxInput(attrs={'class': 'form-check-input', 'style': 'width: 20px; height: 20px;'}),
         }
         labels = {
             'impresora_ticket': 'Nombre de Impresora (PC)',
             'ancho_papel': 'Ancho del Papel (mm)',
             'auto_imprimir': '¿Imprimir Automáticamente?',
-            'usar_logo_impresora': '¿Enviar comando de Logo Térmico?'
+            'usar_logo_impresora': '¿Imprimir logo en ticket?',
+            'abrir_caja_registradora': '¿Abrir Gaveta de Dinero?'
         }
 
 class CostoAdicionalForm(forms.ModelForm):

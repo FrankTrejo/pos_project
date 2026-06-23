@@ -102,6 +102,12 @@ def mandar_a_tickera(venta):
         # Generamos los datos de la imagen
         logo_bytes = obtener_logo_bytes(config)
 
+        # --- COMANDO DE APERTURA DE CAJA AL INICIO ---
+        comando_caja = b''
+        if config.abrir_caja_registradora:
+            # Enviamos pulso doble (Pin 2 y Pin 5) para asegurar compatibilidad universal
+            comando_caja = b'\x1B\x70\x00\x32\xFA\x1B\x70\x01\x32\xFA'
+
         # Diseño del Ticket
         t = ""
         t += f"{config.nombre_empresa.upper().center(32)}\n"
@@ -163,7 +169,7 @@ def mandar_a_tickera(venta):
             t += f"PAGO: {metodo_nombre}\n"
             t += "--------------------------------\n"
             
-        t += f"{'RECIBIDO USD:':<16}{'$':>8}{monto_recibido:>8.2f}\n"
+        t += f"{'TOTAL PAGADO:':<16}{'$':>8}{monto_recibido:>8.2f}\n"
         
         if vuelto_usd > 0:
             t += f"{'VUELTO USD:':<16}{'$':>8}{vuelto_usd:>8.2f}\n"
@@ -174,8 +180,9 @@ def mandar_a_tickera(venta):
         t += f"{config.mensaje_ticket.center(32)}\n"
         t += "\n\n\x1D\x56\x41\x10"
 
-        # Combinamos imagen con el texto codificado
-        datos_impresion = logo_bytes + t.encode('cp850', errors='replace')
+        # Combinamos el pulso de la caja + imagen + texto codificado
+        datos_impresion = comando_caja + logo_bytes + t.encode('cp850', errors='replace')
+            
         return enviar_a_spooler(config.impresora_ticket, datos_impresion, "Factura")
     except Exception as e:
         print(f"Error Factura: {e}")
@@ -198,6 +205,7 @@ def imprimir_precuenta(orden, tasa_valor_ignorado):
         t += "       *** PRE-CUENTA *** \n"
         hora_local = timezone.localtime(timezone.now())
         t += f"MESA: {orden.mesa.number} | {hora_local.strftime('%H:%M')}\n"
+        t += f"MESERO: {orden.mesero.username.upper() if orden.mesero else 'CAJA'}\n"
         t += "--------------------------------\n"
         t += "CANT DESCRIPCION           TOTAL\n"
         t += "--------------------------------\n"
@@ -246,10 +254,6 @@ def imprimir_precuenta(orden, tasa_valor_ignorado):
         t += "     TOTAL A PAGAR:     \n"
         t += f"{'USD:':<16}{'$':>8}{total_usd:>8.2f}\n"
         t += f"{'Bs.:':<16}{'Bs.':>6}{total_bs:>10.2f}\n"
-        t += "--------------------------------\n"
-        t += "      PAGO EN BOLIVARES:      \n"
-        t += "    ACEPTAMOS PAGO MOVIL Y    \n"
-        t += "       PUNTO DE VENTA.        \n"
         
         if config.pm_banco or config.pm_telefono or config.pm_cedula:
             t += "--------------------------------\n"
@@ -262,7 +266,7 @@ def imprimir_precuenta(orden, tasa_valor_ignorado):
         t += "MONTO RECIBIDO: ________________\n\n"
         t += "REFERENCIA:     ________________\n"
         t += "--------------------------------\n"
-        t += " LA PROPINA NO ESTA INCLUIDA  \n"
+        t += "  NO COBRAMOS 10% DE SERVICIO  \n"
         t += "\n\n\x1D\x56\x41\x10"
 
         # Combinamos imagen con el texto codificado

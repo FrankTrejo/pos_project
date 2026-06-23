@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="app-container">
+    <div class="app-header">
+        <h1>📝 Nuevo Cuadre de Caja</h1>
+        <a href="{% url 'cuadre_caja_list' %}" class="btn-secondary">Volver al Historial</a>
+    </div>
+
+    <div class="card-style">
+        <form method="GET" class="mb-4" style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+            <label><strong>Fecha a Cuadrar:</strong></label>
+            <div style="display: flex; gap: 10px; max-width: 300px; margin-top: 5px;">
+                <input type="date" name="fecha" value="{{ fecha_str }}" class="form-control" onchange="this.form.submit()">
+            </div>
+            <small class="text-muted">Si quieres cerrar una caja del día anterior, cambia la fecha.</small>
+        </form>
+
+        <form method="POST">
+            {% csrf_token %}
+            <div class="row">
+                <!-- Efectivo USD -->
+                <div class="col-md-6 mb-4">
+                    <div style="border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
+                        <h4 style="color: #28a745;"><i class="fas fa-dollar-sign"></i> Efectivo USD</h4>
+                        <hr>
+                        <div class="mb-2"><strong>Según Sistema:</strong> <span class="float-end fs-5">$<span id="sys_efectivo_usd">{{ sistema_efectivo_usd|floatformat:2 }}</span></span></div>
+                        <div class="mb-2">
+                            <label><strong>Conteo Físico:</strong></label>
+                            <input type="number" step="0.01" name="fisico_efectivo_usd" id="fis_efectivo_usd" class="form-control mt-1" value="{{ sistema_efectivo_usd|stringformat:'.2f' }}" required onkeyup="calcularDiferencia('efectivo_usd')" onchange="calcularDiferencia('efectivo_usd')">
+                        </div>
+                        <div class="mt-3 p-2 rounded text-center" id="dif_box_efectivo_usd">
+                            <strong>Diferencia: $<span id="dif_efectivo_usd">0.00</span></strong>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Efectivo BS -->
+                <div class="col-md-6 mb-4">
+                    <div style="border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
+                        <h4 style="color: #007bff;"><i class="fas fa-money-bill-wave"></i> Efectivo BS</h4>
+                        <hr>
+                        <div class="mb-2"><strong>Según Sistema:</strong> <span class="float-end fs-5">Bs <span id="sys_efectivo_bs">{{ sistema_efectivo_bs|floatformat:2 }}</span></span></div>
+                        <div class="mb-2">
+                            <label><strong>Conteo Físico:</strong></label>
+                            <input type="number" step="0.01" name="fisico_efectivo_bs" id="fis_efectivo_bs" class="form-control mt-1" value="{{ sistema_efectivo_bs|stringformat:'.2f' }}" required onkeyup="calcularDiferencia('efectivo_bs')" onchange="calcularDiferencia('efectivo_bs')">
+                        </div>
+                        <div class="mt-3 p-2 rounded text-center" id="dif_box_efectivo_bs">
+                            <strong>Diferencia: Bs <span id="dif_efectivo_bs">0.00</span></strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Electrónicos USD -->
+                <div class="col-md-6 mb-4">
+                    <div style="border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
+                        <h4 style="color: #6c757d;"><i class="fas fa-globe"></i> Electrónico USD (Zelle/Binance)</h4>
+                        <hr>
+                        <div class="mb-2"><strong>Según Sistema:</strong> <span class="float-end">$<span id="sys_electronico_usd">{{ sistema_electronico_usd|floatformat:2 }}</span></span></div>
+                        <div class="mb-2">
+                            <label><strong>Confirmación Bancaria:</strong></label>
+                            <input type="number" step="0.01" name="fisico_electronico_usd" id="fis_electronico_usd" class="form-control mt-1" value="{{ sistema_electronico_usd|stringformat:'.2f' }}" required onkeyup="calcularDiferencia('electronico_usd')" onchange="calcularDiferencia('electronico_usd')">
+                        </div>
+                        <div class="mt-3 p-2 rounded text-center" id="dif_box_electronico_usd">
+                            <strong>Diferencia: $<span id="dif_electronico_usd">0.00</span></strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Electrónicos BS -->
+                <div class="col-md-6 mb-4">
+                    <div style="border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
+                        <h4 style="color: #6c757d;"><i class="fas fa-credit-card"></i> Electrónico BS (Punto/PM)</h4>
+                        <hr>
+                        <div class="mb-2"><strong>Según Sistema:</strong> <span class="float-end">Bs <span id="sys_electronico_bs">{{ sistema_electronico_bs|floatformat:2 }}</span></span></div>
+                        <div class="mb-2">
+                            <label><strong>Lotes/Cierres Banco:</strong></label>
+                            <input type="number" step="0.01" name="fisico_electronico_bs" id="fis_electronico_bs" class="form-control mt-1" value="{{ sistema_electronico_bs|stringformat:'.2f' }}" required onkeyup="calcularDiferencia('electronico_bs')" onchange="calcularDiferencia('electronico_bs')">
+                        </div>
+                        <div class="mt-3 p-2 rounded text-center" id="dif_box_electronico_bs">
+                            <strong>Diferencia: Bs <span id="dif_electronico_bs">0.00</span></strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label><strong>Notas / Observaciones del Cierre:</strong></label>
+                <textarea name="notas" class="form-control" rows="3" placeholder="Ej: Faltó $1 porque se compró hielo..."></textarea>
+            </div>
+
+            <div class="text-center">
+                <button type="submit" class="add-btn" style="width: 100%; font-size: 1.2rem; padding: 15px;">
+                    <i class="fas fa-lock"></i> Procesar Cuadre de Caja
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function calcularDiferencia(campo) {
+    let sys = parseFloat(document.getElementById('sys_' + campo).innerText.replace(',', '.')) || 0;
+    let fis = parseFloat(document.getElementById('fis_' + campo).value) || 0;
+    let dif = fis - sys;
+    
+    let difSpan = document.getElementById('dif_' + campo);
+    let difBox = document.getElementById('dif_box_' + campo);
+    
+    difSpan.innerText = Math.abs(dif).toFixed(2);
+    
+    if (dif === 0) { difBox.style.backgroundColor = '#d4edda'; difBox.style.color = '#155724'; difSpan.innerText = "0.00 (Cuadrado)"; }
+    else if (dif < 0) { difBox.style.backgroundColor = '#f8d7da'; difBox.style.color = '#721c24'; difSpan.innerText = "-" + Math.abs(dif).toFixed(2) + " (Faltante)"; }
+    else { difBox.style.backgroundColor = '#fff3cd'; difBox.style.color = '#856404'; difSpan.innerText = "+" + dif.toFixed(2) + " (Sobrante)"; }
+}
+window.onload = function() { calcularDiferencia('efectivo_usd'); calcularDiferencia('efectivo_bs'); calcularDiferencia('electronico_usd'); calcularDiferencia('electronico_bs'); }
+</script>
+{% endblock %}
