@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="app-container">
+    <div class="app-header">
+        <h1><i class="fas fa-cash-register"></i> Historial de Cuadres de Caja</h1>
+        <a href="{% url 'cuadre_caja_nuevo' %}" class="add-btn"><i class="fas fa-plus"></i> Realizar Cuadre</a>
+    </div>
+
+    <div class="card-style" style="padding: 0; overflow-x: auto;">
+        <table class="table table-hover mb-0" style="width: 100%; text-align: center;">
+            <thead style="background: #f8f9fa;">
+                <tr>
+                    <th style="padding: 15px;">Fecha Cuadre</th>
+                    <th style="padding: 15px;">Hora</th>
+                    <th style="padding: 15px;">Cajero</th>
+                    <th style="padding: 15px; color: #28a745;">Dif. Efectivo USD</th>
+                    <th style="padding: 15px; color: #007bff;">Dif. Efectivo BS</th>
+                    <th style="padding: 15px;">Notas</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cuadre in cuadres %}
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 15px; font-weight: bold;">{{ cuadre.fecha_cuadre|date:"d/m/Y" }}</td>
+                    <td style="padding: 15px; color: #888;">{{ cuadre.fecha_hora|date:"H:i A" }}</td>
+                    <td style="padding: 15px;">{{ cuadre.usuario.username|title|default:"-" }}</td>
+                    <td style="padding: 15px; font-weight: bold;">
+                        {% if cuadre.diferencia_efectivo_usd == 0 %} <span class="text-success">0.00</span>
+                        {% elif cuadre.diferencia_efectivo_usd < 0 %} <span class="text-danger">{{ cuadre.diferencia_efectivo_usd }}</span>
+                        {% else %} <span class="text-warning">+{{ cuadre.diferencia_efectivo_usd }}</span> {% endif %}
+                    </td>
+                    <td style="padding: 15px; font-weight: bold;">
+                        {% if cuadre.diferencia_efectivo_bs == 0 %} <span class="text-success">0.00</span>
+                        {% elif cuadre.diferencia_efectivo_bs < 0 %} <span class="text-danger">{{ cuadre.diferencia_efectivo_bs }}</span>
+                        {% else %} <span class="text-warning">+{{ cuadre.diferencia_efectivo_bs }}</span> {% endif %}
+                    </td>
+                    <td style="padding: 15px;">
+                        {% if cuadre.notas %}
+                            <i class="fas fa-comment-dots text-primary" title="{{ cuadre.notas }}" style="cursor: help; font-size: 1.2em;"></i>
+                        {% else %} - {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" style="padding: 30px; color: #888;">No hay cuadres de caja registrados.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        {% if cuadres.has_other_pages %}
+        <div class="p-3 text-center border-top">
+            {% if cuadres.has_previous %} <a href="?page={{ cuadres.previous_page_number }}" class="btn btn-sm btn-outline-secondary">&laquo; Anterior</a> {% endif %}
+            <span class="mx-2 text-muted">Página {{ cuadres.number }} de {{ cuadres.paginator.num_pages }}</span>
+            {% if cuadres.has_next %} <a href="?page={{ cuadres.next_page_number }}" class="btn btn-sm btn-outline-secondary">Siguiente &raquo;</a> {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

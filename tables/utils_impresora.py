@@ -117,6 +117,7 @@ def mandar_a_tickera(venta):
         t += f"FACTURA: {venta.codigo_factura}\n"
         fecha_local = timezone.localtime(venta.fecha)
         t += f"FECHA: {fecha_local.strftime('%d/%m/%Y %H:%M')}\n"
+        t += f"Ticket: #{venta.id}\n"
         t += f"MESA: {venta.mesa_numero} | MESERO: {venta.mesero.username.upper() if venta.mesero else 'CAJA'}\n"
         t += "--------------------------------\n"
         t += "CANT DESCRIPCION           TOTAL\n"
@@ -288,7 +289,14 @@ def imprimir_comanda(orden):
         tipo = getattr(orden, 'tipo_servicio', 'MESA')
         if tipo == 'LLEVAR': t += ">>> PARA LLEVAR <<<\n"
         elif tipo == 'DOMICILIO': t += ">>> DELIVERY <<<\n"
-        else: t += f"MESA: {orden.mesa.number}\n"
+        else:
+            # --- LÓGICA MEJORADA ---
+            # Construimos el texto de la mesa, incluyendo el nombre si existe.
+            mesa_info = f"MESA: {orden.mesa.number}"
+            if orden.mesa.name:
+                mesa_info += f" ({orden.mesa.name.upper()})"
+            t += f"{mesa_info}\n"
+            
         hora_local = timezone.localtime(timezone.now())
         t += f"Ticket: #{orden.id} | Mesero: {orden.mesero.username.upper() if orden.mesero else 'CAJA'}\n"
         t += f"Hora: {hora_local.strftime('%H:%M')}\n--------------------------------\n\n"

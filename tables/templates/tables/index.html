@@ -2,6 +2,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema POS - Mesas</title>
@@ -17,54 +18,207 @@
                     <i class="fas fa-th-large"></i> Dashboard
                 </a>
 
-                <a href="{% url 'create_table' %}" class="add-btn">
+                <button onclick="openCreateModal()" class="add-btn">
                     + Crear Mesa
-                </a>
+                </button>
             </div>
         </header>
 
-        <main class="tables-grid">
-            {% for table in tables %}
-                <a href="{% url 'table_order' table.id %}" class="table-link-wrapper">
-                    
-                    {% if table.solicitud_pago %}
-                        <div class="table-card" style="background-color: #fff3cd; border-color: #ffc107;">
+        <!-- SECCIÓN DE MESAS INTERNAS -->
+        <div class="table-section">
+            <h2 class="section-title">Mesas Internas</h2>
+            <main class="tables-grid">
+                {% for table in internal_tables %}
+                    <a href="{% url 'table_order' table.id %}" class="table-link-wrapper">
+                        <div class="table-card"
+                            style="--table-bg-color: {% if table.solicitud_pago %}#fff3cd{% elif table.is_occupied %}var(--danger-color){% else %}{{ table.color }}{% endif %};
+                                   --table-text-color: {% if table.solicitud_pago %}#856404{% else %}white{% endif %};">
+                            
                             <div class="table-content">
-                                <h3 style="color: #856404;">Mesa {{ table.number }}</h3>
-                                <div class="status-indicator">
-                                    <span class="icon">💰</span> <b style="color: #856404;">Pagando...</b>
+                                <h3 style="color: var(--table-text-color);">Mesa {{ table.number }}</h3>
+                                <div class="status-indicator" style="color: var(--table-text-color);">
+                                    {% if table.solicitud_pago %} <span class="icon">💰</span> <b>Pagando...</b>
+                                    {% elif table.is_occupied %} <span class="icon">✅</span> Ocupada
+                                    {% else %} <span class="icon">🍽️</span> Libre
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>
+                    </a>
+                {% empty %}
+                    <p class="empty-message">No hay mesas internas creadas.</p>
+                {% endfor %}
+            </main>
+        </div>
 
-                    {% elif table.is_occupied %}
-                        <div class="table-card occupied">
+        <!-- SECCIÓN DE MESAS EXTERNAS -->
+        <div class="table-section">
+            <h2 class="section-title">Mesas Externas</h2>
+            <main class="tables-grid">
+                {% for table in external_tables %}
+                    <a href="{% url 'table_order' table.id %}" class="table-link-wrapper">
+                        <div class="table-card"
+                            style="--table-bg-color: {% if table.solicitud_pago %}#fff3cd{% elif table.is_occupied %}var(--danger-color){% else %}{{ table.color }}{% endif %};
+                                   --table-text-color: {% if table.solicitud_pago %}#856404{% else %}white{% endif %};">
+                            
                             <div class="table-content">
-                                <h3>Mesa {{ table.number }}</h3>
-                                <div class="status-indicator">
-                                    <span class="icon">✅</span> Ocupada
+                                <h3 style="color: var(--table-text-color);">Mesa E-{{ table.number }}</h3>
+                                {% if table.name %}
+                                    <div class="table-area-badge">{{ table.name }}</div>
+                                {% endif %}
+                                <div class="status-indicator" style="color: var(--table-text-color);">
+                                    {% if table.solicitud_pago %} <span class="icon">💰</span> <b>Pagando...</b>
+                                    {% elif table.is_occupied %} <span class="icon">✅</span> Ocupada
+                                    {% else %} <span class="icon">🍽️</span> Libre
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>
+                    </a>
+                {% empty %}
+                    <p class="empty-message">No hay mesas externas creadas.</p>
+                {% endfor %}
+            </main>
+        </div>
 
-                    {% else %}
-                        <div class="table-card free">
-                            <div class="table-content">
-                                <h3>Mesa {{ table.number }}</h3>
-                                <div class="status-indicator">
-                                    <span class="icon">🍽️</span> Libre
-                                </div>
-                            </div>
-                        </div>
-                    {% endif %}
-                    
-                </a>
-            {% endfor %}
-        </main>
     </div>
 
     {% csrf_token %}
-    
+
+    <!-- ================================== -->
+    <!-- === MODAL PARA CREAR NUEVA MESA === -->
+    <!-- ================================== -->
+    <div id="create-table-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Nueva Mesa</h2>
+                <button onclick="closeCreateModal()" class="close-button">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form method="POST" action="{% url 'create_table' %}">
+                    {% csrf_token %}
+                    
+                    <div style="background: #f0f2f5; padding: 10px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="is_external_check" name="is_external" onchange="toggleExternalFields()" style="width: 20px; height: 20px; accent-color: var(--primary-blue);">
+                        <label for="is_external_check" style="font-weight: bold; color: #333; cursor: pointer;">¿Es una mesa Externa / Especial?</label>
+                    </div>
+
+                    <div id="internal-fields">
+                        {% if next_internal_number %}
+                            <p style="text-align: center; color: #666;">Se creará la mesa interna <b>#{{ next_internal_number }}</b>.</p>
+                        {% else %}
+                            <p style="text-align: center; color: #dc3545; font-weight: bold;">Límite de mesas internas (100) alcanzado.</p>
+                        {% endif %}
+                    </div>
+
+                    <div id="external-fields" style="display: none;">
+                        {% if next_external_number %}
+                            <p style="text-align: center; color: #666;">Se creará la mesa externa <b>#E-{{ next_external_number }}</b>.</p>
+                            <div style="margin-bottom: 15px;">
+                                <label for="name">Nombre / Área (Opcional)</label>
+                                <input type="text" id="name" name="name" placeholder="Ej: Terraza, VIP, Barra">
+                            </div>
+                    
+                            <div style="margin-bottom: 20px;">
+                                <label for="color">Color</label>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                <div class="color-selector">
+                                    <div class="predefined-colors">
+                                        <span class="color-swatch active" data-color="#28a745" style="background-color: #28a745;"></span>
+                                        <span class="color-swatch" data-color="#0d6efd" style="background-color: #0d6efd;"></span>
+                                        <span class="color-swatch" data-color="#dc3545" style="background-color: #dc3545;"></span>
+                                        <span class="color-swatch" data-color="#fd7e14" style="background-color: #fd7e14;"></span>
+                                        <span class="color-swatch" data-color="#6f42c1" style="background-color: #6f42c1;"></span>
+                                    </div>
+                                    <input type="color" id="custom_color_picker" value="#28a745">
+                                </div>
+                                <input type="text" id="color_hex" name="color" value="#28a745" style="width: 100px;">
+                                </div>
+                            </div>
+                        {% else %}
+                            <p style="text-align: center; color: #dc3545; font-weight: bold;">Límite de mesas externas (200) alcanzado.</p>
+                        {% endif %}
+                    </div>
+            
+                    <button type="submit" class="add-btn" style="width: 100%; margin-top: 10px;">Crear Mesa</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script src="{% static 'js/script.js' %}"></script>
+    <script>
+        function openCreateModal() {
+            const modal = document.getElementById('create-table-modal');
+            modal.style.display = 'flex'; // Primero lo hacemos visible en el layout
+            setTimeout(() => { // Luego activamos la animación
+                modal.style.opacity = '1';
+                modal.style.visibility = 'visible';
+                modal.querySelector('.modal-content').style.transform = 'scale(1)';
+            }, 10);
+        }
+        function closeCreateModal() {
+            const modal = document.getElementById('create-table-modal');
+            modal.style.opacity = '0';
+            modal.style.visibility = 'hidden';
+            modal.querySelector('.modal-content').style.transform = 'scale(0.95)';
+            setTimeout(() => { modal.style.display = 'none'; }, 300); // Ocultamos del layout después de la animación
+        }
+
+        function toggleExternalFields() {
+            const isChecked = document.getElementById('is_external_check').checked;
+            const externalFields = document.getElementById('external-fields');
+            const internalFields = document.getElementById('internal-fields');
+            const submitButton = document.querySelector('#create-table-modal form button[type="submit"]');
+
+            if (isChecked) {
+                externalFields.style.display = 'block';
+                internalFields.style.display = 'none';
+                submitButton.disabled = !({{ next_external_number|yesno:"true,false" }});
+            } else {
+                externalFields.style.display = 'none';
+                internalFields.style.display = 'block';
+                submitButton.disabled = !({{ next_internal_number|yesno:"true,false" }});
+            }
+        }
+
+        // --- NUEVA LÓGICA PARA EL SELECTOR DE COLOR ---
+        const customColorPicker = document.getElementById('custom_color_picker');
+        const colorHex = document.getElementById('color_hex');
+        const swatches = document.querySelectorAll('.color-swatch');
+
+        // 1. Clic en un color predefinido
+        swatches.forEach(swatch => {
+            swatch.addEventListener('click', function() {
+                const color = this.getAttribute('data-color');
+                colorHex.value = color;
+                customColorPicker.value = color;
+                
+                // Actualizar estado activo
+                swatches.forEach(s => s.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+
+        // 2. Cambiar el color personalizado
+        customColorPicker.addEventListener('input', (e) => {
+            colorHex.value = e.target.value;
+            // Quitar estado activo de los predefinidos
+            swatches.forEach(s => s.classList.remove('active'));
+        });
+
+        // 3. Escribir directamente en el input de texto
+        colorHex.addEventListener('input', (e) => {
+            customColorPicker.value = e.target.value;
+            swatches.forEach(s => s.classList.remove('active'));
+        });
+
+
+        // Ejecutar al abrir para setear el estado inicial del botón
+        document.addEventListener('DOMContentLoaded', function() {
+            toggleExternalFields();
+        });
+    </script>
+</body>
 </body>
 </html>

@@ -31,12 +31,19 @@
                     </div>
                     <div>
                         <label style="font-weight: 600; font-size: 0.9em; color: #444; margin-bottom: 5px; display: block;">Producto Base:</label>
-                        <select name="producto_base" class="form-control" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;" required>
-                            <option value="">-- Seleccionar --</option>
+                        <div class="searchable-select-wrapper"> 
+                            <input type="text" id="search-input-base" class="searchable-select-input" 
+                                   placeholder="Buscar producto base..." autocomplete="off"
+                                   value="{{ producto_personal_default.nombre|default:'' }}">
+                            <input type="hidden" name="producto_base" id="hidden-input-base" required
+                                   value="{{ producto_personal_default.id|default:'' }}">
+
+                            <div class="searchable-select-dropdown" id="dropdown-base">
                             {% for prod in productos %}
-                                <option value="{{ prod.id }}" {% if 'COMIDA' in prod.nombre|upper %}selected{% endif %}>{{ prod.nombre }} {% if prod.tamano != 'UNI' %}({{ prod.get_tamano_display }}){% endif %}</option>
+                                <div class="searchable-select-item" data-value="{{ prod.id }}">{{ prod.nombre }}</div>
                             {% endfor %}
-                        </select>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -80,12 +87,16 @@
                 
                 <div style="margin-bottom: 15px;">
                     <label style="font-weight: 600; font-size: 0.9em; color: #444; margin-bottom: 5px; display: block;">Producto a Regalar:</label>
-                    <select name="producto_regalo" class="form-control" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;" required>
-                        <option value="">-- Seleccionar --</option>
-                    {% for prod in productos %}
-                            <option value="{{ prod.id }}">{{ prod.nombre }} {% if prod.tamano != 'UNI' %}({{ prod.get_tamano_display }}){% endif %}</option>
-                    {% endfor %}
-                    </select>
+                    <!-- NUEVO COMPONENTE DE BÚSQUEDA -->
+                    <div class="searchable-select-wrapper">
+                        <input type="text" id="search-input-regalo" class="searchable-select-input" placeholder="Buscar producto de regalo..." autocomplete="off">
+                        <input type="hidden" name="producto_regalo" id="hidden-input-regalo" required>
+                        <div class="searchable-select-dropdown" id="dropdown-regalo">
+                        {% for prod in productos %}
+                            <div class="searchable-select-item" data-value="{{ prod.id }}">{{ prod.nombre }}</div>
+                        {% endfor %}
+                        </div>
+                    </div>
                 </div>
 
                 <div style="margin-bottom: 20px;">
@@ -225,6 +236,56 @@
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+    // --- NUEVA LÓGICA PARA SELECTORES CON BÚSQUEDA ---
+    function setupSearchableSelect(inputId, dropdownId, hiddenInputId) {
+        const searchInput = document.getElementById(inputId);
+        const dropdown = document.getElementById(dropdownId);
+        const hiddenInput = document.getElementById(hiddenInputId);
+        const items = dropdown.querySelectorAll('.searchable-select-item');
+
+        searchInput.addEventListener('focus', () => {
+            dropdown.style.display = 'block';
+        });
+
+        searchInput.addEventListener('input', () => {
+            const filter = searchInput.value.toLowerCase();
+            items.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                item.style.display = text.includes(filter) ? '' : 'none';
+            });
+        });
+
+        items.forEach(item => {
+            item.addEventListener('mousedown', (e) => { // Usamos mousedown para que se ejecute antes que el 'blur'
+                e.preventDefault();
+                searchInput.value = item.textContent;
+                hiddenInput.value = item.dataset.value;
+                dropdown.style.display = 'none';
+            });
+        });
+
+        searchInput.addEventListener('blur', () => {
+            // Pequeño delay para permitir que el click en el item se registre
+            setTimeout(() => {
+                dropdown.style.display = 'none';
+                // Si el texto no corresponde a una opción, limpiar
+                let valid = false;
+                items.forEach(item => {
+                    if(item.textContent === searchInput.value) valid = true;
+                });
+                if(!valid) {
+                    searchInput.value = '';
+                    hiddenInput.value = '';
+                }
+            }, 200);
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        setupSearchableSelect('search-input-base', 'dropdown-base', 'hidden-input-base');
+        setupSearchableSelect('search-input-regalo', 'dropdown-regalo', 'hidden-input-regalo');
+    });
+    
     window.addEventListener('load', function() {
         // 1. Buscamos si hay una orden de impresión
         const urlParams = new URLSearchParams(window.location.search);

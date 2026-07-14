@@ -131,47 +131,13 @@ class Producto(models.Model):
         self.costo_materia_prima = total
         self.save() # Guardamos el nuevo costo en la BD
     
-
-# Tu modelo original de Mesas
-class Table(models.Model):
-    number = models.PositiveIntegerField(unique=True, verbose_name="Número de Mesa")
-    is_occupied = models.BooleanField(default=False, verbose_name="¿Ocupada?")
-
-    class Meta:
-        ordering = ['number']
-
-    def __str__(self):
-        return f"{self.nombre} ({self.tamano})"
-
-    # --- LÓGICA DE COSTOS AUTOMÁTICA ---
-    @property
-    def costo_receta(self):
-        """Calcula cuánto cuesta hacer este producto sumando sus ingredientes"""
-        total_costo = Decimal('0.00')
-        # Recorremos todos los ingredientes de este producto
-        for ingrediente in self.ingredientes.all():
-            if ingrediente.insumo:
-                # Costo = Cantidad de la receta * Costo Promedio actual del insumo
-                costo_insumo = ingrediente.cantidad * ingrediente.insumo.costo_unitario
-                total_costo += costo_insumo
-        return total_costo
-
-    @property
-    def ganancia_estimada(self):
-        """Muestra cuánto ganas: Precio Venta - Costo Receta"""
-        return self.precio - self.costo_receta
-    
-    @property
-    def margen_ganancia(self):
-        """Margen en porcentaje"""
-        if self.precio > 0:
-            return (self.ganancia_estimada / self.precio) * 100
-        return 0
-
     
 class Table(models.Model):
-    number = models.PositiveIntegerField(unique=True, verbose_name="Número de Mesa")
+    number = models.CharField(max_length=10, unique=True, verbose_name="Número de Mesa")
+    name = models.CharField(max_length=50, blank=True, null=True, verbose_name="Área / Nombre")
+    color = models.CharField(max_length=7, default="#28a745", verbose_name="Color")
     is_occupied = models.BooleanField(default=False, verbose_name="¿Ocupada?")
+    is_external = models.BooleanField(default=False, verbose_name="¿Es Externa?")
     
     # --- NUEVO CAMPO ---
     # Relacionamos la mesa con un usuario. 

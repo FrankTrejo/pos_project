@@ -1,26 +1,27 @@
 from django.shortcuts import render, get_object_or_404
 from django.db.models import Sum, Count, F, ExpressionWrapper, DecimalField
 from django.utils import timezone
-from datetime import timedelta, datetime   
+from datetime import timedelta
+from django.views.decorators.cache import never_cache
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import Paginator
-from .models import AuditoriaEliminacion, AuditoriaConfiguracion, CuadreCaja
-import csv
-import math
+from .models import AuditoriaEliminacion, AuditoriaConfiguracion
 from decimal import Decimal
 from django.http import HttpResponse
 
 # Importamos modelos de ambas aplicaciones (Inventario y Ventas)
 from inventory.models import Insumo, MovimientoInventario
-from tables.models import Venta, DetalleVenta, TasaBCV, Pago
+from tables.models import Venta, DetalleVenta, TasaBCV
 
 # 1. MENÚ PRINCIPAL DE REPORTES (Centro de Mando)
+@never_cache
 @staff_member_required
 def reportes_index(request):
     """Muestra el panel con las tarjetas de opciones"""
     return render(request, 'reports/index.html')
 
 # 2. REPORTE DE INVENTARIO (Completo)
+@never_cache
 @staff_member_required
 def reporte_inventario(request):
     # Filtros de fecha (Por defecto: Últimos 30 días)
@@ -74,6 +75,7 @@ def reporte_inventario(request):
     return render(request, 'reports/inventory_report.html', context)
 
 # 3. REPORTE VENTAS X MESERO
+@never_cache
 @staff_member_required
 def ventas_mesero(request):
     fecha_inicio = request.GET.get('fecha_inicio', (timezone.now() - timedelta(days=30)).strftime('%Y-%m-%d'))
@@ -102,6 +104,7 @@ def ventas_mesero(request):
     return render(request, 'reports/generic_sales_report.html', context)
 
 # 4. REPORTE VENTAS X PRODUCTO
+@never_cache
 @staff_member_required
 def ventas_producto(request):
     fecha_inicio = request.GET.get('fecha_inicio', (timezone.now() - timedelta(days=30)).strftime('%Y-%m-%d'))
@@ -144,6 +147,7 @@ def ventas_producto(request):
     }
     return render(request, 'reports/generic_sales_report.html', context)
 
+@never_cache
 @staff_member_required
 def auditoria_eliminaciones(request):
     logs_list = AuditoriaEliminacion.objects.all().order_by('-fecha')
@@ -161,6 +165,7 @@ def auditoria_eliminaciones(request):
     })
 
 # 7. HISTORIAL DE TASAS DE CAMBIO
+@never_cache
 @staff_member_required
 def historial_tasas_bcv(request):
     tasas_list = TasaBCV.objects.all().order_by('-fecha_actualizacion')
@@ -174,6 +179,7 @@ def historial_tasas_bcv(request):
 
 # reports/views.py
 
+@never_cache
 @staff_member_required
 def reporte_ventas_detalle(request):
     # 1. Filtros de Fecha
@@ -279,6 +285,7 @@ def reporte_ventas_detalle(request):
     }
     return render(request, 'reports/sales_detail_report.html', context)
 
+@never_cache
 @staff_member_required
 def detalle_venta_view(request, venta_id):
     venta = get_object_or_404(
@@ -315,6 +322,7 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import F, ExpressionWrapper, DecimalField
 from inventory.models import Insumo
 
+@never_cache
 @login_required
 def reporte_insumos_agotados(request):
     # CORRECCIÓN: Usamos 'stock_actual' en lugar de 'cantidad'
@@ -335,6 +343,7 @@ def reporte_insumos_agotados(request):
         'insumos': insumos_criticos
     })
 
+@never_cache
 @staff_member_required
 def reporte_propinas(request):
     hoy_str = timezone.localtime().date().strftime('%Y-%m-%d')
@@ -399,6 +408,7 @@ def reporte_propinas(request):
     }
     return render(request, 'reports/propinas_report.html', context)
 
+@never_cache
 @staff_member_required
 def ventas_pago(request):
     # 1. POR DEFECTO: Siempre mostrar HOY al ingresar
@@ -515,76 +525,3 @@ def ventas_pago(request):
 
     # Apuntamos a la nueva plantilla especializada
     return render(request, 'reports/payment_methods_report.html', context)
-
-@staff_member_required
-def cuadre_caja_list(request):
-    cuadres = CuadreCaja.objects.all().order_by('-fecha_hora')
-    paginator = Paginator(cuadres, 10)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    return render(request, 'reports/cuadre_caja_list.html', {'cuadres': page_obj})
-
-@staff_member_required
-def cuadre_caja_nuevo(request):
-    from django.utils.dateparse import parse_date
-    
-    hoy = timezone.localtime().date()
-    fecha_str = request.GET.get('fecha', hoy.strftime('%Y-%m-%d'))
-    fecha_obj = parse_date(fecha_str) if fecha_str else hoy
-
-    # 1. Obtener ventas y pagos válidos de esa fecha
-    ventas_validas = Venta.objects.filter(fecha__date=fecha_obj, anulada=False)
-    pagos = Pago.objects.filter(venta__in=ventas_validas)
-
-    # 2. Calcular valores del sistema
-    sistema_efectivo_usd = pagos.filter(metodo='EFECTIVO_USD').aggregate(Sum('monto'))['monto__sum'] or 0
-    sistema_efectivo_bs = pagos.filter(metodo='EFECTIVO_BS').aggregate(Sum('monto'))['monto__sum'] or 0
-    sistema_electronico_bs = pagos.filter(metodo__in=['PUNTO', 'PAGO_MOVIL', 'TRANSFERENCIA']).aggregate(Sum('monto'))['monto__sum'] or 0
-    sistema_electronico_usd = pagos.filter(metodo__in=['ZELLE', 'BINANCE']).aggregate(Sum('monto'))['monto__sum'] or 0
-
-    # Sumar ventas legacy que no tengan pagos registrados (por retrocompatibilidad)
-    tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
-    tasa_valor = float(tasa_obj.precio) if tasa_obj else 0
-    
-    ventas_legacy = ventas_validas.filter(pagos__isnull=True)
-    for v in ventas_legacy:
-        if v.metodo_pago == 'EFECTIVO_USD':
-            sistema_efectivo_usd += v.total
-        elif v.metodo_pago == 'EFECTIVO_BS':
-            sistema_efectivo_bs += v.total * Decimal(str(tasa_valor))
-
-    if request.method == 'POST':
-        fisico_efectivo_usd = Decimal(request.POST.get('fisico_efectivo_usd', '0').replace(',', '.'))
-        fisico_efectivo_bs = Decimal(request.POST.get('fisico_efectivo_bs', '0').replace(',', '.'))
-        fisico_electronico_bs = Decimal(request.POST.get('fisico_electronico_bs', '0').replace(',', '.'))
-        fisico_electronico_usd = Decimal(request.POST.get('fisico_electronico_usd', '0').replace(',', '.'))
-        notas = request.POST.get('notas', '')
-
-        CuadreCaja.objects.create(
-            fecha_cuadre=fecha_obj,
-            usuario=request.user,
-            sistema_efectivo_usd=sistema_efectivo_usd,
-            fisico_efectivo_usd=fisico_efectivo_usd,
-            sistema_efectivo_bs=sistema_efectivo_bs,
-            fisico_efectivo_bs=fisico_efectivo_bs,
-            sistema_electronico_bs=sistema_electronico_bs,
-            fisico_electronico_bs=fisico_electronico_bs,
-            sistema_electronico_usd=sistema_electronico_usd,
-            fisico_electronico_usd=fisico_electronico_usd,
-            notas=notas
-        )
-        
-        from django.contrib import messages
-        messages.success(request, "¡Cuadre de caja guardado exitosamente!")
-        from django.shortcuts import redirect
-        return redirect('cuadre_caja_list')
-
-    context = {
-        'fecha_obj': fecha_obj,
-        'fecha_str': fecha_str,
-        'sistema_efectivo_usd': float(sistema_efectivo_usd),
-        'sistema_efectivo_bs': float(sistema_efectivo_bs),
-        'sistema_electronico_bs': float(sistema_electronico_bs),
-        'sistema_electronico_usd': float(sistema_electronico_usd),
-    }
-    return render(request, 'reports/cuadre_caja_form.html', context)

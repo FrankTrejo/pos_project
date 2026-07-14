@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'reports',
     'maestros',
     'core',
+    'caja',
     'staff',
 ]
 
@@ -152,3 +153,15 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'frankdtg2004@gmail.com'  # <--- PON TU CORREO AQUÍ
 EMAIL_HOST_PASSWORD = 'eryj fpwj gyat vpli'  # <--- TU CONTRASEÑA DE APLICACIÓN
+
+# --- CONFIGURACIÓN DE TIMEOUT DE SESIÓN ---
+# Cierra la sesión después de un tiempo de INACTIVIDAD.
+# Para probar, lo ponemos en 60 segundos. Una vez que confirmes que funciona,
+# puedes volver a ponerlo en 3600 (1 hora) o el tiempo que prefieras.
+SESSION_COOKIE_AGE = 36000
+
+# Al cerrar el navegador, la sesión expira inmediatamente.
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
+# Cada vez que el usuario hace una petición, el contador de inactividad se reinicia.
+SESSION_SAVE_EVERY_REQUEST = True

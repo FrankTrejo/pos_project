@@ -95,6 +95,20 @@ body {
   gap: 20px; /* Espacio entre recuadros */
 }
 
+/* --- NUEVO: Estilos para las secciones de mesas --- */
+.table-section {
+    margin-bottom: 40px;
+}
+
+.section-title {
+    color: #495057;
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.empty-message { color: #868e96; }
+
 /* --- Tarjeta de Mesa --- */
 .table-card {
   border-radius: 8px;
@@ -103,7 +117,8 @@ body {
   cursor: pointer;
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
   transition: transform 0.1s, opacity 0.2s;
-  color: var(--card-text);
+  background-color: var(--table-bg-color, var(--success-color));
+  color: var(--table-text-color, white);
 }
 
 .table-card:hover {
@@ -117,21 +132,22 @@ body {
     font-size: 1.2rem;
 }
 
+.table-area-badge {
+    background: rgba(0,0,0,0.15);
+    color: white;
+    font-size: 0.8em;
+    padding: 3px 8px;
+    border-radius: 10px;
+    display: inline-block;
+    margin-bottom: 10px;
+}
+
 .status-indicator {
     font-size: 0.95rem;
     display: flex;
     justify-content: center;
     align-items: center;
     gap: 5px;
-}
-
-/* Estados de color */
-.table-card.free {
-    background-color: var(--success-color);
-}
-
-.table-card.occupied {
-    background-color: var(--danger-color);
 }
 
 /* --- tables/static/css/style.css --- */
@@ -528,6 +544,109 @@ body.light-theme .input-group .readonly-field {
     transform: translateY(-5px);
     box-shadow: var(--shadow-soft); /* Sombra solo al pasar el mouse */
     border-color: transparent;
+}
+
+
+/* =========================================
+   ESTILOS PARA EL MODAL DE CREAR MESA
+   ========================================= */
+
+.modal-content {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    width: 90%;
+    max-width: 450px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    transform: scale(0.95); /* Inicia ligeramente más pequeño */
+    transition: transform 0.3s ease; /* <-- ANIMACIÓN DE APERTURA */
+}
+
+.modal-header { text-align: center; padding: 25px 20px 15px; border-bottom: 1px solid #eee; display: flex; flex-direction: column; align-items: center; }
+
+.modal-header h2 { margin: 0; color: var(--primary-blue); }
+
+.close-button {
+    background: none;
+    border: none;
+    font-size: 1.8rem;
+    cursor: pointer;
+    color: #888;
+}
+
+.modal-body label { display: block; font-weight: bold; margin-bottom: 5px; }
+.modal-body input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; 
+}
+
+/* --- NUEVO: Estilos para el selector de color --- */
+.color-selector {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background-color: #f0f2f5;
+    padding: 5px;
+    border-radius: 8px;
+}
+
+.predefined-colors {
+    display: flex;
+    gap: 6px;
+}
+
+.color-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.2s, border-color 0.2s;
+}
+
+.color-swatch:hover {
+    transform: scale(1.1);
+}
+
+.color-swatch.active {
+    border-color: #fff;
+    box-shadow: 0 0 0 2px #0d6efd; /* Borde azul para el seleccionado */
+}
+
+/* --- NUEVO: Estilos para el selector con búsqueda --- */
+.searchable-select-wrapper {
+    position: relative;
+}
+
+.searchable-select-input {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    font-size: 1em;
+    background-color: #fff;
+    cursor: pointer;
+}
+
+.searchable-select-dropdown {
+    display: none;
+    position: absolute;
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    width: 100%;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 10;
+    margin-top: 4px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.searchable-select-item {
+    padding: 10px;
+    cursor: pointer;
+}
+
+.searchable-select-item:hover {
+    background-color: #f0f2f5;
 }
 
 

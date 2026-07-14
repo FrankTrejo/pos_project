@@ -38,7 +38,7 @@
                 <i class="fas fa-credit-card"></i> Cuenta Mesa
             </button>
             <button class="action-btn" onclick="iniciarFacturacion()">
-                <i class="fas fa-receipt"></i> Facturar Mesa
+                <i class="fas fa-receipt"></i> Facturar Mesa 
             </button>
         </div>
 
@@ -224,7 +224,7 @@
         </div>
     </div>
 
-    <div id="payment-modal-overlay" class="modal-overlay">
+    <div id="payment-modal-overlay" style="display: none;">
         <div class="modal-card">
             <div class="modal-header">
                 <h2 class="total-title">Total a Pagar: <span id="display-total-usd">$0.00</span></h2>
@@ -312,7 +312,7 @@
 
                 <div class="action-buttons">
                     <button class="btn-cancel" onclick="cerrarModalPago()">Cancelar</button>
-                    <button class="btn-process" id="btn-procesar-pago" disabled onclick="confirmarPago()">Procesar Pago</button>
+                    <button class="btn-process" id="btn-procesar-pago" disabled onclick="procesarPagoFinal()">Procesar Pago</button>
                 </div>
             </div>
         </div>
@@ -332,7 +332,7 @@
         .btn-extra-item.selected .badge-precio { color: #198754; }
 
         /* --- NUEVOS ESTILOS PARA EL MODAL DE PAGO (ACORDEÓN) --- */
-        .modal-overlay {
+        #payment-modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.6);
             display: none; justify-content: center; align-items: center;
@@ -346,8 +346,8 @@
         }
         .modal-header { text-align: center; padding: 25px 20px 15px; border-bottom: 1px solid #eee; }
         .total-title { font-size: 1.8em; color: #333; margin: 0; font-weight: 700; }
-        .total-title span { color: var(--primary-blue, #0d6efd); }
-        .total-bs-subtitle { color: #666; font-size: 1.1em; margin-top: 5px; }
+        .total-title > span { color: var(--primary-blue, #0d6efd); }
+        .total-bs-subtitle { color: #6c757d; font-size: 1.1em; margin-top: 5px; font-weight: 500; }
 
         .payment-accordion { padding: 15px; overflow-y: auto; flex: 1; }
         
@@ -1006,10 +1006,16 @@
                 return;
             }
             
-            const esPrimeraVez = '{{ orden_activa.impreso|yesno:"true,false"|default:"false" }}' === 'false';
-            const debeImprimir = esPrimeraVez || carritoModificado;
+            // --- LÓGICA DE IMPRESIÓN CORREGIDA ---
+            // Si la orden no existe, es la primera vez que se guarda.
+            const esOrdenNueva = !{{ orden_activa.id|default:0 }};
             
-            const data = { carrito: carrito, mesero: meseroNombre, imprimir: true, imprimir_ticket: debeImprimir, ignorar_stock: ignorarStock };
+            // Si la orden ya existe Y NUNCA ha sido impresa, también debe imprimir.
+            const noHaSidoImpresa = {{ orden_activa.id|default:0 }} && '{{ orden_activa.impreso|yesno:"true,false" }}' === 'false';
+
+            const debeImprimir = esOrdenNueva || noHaSidoImpresa || carritoModificado;
+            
+            const data = { carrito: carrito, mesero: meseroNombre, imprimir_ticket: debeImprimir, ignorar_stock: ignorarStock, is_sync: false };
             Swal.fire({ title: 'Guardando...', didOpen: () => Swal.showLoading(), timerProgressBar: true, allowOutsideClick: false });
 
             fetch("{% url 'grabar_mesa' table.id %}", {
@@ -1019,10 +1025,10 @@
             .then(result => {
                 if(result.status === 'ok') {
                     if (result.imprimir) {
-                        Swal.fire({ icon: 'success', title: '¡Mesa Guardada!', text: 'Enviando a cocina...', showConfirmButton: false, timer: 400 });
+                        Swal.fire({ icon: 'success', title: '¡Mesa Guardada!', text: 'Enviando comanda a cocina...', showConfirmButton: false, timer: 500 });
                         setTimeout(() => { window.location.href = "{% url 'index' %}"; }, 200); 
                     } else {
-                        Swal.fire({ icon: 'info', title: 'Mesa Actualizada', text: 'Sin cambios en la orden. No se imprime ticket nuevo.', showConfirmButton: false, timer: 500 });
+                        Swal.fire({ icon: 'info', title: 'Mesa Actualizada', text: 'No se detectaron cambios para imprimir.', showConfirmButton: false, timer: 600 });
                         setTimeout(() => { window.location.href = "{% url 'index' %}"; }, 300); 
                     }
                 } else if (result.status === 'warning_stock' || (result.message && result.message.includes('STOCK_INSUFICIENTE'))) {
@@ -1059,7 +1065,6 @@
         // =============================================
         // === NUEVA LÓGICA DE FACTURACIÓN (MODAL) ===
         // =============================================
-
         function iniciarFacturacion(ignorarStock = false) {
         // 1. Validar que el carrito no esté vacío
         if (carrito.length === 0) {
@@ -1091,10 +1096,14 @@
             allowOutsideClick: false 
         });
 
-        const esPrimeraVez = '{{ orden_activa.impreso|yesno:"true,false"|default:"false" }}' === 'false';
-        const debeImprimir = esPrimeraVez || carritoModificado;
+        // --- DIAGNÓSTICO: Mostramos en consola lo que vamos a enviar ---
+        console.log("PASO 1: Enviando datos para sincronizar...", { carrito, meseroNombre });
 
-        const data = { carrito: carrito, mesero: meseroNombre, imprimir_ticket: debeImprimir };
+        const data = { 
+            carrito: carrito, 
+            mesero: meseroNombre, 
+            is_sync: true // Flag para que el backend solo guarde sin imprimir
+        };
 
         // Hacemos el llamado a la vista grabar_mesa_ajax
         fetch("{% url 'grabar_mesa' table.id %}", {
@@ -1107,28 +1116,41 @@
         })
         .then(response => response.json())
         .then(result => {
-            
+            // --- DIAGNÓSTICO: Mostramos la respuesta del servidor ---
+            console.log("PASO 2: Respuesta del servidor recibida.", result);
+
             if (result.status === 'ok') {
-                Swal.close(); // Cerramos el cuadro de carga
+                Swal.close(); // ¡Éxito! Cerramos el "Sincronizando..."
+                console.log("PASO 3: Sincronización OK. Abriendo modal de pago...");
                 
+                // --- DIAGNÓSTICO ADICIONAL ---
+                console.log("PASO 3.1: Verificando Tasa de Cambio...");
+                if (!TASA_CAMBIO || TASA_CAMBIO <= 0) {
+                    console.error("ERROR: TASA_CAMBIO inválida o no definida. Valor:", TASA_CAMBIO);
+                    Swal.fire('Error de Configuración', 'No se ha definido una Tasa de Cambio válida.', 'error');
+                    return;
+                }
+                console.log("PASO 3.2: Tasa OK. Valor:", TASA_CAMBIO);
+
                 // 4. AHORA SÍ, ABRIMOS EL MODAL DE PAGO
                 const totalTexto = document.getElementById('total-usd').innerText;
                 totalMesaFacturacion = parseFloat(totalTexto);
                 
-                if (!TASA_CAMBIO || TASA_CAMBIO <= 0) {
-                    Swal.fire('Error', 'Sin Tasa de Cambio', 'error');
-                    return;
-                }
+                console.log("PASO 3.3: Verificando Total de la Mesa...");
                 if (totalMesaFacturacion <= 0) {
-                    Swal.fire('Error', 'Monto en 0', 'error');
+                    console.error("ERROR: El total de la mesa es 0 o inválido. Valor:", totalMesaFacturacion);
+                    Swal.fire('Error en el Carrito', 'El monto total de la mesa es cero. No se puede facturar.', 'error');
                     return;
                 }
+                console.log("PASO 3.4: Total OK. Valor:", totalMesaFacturacion);
 
                 // Setear textos iniciales en el modal
+                console.log("PASO 3.5: Actualizando textos del modal...");
                 document.getElementById('display-total-usd').innerText = `$${totalMesaFacturacion.toFixed(2)}`;
                 document.getElementById('display-total-bs').innerText = `(Bs. ${(totalMesaFacturacion * TASA_CAMBIO).toLocaleString('es-VE', {minimumFractionDigits: 2})})`;
 
                 // Limpiar inputs previos del modal
+                console.log("PASO 3.6: Limpiando campos de pago anteriores...");
                 document.querySelectorAll('.payment-input, .ref-input').forEach(i => i.value = '');
                 document.querySelectorAll('.entered-badge').forEach(b => b.style.display = 'none');
                 
@@ -1137,45 +1159,31 @@
                 document.querySelectorAll('.payment-item').forEach(item => item.classList.remove('active'));
 
                 // Abrir modal de pagos visualmente
-                document.getElementById('payment-modal-overlay').style.display = 'flex';
+                const modalPago = document.getElementById('payment-modal-overlay');
+                if (modalPago) {
+                    modalPago.style.display = 'flex';
+                    console.log("PASO 4: ¡Modal de pago abierto exitosamente!");
+                } else {
+                    console.error("ERROR FATAL: No se encontró el elemento #payment-modal-overlay en el HTML.");
+                    Swal.fire('Error de Interfaz', 'No se pudo encontrar el modal de pago. Revisa el HTML.', 'error');
+                    return;
+                }
                 
                 // Activar cálculos
                 activarListenersPagos();
                 calcularResumenPago();
-            } else if (result.status === 'warning_stock' || (result.message && result.message.includes('STOCK_INSUFICIENTE'))) {
-                let mensajeError = result.message.replace('STOCK_INSUFICIENTE|', '').replace(/\n/g, '<br>');
-                Swal.fire({
-                    title: 'Faltan Ingredientes',
-                    html: mensajeError,
-                    icon: 'warning',
-                    showCancelButton: true,
-                    showDenyButton: true,
-                    confirmButtonColor: '#d33',
-                    denyButtonColor: '#ffc107',
-                    cancelButtonColor: '#6c757d',
-                    confirmButtonText: 'Sí, facturar igual',
-                    denyButtonText: 'Sustituir Ingrediente',
-                    cancelButtonText: 'Cancelar'
-                }).then((res) => {
-                    if (res.isConfirmed) {
-                        iniciarFacturacion(true);
-                    } else if (res.isDenied) {
-                        if (carrito.length === 1) {
-                            abrirModalPersonalizar(0);
-                            mostrarOpcionesSustituir();
-                        } else {
-                            Swal.fire({icon: 'info', title: 'Selecciona el producto', text: 'Como tienes varios productos en la orden, haz clic en el botón "Personalizar" del producto específico que deseas modificar para sustituir el ingrediente.', timer: 4500, showConfirmButton: false});
-                        }
-                    }
-                });
             } else {
-                Swal.close(); // Cerramos el cuadro de carga
-                Swal.fire('Error', 'No se pudo actualizar la mesa: ' + result.message, 'error');
+                // Si el guardado falla (ej: por stock), mostramos el error y no continuamos.
+                Swal.close();
+                console.error("FALLO en la sincronización. Razón:", result.message);
+                Swal.fire('Error de Sincronización', result.message || 'No se pudo guardar la orden antes de facturar.', 'error');
             }
         })
         .catch(error => {
+            // --- DIAGNÓSTICO: Capturamos errores de red o de JSON ---
+            console.error("ERROR CRÍTICO: La petición fetch falló.", error);
             console.error('Error:', error);
-            Swal.fire('Error Técnico', 'No se pudo conectar con el servidor.', 'error');
+            Swal.fire('Error Técnico', 'No se pudo conectar con el servidor. Revisa la consola para más detalles (Clic derecho > Inspeccionar > Consola).', 'error');
         });
     }
 
@@ -1265,7 +1273,7 @@
             montosPagos = { efecUsd, pmBs, puntoBs, efecBs, totalPagadoUsd, restante };
         }
 
-        async function confirmarPago() {
+        async function procesarPagoFinal() {
         const btn = document.getElementById('btn-procesar-pago');
         if(btn.disabled) return;
 

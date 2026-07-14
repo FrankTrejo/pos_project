@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+    .total-display {
+        background: #343a40; color: white; padding: 25px; border-radius: 12px; text-align: center; margin-bottom: 2rem;
+    }
+    .total-display h2 { margin: 0; font-size: 1.2rem; opacity: 0.8; }
+    .total-display .amount { font-size: 3rem; font-weight: bold; letter-spacing: -2px; }
+    .input-group-text { background-color: #e9ecef; border-right: 0; font-weight: bold; }
+    .form-control { border-left: 0; }
+</style>
+
+<div class="app-container">
+    <div class="app-header">
+        <h1>📝 Nuevo Cuadre de Caja</h1>
+        <a href="{% url 'cuadre_caja_list' %}" class="btn-secondary">Volver al Historial</a>
+    </div>
+
+    <div class="card-style" style="max-width: 800px; margin: auto;">
+        <form method="GET" class="mb-4" style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+            <label><strong>Fecha a Cuadrar:</strong></label>
+            <div style="display: flex; gap: 10px; max-width: 300px; margin-top: 5px;">
+                <input type="date" name="fecha" value="{{ fecha_str }}" class="form-control" onchange="this.form.submit()">
+            </div>
+        </form>
+
+        <!-- TOTAL A CUADRAR -->
+        <div class="total-display">
+            <h2>Total a Justificar (Ventas + Fondo - Gastos)</h2>
+            <div class="amount" id="total-a-justificar">${{ total_ventas_dia|floatformat:2 }}</div>
+        </div>
+
+        <form method="POST">
+            {% csrf_token %}
+
+            <!-- CAMPOS DE ENTRADA -->
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label>Fondo de Caja Inicial ($)</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-wallet text-success"></i></span>
+                        <input type="number" step="0.01" name="fondo_caja_usd" id="fondo_caja_usd" class="form-control" value="0.00" oninput="calcularCuadre()">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label>Gastos del Turno ($)</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-receipt text-danger"></i></span>
+                        <input type="number" step="0.01" name="gastos_turno_usd" id="gastos_turno_usd" class="form-control" value="0.00" oninput="calcularCuadre()">
+                    </div>
+                </div>
+                <hr class="my-3">
+                <div class="col-md-6">
+                    <label>Recibido en Efectivo ($)</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-dollar-sign"></i></span>
+                        <input type="number" step="0.01" name="recibido_efectivo_usd" id="recibido_efectivo_usd" class="form-control" value="0.00" oninput="calcularCuadre()">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label>Recibido en Efectivo (Bs)</label>
+                    <div class="input-group">
+                        <span class="input-group-text">Bs</span>
+                        <input type="number" step="0.01" name="recibido_efectivo_bs" id="recibido_efectivo_bs" class="form-control" value="0.00" oninput="calcularCuadre()">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label>Recibido Electrónico ($)</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-globe"></i></span>
+                        <input type="number" step="0.01" name="recibido_electronico_usd" id="recibido_electronico_usd" class="form-control" value="0.00" oninput="calcularCuadre()">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label>Recibido Electrónico (Bs)</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-credit-card"></i></span>
+                        <input type="number" step="0.01" name="recibido_electronico_bs" id="recibido_electronico_bs" class="form-control" value="0.00" oninput="calcularCuadre()">
+                    </div>
+                </div>
+            </div>
+
+            <!-- RESULTADO -->
+            <div class="total-display mt-4" id="resultado-cuadre" style="background: #6c757d;">
+                <h2>Diferencia</h2>
+                <div class="amount" id="diferencia-final">$0.00</div>
+            </div>
+
+            <div class="mb-4">
+                <label for="notas"><strong>Notas / Justificación (Obligatorio si hay faltante):</strong></label>
+                <textarea name="notas" id="notas" class="form-control" rows="3" placeholder="Ej: Faltó $1 porque se compró hielo..."></textarea>
+            </div>
+
+            <div class="text-center">
+                <button type="submit" id="btn-procesar-cuadre" class="add-btn" style="width: 100%; font-size: 1.2rem; padding: 15px;">
+                    <i class="fas fa-lock"></i> Procesar Cuadre de Caja
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+    const VENTAS_DIA = parseFloat("{{ total_ventas_dia|stringformat:'f' }}");
+    const TASA = parseFloat("{{ tasa_bcv|stringformat:'f' }}");
+    const notaTextarea = document.getElementById('notas');
+    const btnProcesar = document.getElementById('btn-procesar-cuadre');
+    
+    function calcularCuadre() {
+        const fondo = parseFloat(document.getElementById('fondo_caja_usd').value) || 0;
+        const gastos = parseFloat(document.getElementById('gastos_turno_usd').value) || 0;
+        
+        const recEfectivoUsd = parseFloat(document.getElementById('recibido_efectivo_usd').value) || 0;
+        const recEfectivoBs = parseFloat(document.getElementById('recibido_efectivo_bs').value) || 0;
+        const recElectroUsd = parseFloat(document.getElementById('recibido_electronico_usd').value) || 0;
+        const recElectroBs = parseFloat(document.getElementById('recibido_electronico_bs').value) || 0;
+
+        const totalEsperado = VENTAS_DIA + fondo - gastos;
+        const totalRecibido = recEfectivoUsd + (recEfectivoBs / TASA) + recElectroUsd + (recElectroBs / TASA);
+        const diferencia = totalRecibido - totalEsperado;
+
+        // Actualizar displays
+        document.getElementById('total-a-justificar').innerText = `$${totalEsperado.toFixed(2)}`;
+        const difDisplay = document.getElementById('diferencia-final');
+        const resultadoBox = document.getElementById('resultado-cuadre');
+
+        difDisplay.innerText = `$${diferencia.toFixed(2)}`;
+
+        if (Math.abs(diferencia) < 0.01) {
+            resultadoBox.style.background = '#198754'; // Verde
+            difDisplay.innerText = '¡CUADRADO!';
+            notaTextarea.required = false;
+            btnProcesar.disabled = false;
+        } else if (diferencia < 0) {
+            resultadoBox.style.background = '#dc3545'; // Rojo
+            difDisplay.innerText = `FALTANTE: $${Math.abs(diferencia).toFixed(2)}`;
+            notaTextarea.required = true;
+            // Deshabilitar botón si no hay nota
+            btnProcesar.disabled = !notaTextarea.value.trim();
+        } else {
+            resultadoBox.style.background = '#ffc107'; // Amarillo
+            resultadoBox.style.color = '#343a40';
+            difDisplay.innerText = `SOBRANTE: $${diferencia.toFixed(2)}`;
+            notaTextarea.required = false;
+            btnProcesar.disabled = false;
+        }
+    }
+
+    notaTextarea.addEventListener('input', calcularCuadre);
+    window.onload = calcularCuadre;
+</script>
+{% endblock %}

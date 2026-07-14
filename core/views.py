@@ -18,6 +18,12 @@ def conf_identidad(request):
     if request.method == 'POST':
         form = ConfigIdentidadForm(request.POST, instance=config)
         if form.is_valid():
+            # Auditoría
+            AuditoriaConfiguracion.objects.create(
+                usuario=request.user,
+                accion="Actualización de Identidad",
+                accion_detalle="Se modificaron los datos del negocio (Nombre, RIF, etc)."
+            )
             form.save()
             messages.success(request, "Datos de Identidad actualizados.")
             return redirect('configuracion_menu')
@@ -71,6 +77,12 @@ def conf_visual(request):
     if request.method == 'POST':
         form = ConfigVisualForm(request.POST, request.FILES, instance=config)
         if form.is_valid():
+            # Auditoría
+            AuditoriaConfiguracion.objects.create(
+                usuario=request.user,
+                accion="Actualización Visual/Impresión",
+                accion_detalle="Se modificó la configuración de apariencia o de la impresora."
+            )
             form.save()
             messages.success(request, "Configuración Visual e Impresión actualizada.")
             return redirect('configuracion_menu')
@@ -85,6 +97,8 @@ def conf_visual(request):
 def conf_procesos(request):
     config, created = Configuracion.objects.get_or_create(id=1)
     
+    from decimal import Decimal
+
     # Guardar valores anteriores para la auditoría
     old_scraping = config.usar_scraping_bcv
     old_tasa = config.tasa_dolar
@@ -100,8 +114,8 @@ def conf_procesos(request):
                 estado = "Activado" if nuevo_config.usar_scraping_bcv else "Desactivado"
                 cambios.append(f"Scraping automático {estado}")
             
-            if old_tasa != nuevo_config.tasa_dolar:
-                cambios.append(f"Tasa manual cambiada de {old_tasa} a {nuevo_config.tasa_dolar}")
+            if Decimal(str(old_tasa)) != Decimal(str(nuevo_config.tasa_dolar)):
+                cambios.append(f"Tasa manual cambiada de {old_tasa:g} a {nuevo_config.tasa_dolar:g}")
             
             nuevo_config.save()
             
@@ -110,7 +124,7 @@ def conf_procesos(request):
                 AuditoriaConfiguracion.objects.create(
                     usuario=request.user if request.user.is_authenticated else None,
                     accion="Actualización de Procesos y Tasa",
-                    detalles=" | ".join(cambios)
+                    accion_detalle=" | ".join(cambios)
                 )
             
             messages.success(request, "Automatización y Procesos actualizados.")

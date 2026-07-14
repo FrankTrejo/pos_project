@@ -15,6 +15,7 @@ from django.db import transaction
 from django.db.models import Sum
 from django.http import HttpResponseRedirect, HttpResponse
 
+@never_cache
 def inventory_index(request):
     """Muestra el listado de insumos con alertas de stock bajo"""
     insumos_list = Insumo.objects.all().order_by('nombre')
@@ -135,6 +136,7 @@ def insumo_create(request):
 # inventory/views.py
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
+from django.views.decorators.cache import never_cache
 from .models import Insumo, IngredienteCompuesto
 
 def insumo_composition(request, insumo_id):
@@ -265,6 +267,7 @@ def insumo_composition(request, insumo_id):
         'costo_total_lote': costo_total_lote  # <--- ¡NO OLVIDES AGREGAR ESTO AQUÍ!
     })
 
+@never_cache
 @staff_member_required
 def inventory_move(request):
     if request.method == 'POST':
@@ -291,6 +294,7 @@ def inventory_move(request):
 
 # inventory/views.py
 
+@never_cache
 @staff_member_required
 def insumo_edit(request, pk):
     insumo = get_object_or_404(Insumo, pk=pk)
@@ -317,6 +321,7 @@ def insumo_edit(request, pk):
         'insumo': insumo   # Pasamos el objeto para sacar ID y datos extra
     })
 
+@never_cache
 @staff_member_required
 def insumo_delete(request, pk):
     insumo = get_object_or_404(Insumo, pk=pk)
@@ -341,6 +346,7 @@ from django.contrib import messages
 from decimal import Decimal
 from .models import Insumo, MovimientoInventario
 
+@never_cache
 @staff_member_required
 # inventory/views.py
 
@@ -575,6 +581,7 @@ def insumo_produccion(request, pk):
     })
     insumo_padre = get_object_or_404(Insumo, pk=pk)
     
+    
     if not insumo_padre.es_insumo_compuesto:
         messages.error(request, "Solo se pueden producir insumos compuestos (Recetas).")
         return redirect('inventory_index')
@@ -671,6 +678,7 @@ BASE_PERSONAL = [
 ]
 
 # inventory/views.py
+@never_cache
 def salidas_especiales_view(request):
     # 1. Traer datos para el formulario
     productos_qs = Producto.objects.all().order_by('nombre')
@@ -679,6 +687,15 @@ def salidas_especiales_view(request):
         if p.tamano != 'UNI':
             p.nombre = f"{p.nombre} ({p.get_tamano_display()})"
         productos.append(p)
+
+    # --- LÓGICA PARA PRODUCTO POR DEFECTO ---
+    producto_personal_default = None
+    for p in productos_qs:
+        nombre_lower = p.nombre.lower()
+        if nombre_lower.startswith('comida') or nombre_lower.startswith('personal'):
+            producto_personal_default = p
+            break # Nos quedamos con el primero que encontremos
+    # -----------------------------------------
         
     # Traemos todos los insumos configurados como extras
     ingredientes_extra = Insumo.objects.filter(es_extra=True).order_by('nombre')
@@ -808,13 +825,15 @@ def salidas_especiales_view(request):
         'productos': productos,
         'ingredientes': ingredientes_extra,
         'categorias_insumo': categorias_insumo,
-        'historial': historial
+        'historial': historial,
+        'producto_personal_default': producto_personal_default, # <-- Enviamos el producto
     })
 
 from django.template.loader import get_template
 from xhtml2pdf import pisa
 from django.http import HttpResponse
 
+@never_cache
 def generar_comanda_interno_pdf(request, consumo_id):
     consumo = get_object_or_404(ConsumoInterno, id=consumo_id)
     
@@ -856,6 +875,7 @@ def generar_comanda_interno_pdf(request, consumo_id):
 from .forms import RecetaInsumoForm # Importa el formulario nuevo
 
 # Vista exclusiva para crear RECETAS en Inventario
+@never_cache
 def receta_create(request):
     if request.method == 'POST':
         form = RecetaInsumoForm(request.POST) # Usa el form ligero
@@ -870,6 +890,7 @@ def receta_create(request):
     
     return render(request, 'inventory/receta_form.html', {'form': form})
 
+@never_cache
 @staff_member_required
 def anular_consumo_interno(request, consumo_id):
     if request.method == 'POST':

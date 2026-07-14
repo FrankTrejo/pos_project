@@ -2,7 +2,7 @@
 
 import json
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse, HttpResponse, Http404
 from django.db.models import Max
 from django.contrib import messages
 from django.core.paginator import Paginator
@@ -12,6 +12,8 @@ from django.template.loader import get_template
 from django.db import transaction
 from django.utils import timezone
 from decimal import Decimal
+from django.db.models.functions import Cast
+from django.db.models import IntegerField
 from django.core.serializers.json import DjangoJSONEncoder
 from xhtml2pdf import pisa
 from inventory.models import Insumo
@@ -46,19 +48,69 @@ def initialize_tables_if_empty():
         Table.objects.bulk_create(tables_to_create)
 
 def index(request):
-    initialize_tables_if_empty()
-    
     # Actualizamos la tasa al cargar el mapa de mesas (inicio del POS)
     obtener_tasa_bcv()
     
-    tables = Table.objects.all()
-    return render(request, 'tables/index.html', {'tables': tables})
+    # --- LÓGICA CORREGIDA: SEPARAMOS LAS MESAS ---
+    internal_tables = Table.objects.filter(is_external=False).order_by(Cast('number', output_field=IntegerField()))
+    external_tables = Table.objects.filter(is_external=True).order_by(Cast('number', output_field=IntegerField()))
+
+    # --- LÓGICA CORREGIDA PARA CALCULAR SIGUIENTES NÚMEROS EN SUS RANGOS ---
+    # Siguiente para mesas INTERNAS (rango 1-100)
+    internal_numbers = [int(n) for n in internal_tables.values_list('number', flat=True) if n.isdigit()]
+    next_internal_number = max(internal_numbers) + 1 if internal_numbers else 1
+    if next_internal_number > 100: next_internal_number = None # No se pueden crear más
+
+    # Siguiente para mesas EXTERNAS (rango 101-200)
+    external_numbers_db = [int(n) for n in external_tables.values_list('number', flat=True) if n.isdigit()]
+    next_external_number = max(external_numbers_db) + 1 if external_numbers_db else 101
+    if next_external_number < 101: next_external_number = 101 # Asegura que empiece en 101
+    if next_external_number > 200: next_external_number = None # No se pueden crear más
+
+    return render(request, 'tables/index.html', {
+        'internal_tables': internal_tables, 
+        'external_tables': external_tables,
+        'next_internal_number': next_internal_number, 
+        'next_external_number': next_external_number
+    })
 
 def create_table(request):
-    max_number = Table.objects.aggregate(Max('number'))['number__max']
-    new_number = (max_number or 0) + 1
-    Table.objects.create(number=new_number)
-    return redirect('index')
+    if request.method == 'POST':
+        is_external = request.POST.get('is_external') == 'on'        
+        
+        if is_external:
+            # Lógica para mesas externas (rango 101-200)
+            name = request.POST.get('name')
+            color = request.POST.get('color')
+            external_numbers = [int(n) for n in Table.objects.filter(is_external=True).values_list('number', flat=True) if n.isdigit()]
+            new_number = max(external_numbers) + 1 if external_numbers else 101
+            if new_number < 101: new_number = 101
+            if new_number > 200:
+                messages.error(request, "No se pueden crear más mesas externas (límite 200 alcanzado).")
+                return redirect('index')
+            Table.objects.create(number=new_number, name=name, color=color, is_external=True)
+        else:
+            # Lógica para mesas internas (rango 1-100)
+            internal_numbers = [int(n) for n in Table.objects.filter(is_external=False).values_list('number', flat=True) if n.isdigit()]
+            max_int_num = max(internal_numbers) if internal_numbers else 0
+            new_number = max_int_num + 1
+            if new_number > 100:
+                messages.error(request, "No se pueden crear más mesas internas (límite 100 alcanzado).")
+                return redirect('index')
+            Table.objects.create(number=new_number, is_external=False)
+
+        messages.success(request, f"Mesa #{new_number} creada exitosamente.")
+        return redirect('index')
+
+    # La lógica GET ahora está en la vista 'index' que renderiza el modal
+
+    # Para GET, pre-calculamos el siguiente número de mesa
+    max_number = Table.objects.aggregate(Max('number'))['number__max'] or 0
+    next_number = max_number + 1
+    
+    return render(request, 'tables/create_table.html', {
+        'next_number': next_number
+    })
 
 def toggle_status(request, table_id):
     if request.method == 'POST':
@@ -597,13 +649,20 @@ def calcular_insumos_requeridos_json(items):
 
 def procesar_inventario_orden(orden, usuario, nota_base, tipo_movimiento):
     for det in orden.detalles.all():
+        # --- LÓGICA CORREGIDA PARA MANEJAR REMOVIDOS ---
         removidos_dict = {}
-        for r in det.ingredientes_removidos.all():
-            removidos_dict[r.id] = Decimal('1.0')
+        # Primero, los removidos simples (porción completa)
+        if hasattr(det, 'ingredientes_removidos') and det.ingredientes_removidos.exists():
+            for r in det.ingredientes_removidos.all():
+                removidos_dict[r.id] = Decimal('1.0')
+        
+        # Luego, los removidos con porción específica (sobrescribe si es necesario)
         if hasattr(det, 'removidos_detalles'):
             for r in det.removidos_detalles.all():
-                removidos_dict[r.insumo.id] = r.porcion
-                
+                if r.insumo: # Verificación de seguridad
+                    removidos_dict[r.insumo.id] = r.porcion
+        # --- FIN DE LA CORRECCIÓN ---
+
         if getattr(det, 'cuarto_2_producto', None) and getattr(det, 'cuarto_3_producto', None) and getattr(det, 'cuarto_4_producto', None):
             ings_prod1 = {ing.insumo.id: ing for ing in det.producto.ingredientes.all()}
             ings_prod2 = {ing.insumo.id: ing for ing in det.cuarto_2_producto.ingredientes.all()}
@@ -690,13 +749,26 @@ def grabar_mesa_ajax(request, table_id):
             data = json.loads(request.body)
             items = data.get('carrito', [])
             mesero_nombre = data.get('mesero', '')
-            debe_imprimir = data.get('imprimir', True)
-            imprimir_ticket = data.get('imprimir_ticket', True)
-            ignorar_stock = data.get('ignorar_stock', False)
-            
-            # Combinamos ambos: debe_imprimir es para saber si se solicitó la comanda
-            # imprimir_ticket es el flag inteligente que dice si hubo cambios
-            imprimir_real = debe_imprimir and imprimir_ticket
+            is_sync = data.get('is_sync', False)
+            imprimir_ticket = data.get('imprimir_ticket', False)
+
+            # --- VALIDACIÓN DE STOCK CORREGIDA Y CENTRALIZADA ---
+            if not is_sync: # Solo validamos stock si no es una sincronización previa a facturar
+                # Usamos la función central que sí contempla mitades, cuartos, extras, etc.
+                insumos_requeridos = calcular_insumos_requeridos_json(items)
+                
+                faltantes = []
+                for insumo_id, cant_requerida in insumos_requeridos.items():
+                    try:
+                        insumo = Insumo.objects.get(id=insumo_id)
+                        if insumo.stock_actual < cant_requerida:
+                            faltantes.append(f"Falta {insumo.nombre}: Tienes {insumo.stock_actual:g}, necesitas {cant_requerida:g}")
+                    except Insumo.DoesNotExist:
+                        # Si un insumo no existe, lo ignoramos en la validación para no romper el flujo
+                        continue
+
+                if faltantes:
+                    return JsonResponse({'status': 'warning_stock', 'message': "STOCK_INSUFICIENTE|\n" + "\n".join(faltantes)})
             
             table = Table.objects.get(id=table_id)
             
@@ -711,23 +783,7 @@ def grabar_mesa_ajax(request, table_id):
                 if not created and orden.detalles.exists():
                     procesar_inventario_orden(orden, request.user, f"Rep. edición Mesa {table.number}", 'ENTRADA')
 
-                # 2. Validar Stock de la nueva orden
-                insumos_req = calcular_insumos_requeridos_json(items)
-                
-                if not ignorar_stock:
-                    faltantes = []
-                    for i_id, cant_necesaria in insumos_req.items():
-                        try:
-                            ins = Insumo.objects.get(id=i_id)
-                            if ins.stock_actual < cant_necesaria:
-                                faltantes.append(f"• {ins.nombre}: Faltan {(cant_necesaria - ins.stock_actual):.2f}")
-                        except Insumo.DoesNotExist:
-                            pass
-                    
-                    if faltantes:
-                        raise ValueError("STOCK_INSUFICIENTE|" + "\n".join(faltantes))
-
-                # 3. Borrar items viejos y aplicar nuevos
+                # Borrar items viejos y aplicar nuevos
                 orden.detalles.all().delete()
                 orden.mesero = mesero_obj
                 orden.save()
@@ -837,19 +893,10 @@ def grabar_mesa_ajax(request, table_id):
             table.mesero = mesero_obj
             table.save()
             
-            if imprimir_real:
+            if not is_sync and imprimir_ticket: # Si NO es sincronización Y se solicitó imprimir
                 from .utils_impresora import imprimir_comanda
-                exito_comanda = imprimir_comanda(orden)
-                if exito_comanda:
-                    orden.impreso = True  # Marcamos que ya pasó por cocina
-                    orden.save()
-            else:
-                # Si no mandamos a tickera pero actualizamos, igual guardamos el flag si venía True de antes
-                if not orden.impreso:
-                    orden.impreso = True
-                    orden.save()
-
-            return JsonResponse({'status': 'ok', 'orden_id': orden.id, 'imprimir': imprimir_real})
+                imprimir_comanda(orden)
+            return JsonResponse({'status': 'ok', 'orden_id': orden.id, 'imprimir': imprimir_ticket})
             
         except Exception as e:
             print(f"ERROR GRABAR MESA: {e}")
@@ -910,6 +957,7 @@ def eliminar_mesa_ajax(request, table_id):
                 orden.delete()
             
             table.is_occupied = False
+            table.solicitud_pago = False
             table.mesero = None
             table.save()
             return JsonResponse({'status': 'ok'})
@@ -1107,6 +1155,7 @@ def facturar_mesa_ajax(request, table_id):
                 orden.delete()
                 table.is_occupied = False
                 table.solicitud_pago = False
+                table.solicitud_pago = False
                 table.mesero = None
                 table.save()
 
@@ -1126,6 +1175,7 @@ def facturar_mesa_ajax(request, table_id):
             return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
     return JsonResponse({'status': 'error'}, status=400)
 @staff_member_required
+
 def generar_factura_pdf(request, venta_id):
     venta = get_object_or_404(Venta, id=venta_id)
     tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()

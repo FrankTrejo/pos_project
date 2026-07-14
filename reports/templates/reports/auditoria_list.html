@@ -75,7 +75,7 @@
                     <td style="padding: 10px;">{{ log.fecha|date:"d/m/Y H:i" }}</td>
                     <td style="padding: 10px;">{{ log.usuario.username|default:"Sistema" }}</td>
                     <td style="padding: 10px; font-weight: bold;">{{ log.accion }}</td>
-                    <td style="padding: 10px; font-size: 0.9em; color: #555;">{{ log.detalles }}</td>
+                    <td style="padding: 10px; font-size: 0.9em; color: #555;">{{ log.accion_detalle }}</td>
                 </tr>
                 {% empty %}
                 <tr><td colspan="4" style="padding: 20px; text-align: center;">Sin cambios registrados en la configuración.</td></tr>
