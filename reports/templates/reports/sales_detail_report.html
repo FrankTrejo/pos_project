@@ -1,12 +1,18 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load humanize %}
 
 {% block title %}- Detalle de Ventas{% endblock %}
 
 {% block content %}
 <style>
     /* ESTILOS PARA LA ANULACIÓN */
-    .fila-anulada {
+    .fila-anulada td {
+        background-color: #fff5f5 !important; /* Fondo rojizo suave */
+    }
+    .fila-cashea td {
+        background-color: #fff9e6 !important; /* Amarillo suave para Cashea */
+    }    .fila-anulada td {
         background-color: #fff5f5 !important; /* Fondo rojizo suave */
     }
     .fila-anulada td {
@@ -163,6 +169,11 @@
                 <i class="fas fa-hand-holding-usd"></i> Propinas: ${{ total_propina|floatformat:4 }}
             </span>
             {% endif %}
+            {% if total_financiado_cashea > 0 %}
+            <span style="font-size: 0.9em; font-weight: bold; color: #e67e22; display: block; margin-top: 2px;">
+                <i class="fas fa-receipt"></i> Financiado Cashea: ${{ total_financiado_cashea|floatformat:2 }}
+            </span>
+            {% endif %}
         </div>
     </div>
 
@@ -175,13 +186,14 @@
                     <th style="padding: 12px;">Mesero</th>
                     <th style="padding: 12px;">Estado</th> 
                     <th style="padding: 12px; text-align: right;">Propina ($)</th>
+                    <th style="padding: 12px; text-align: right; background-color: #495057;">Financiado ($)</th>
                     <th style="padding: 12px; text-align: right;">Total ($)</th>
                     <th style="padding: 12px; text-align: center;">Acciones</th> 
                 </tr>
             </thead>
             <tbody>
                 {% for venta in ventas %}
-                <tr class="{% if venta.anulada %}fila-anulada{% endif %}" style="border-bottom: 1px solid #eee;">
+                <tr class="{% if venta.anulada %}fila-anulada{% elif venta.es_cashea %}fila-cashea{% endif %}" style="border-bottom: 1px solid #eee;">
                     
                     <td style="padding: 12px; white-space: nowrap; vertical-align: top;">
                         <div style="font-weight: bold;">{{ venta.fecha|date:"d/m/Y" }}</div>
@@ -226,6 +238,13 @@
                         {% endif %}
                     </td>
 
+                    <td style="padding: 12px; text-align: right; vertical-align: top; font-weight: bold;">
+                        {% if venta.monto_financiado > 0 %}
+                            <span style="color: #e67e22;">${{ venta.monto_financiado|floatformat:2 }}</span>
+                        {% else %}
+                            <span style="color: #ccc;">-</span>
+                        {% endif %}
+                    </td>
                     <td style="padding: 12px; text-align: right; vertical-align: top;">
                         {% if venta.anulada %}
                             <del style="color: #999;">${{ venta.total|floatformat:2 }}</del>
@@ -257,7 +276,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="7" style="padding: 30px; text-align: center; color: #999;">
+                    <td colspan="8" style="padding: 30px; text-align: center; color: #999;">
                         No se encontraron ventas en este rango de fechas.
                     </td>
                 </tr>

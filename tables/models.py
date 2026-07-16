@@ -375,6 +375,7 @@ class Pago(models.Model):
         ('EFECTIVO_BS', 'Efectivo (Bs)'), # Opcional, si quieres registrarlo separado
         ('PAGO_MOVIL', 'Pago Móvil'),
         ('PUNTO', 'Punto de Venta'),
+        ('CASHEA', 'Cashea'),
     ]
     
     venta = models.ForeignKey(Venta, on_delete=models.CASCADE, related_name='pagos')

@@ -649,6 +649,10 @@ body.light-theme .input-group .readonly-field {
     background-color: #f0f2f5;
 }
 
+ .text-warning { 
+    color: #ffc107;
+}
+
 
 /* Responsive actualizado para el nuevo layout */
 @media (max-width: 992px) { /* Punto de quiebre un poco más alto */

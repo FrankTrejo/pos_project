@@ -199,6 +199,7 @@ def reporte_ventas_detalle(request):
     # 4. APLICACIÓN DE FILTROS Y CÁLCULO DE TOTALES
     total_periodo = 0
     total_propina = 0
+    total_financiado_cashea = 0
 
     if estado_filtro == 'anuladas':
         # CASO A: Solo ver las canceladas
@@ -212,12 +213,22 @@ def reporte_ventas_detalle(request):
         ventas_list = ventas_list.filter(anulada=False)
         total_periodo = ventas_list.aggregate(Sum('total'))['total__sum'] or 0
         total_propina = ventas_list.aggregate(Sum('propina'))['propina__sum'] or 0
+        # Sumar lo financiado solo de las ventas válidas
+        for v in ventas_list:
+            pago_cashea = v.pagos.filter(metodo='CASHEA').first()
+            if pago_cashea:
+                total_financiado_cashea += float(v.total) - float(pago_cashea.monto)
 
     else:
         # CASO C: Ver todas (Mix)
         # Aquí mostramos la lista completa, pero el total SUMA SOLO LO REAL (No anulado)
-        total_periodo = ventas_list.filter(anulada=False).aggregate(Sum('total'))['total__sum'] or 0
-        total_propina = ventas_list.filter(anulada=False).aggregate(Sum('propina'))['propina__sum'] or 0
+        ventas_validas = ventas_list.filter(anulada=False)
+        total_periodo = ventas_validas.aggregate(Sum('total'))['total__sum'] or 0
+        total_propina = ventas_validas.aggregate(Sum('propina'))['propina__sum'] or 0
+        for v in ventas_validas:
+            pago_cashea = v.pagos.filter(metodo='CASHEA').first()
+            if pago_cashea:
+                total_financiado_cashea += float(v.total) - float(pago_cashea.monto)
 
     # Calcular equivalente en bolívares usando la tasa actual
     tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
@@ -273,12 +284,20 @@ def reporte_ventas_detalle(request):
     for v in ventas:
         v.total_bs = float(v.total) * tasa_valor
         v.propina_bs = float(v.propina) * tasa_valor
+        
+        # --- NUEVA LÓGICA PARA CASHEA ---
+        v.es_cashea = v.pagos.filter(metodo='CASHEA').exists()
+        v.monto_financiado = 0
+        if v.es_cashea:
+            pago_cashea = v.pagos.filter(metodo='CASHEA').first()
+            v.monto_financiado = float(v.total) - float(pago_cashea.monto)
 
     context = {
         'ventas': ventas,
         'fecha_inicio': fecha_inicio,
         'fecha_fin': fecha_fin,
         'total_periodo': total_periodo,
+        'total_financiado_cashea': total_financiado_cashea,
         'total_periodo_bs': total_periodo_bs,
         'total_propina': total_propina,
         'estado_filtro': estado_filtro # Pasamos esto para pintar los botones
@@ -436,6 +455,7 @@ def ventas_pago(request):
         'PAGO_MOVIL': 'Pago Móvil',
         'ZELLE': 'Zelle',
         'BINANCE': 'Binance',
+        'CASHEA': 'Cashea',
         'TRANSFERENCIA': 'Transferencia',
         'MIXTO': 'Mixto (Legacy)'
     }

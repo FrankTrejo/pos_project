@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.humanize', # <-- AÑADE ESTA LÍNEA
     'tables',
     'dashboard',
     'inventory',
@@ -128,6 +129,11 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+
+# --- AÑADIR ESTO ---
+# Le decimos a Django que busque archivos estáticos (CSS, JS, imágenes)
+# en una carpeta llamada 'static' en la raíz del proyecto.
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
