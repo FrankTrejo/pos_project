@@ -83,5 +83,28 @@
         toggleTasaInput();
         chkScraping.addEventListener('change', toggleTasaInput);
     }
+
+    // --- LÓGICA DE TASA CASHEA ---
+    const chkCashea = document.getElementById('id_usar_tasa_bcv_para_cashea');
+    const inputCashea = document.getElementById('id_tasa_cashea');
+
+    if (chkCashea && inputCashea) {
+        function toggleCasheaInput() {
+            if (chkCashea.checked) {
+                inputCashea.readOnly = true;
+                inputCashea.style.backgroundColor = '#e9ecef';
+                inputCashea.style.color = '#6c757d';
+                inputCashea.style.cursor = 'not-allowed';
+                if (tasaScraped > 0) inputCashea.value = tasaScraped.toFixed(2);
+            } else {
+                inputCashea.readOnly = false;
+                inputCashea.style.backgroundColor = '#ffffff';
+                inputCashea.style.color = '#333';
+                inputCashea.style.cursor = 'text';
+            }
+        }
+        toggleCasheaInput();
+        chkCashea.addEventListener('change', toggleCasheaInput);
+    }
 </script>
 {% endblock %}

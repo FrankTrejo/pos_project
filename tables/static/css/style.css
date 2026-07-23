@@ -11,11 +11,19 @@
     box-sizing: border-box;
 }
 
-body {
+html, body {
+  min-height: 100vh;
   margin: 0;
+  padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   background-color: var(--bg-color);
   color: var(--text-dark);
+}
+
+/* Fix for SweetAlert shrinking the body height and leaving a white gap */
+html.swal2-height-auto, 
+body.swal2-height-auto {
+    height: 100vh !important;
 }
 
 .app-container {
@@ -170,7 +178,7 @@ body {
 }
 
 /* Estilo para el body en esta vista */
-body.light-theme {
+html.light-theme, body.light-theme {
     background-color: var(--light-bg);
 }
 
@@ -458,6 +466,18 @@ body.light-theme .input-group .readonly-field {
     display: flex;
     flex-direction: column;
     gap: 10px; /* Menor espacio entre items */
+    position: relative;
+}
+
+.sidebar-active-pill {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    background-color: #dbeafe; /* Azul claro */
+    border-radius: 10px;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0; /* Oculto hasta posicionar */
 }
 
 .sidebar-link {
@@ -470,6 +490,9 @@ body.light-theme .input-group .readonly-field {
     padding: 12px 20px; /* Padding ajustado */
     border-radius: 10px; /* Bordes un poco menos redondeados para el menú */
     transition: all 0.2s ease;
+    position: relative;
+    z-index: 1;
+    background-color: transparent !important;
 }
 
 .sidebar-link i {
@@ -488,7 +511,6 @@ body.light-theme .input-group .readonly-field {
 
 /* Estado activo */
 .sidebar-link.active {
-    background-color: #dbeafe; /* Azul claro */
     color: var(--primary-blue);
 }
 .sidebar-link.active i {
@@ -518,11 +540,49 @@ body.light-theme .input-group .readonly-field {
     background: #e9ecef;
 }
 
-/* --- ÁREA DE CONTENIDO PRINCIPAL --- */
+@keyframes moduleFadeIn {
+    0% {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes moduleFadeOut {
+    0% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-15px);
+    }
+}
+
+.animate-fade-in {
+    animation: moduleFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fade-out {
+    animation: moduleFadeOut 0.3s forwards;
+}
+
 .main-content-area {
     flex-grow: 1; /* Ocupa el resto del espacio */
-    padding: 40px; /* Padding interno amplio para el contenido */
-    background-color: var(--white-card); /* Fondo blanco puro */
+    padding: 20px; /* Padding ajustado para no comprimir las vistas */
+    background-color: transparent; /* Fondo transparente para usar el del body/theme */
+    animation: moduleFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    overflow-y: auto;
+}
+
+/* Layout específico para que todas las vistas cumplan el mismo formato */
+.standard-page-layout {
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
 }
 
 /* Grid para las tarjetas de resumen (sin cambios mayores) */
@@ -550,6 +610,23 @@ body.light-theme .input-group .readonly-field {
 /* =========================================
    ESTILOS PARA EL MODAL DE CREAR MESA
    ========================================= */
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex; /* Se activará por JS */
+    align-items: center;
+    justify-content: center;
+    z-index: 1050;
+    backdrop-filter: blur(2px);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
 
 .modal-content {
     background: white;

@@ -144,10 +144,27 @@ def asignar_mesero(request, table_id):
 def table_order_view(request, table_id):
     table = get_object_or_404(Table, id=table_id)
     
-    # 1. Recuperamos la Tasa y Productos
+    config = Configuracion.get_solo()
     tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
-    tasa_numerica = float(tasa_obj.precio) if tasa_obj else 0
-    tasa_actual_texto = f"{tasa_numerica:.2f} Bs/S" if tasa_obj else "0.00 Bs/S"
+    tasa_bcv_real = float(tasa_obj.precio) if tasa_obj else 0
+    
+    # 1. Tasa Global del Sistema
+    if config.usar_scraping_bcv:
+        tasa_numerica = tasa_bcv_real
+        tasa_actual_texto = f"{tasa_numerica:.2f} Bs/S" if tasa_bcv_real else "0.00 Bs/S"
+    else:
+        tasa_numerica = float(config.tasa_dolar)
+        tasa_actual_texto = f"{tasa_numerica:.2f} Bs/S (Manual)"
+    
+    # 2. Tasa Específica de Cashea
+    if config.usar_tasa_bcv_para_cashea:
+        tasa_cashea_valor = tasa_bcv_real
+    else:
+        if config.tasa_cashea > 0:
+            tasa_cashea_valor = float(config.tasa_cashea)
+        else:
+            tasa_cashea_valor = tasa_numerica # fallback
+
     
     categorias = Categoria.objects.all()
     productos = Producto.objects.filter(precio__gt=0).select_related('categoria').order_by('id')
@@ -254,6 +271,7 @@ def table_order_view(request, table_id):
         'table': table,
         'tasa_cambio': tasa_actual_texto, # Para HTML
         'tasa_valor': tasa_numerica,      # Para JS
+        'tasa_cashea_valor': tasa_cashea_valor, # Para JS
         'categorias': categorias,
         'productos': productos,
         'meseros': meseros,
@@ -751,9 +769,10 @@ def grabar_mesa_ajax(request, table_id):
             mesero_nombre = data.get('mesero', '')
             is_sync = data.get('is_sync', False)
             imprimir_ticket = data.get('imprimir_ticket', False)
+            ignorar_stock = data.get('ignorar_stock', False)
 
             # --- VALIDACIÓN DE STOCK CORREGIDA Y CENTRALIZADA ---
-            if not is_sync: # Solo validamos stock si no es una sincronización previa a facturar
+            if not is_sync and not ignorar_stock: # Solo validamos stock si no es una sincronización previa a facturar
                 # Usamos la función central que sí contempla mitades, cuartos, extras, etc.
                 insumos_requeridos = calcular_insumos_requeridos_json(items)
                 
@@ -1097,6 +1116,23 @@ def facturar_mesa_ajax(request, table_id):
 
                 metodo_general = 'MIXTO' if len(lista_pagos) > 1 else lista_pagos[0]['metodo']
                 
+                config_solo = Configuracion.get_solo()
+                tasa_usar = config_solo.tasa_dolar
+                
+                tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
+                tasa_bcv_real = tasa_obj.precio if tasa_obj else config_solo.tasa_dolar
+                
+                if config_solo.usar_scraping_bcv:
+                    tasa_usar = tasa_bcv_real
+                    
+                tiene_cashea = any(p.get('metodo') == 'CASHEA' for p in lista_pagos)
+                if tiene_cashea:
+                    if config_solo.usar_tasa_bcv_para_cashea:
+                        tasa_usar = tasa_bcv_real
+                    else:
+                        if config_solo.tasa_cashea > 0:
+                            tasa_usar = config_solo.tasa_cashea
+
                 # Crear Venta con el TOTAL REAL RECALCULADO
                 venta = Venta.objects.create(
                     codigo_factura=codigo,
@@ -1105,7 +1141,8 @@ def facturar_mesa_ajax(request, table_id):
                     mesero=orden.mesero,
                     mesa_numero=table.number,
                     monto_recibido=monto_total_recibido,
-                    propina=propina_calc
+                    propina=propina_calc,
+                    tasa_aplicada=tasa_usar
                 )
 
                 # Registrar Pagos
@@ -1180,13 +1217,14 @@ def generar_factura_pdf(request, venta_id):
     venta = get_object_or_404(Venta, id=venta_id)
     tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
     tasa_valor = float(tasa_obj.precio) if tasa_obj else 0
-    total_bs = float(venta.total) * tasa_valor
+    tasa_uso = float(venta.tasa_aplicada) if venta.tasa_aplicada else tasa_valor
+    total_bs = float(venta.total) * tasa_uso
     config_negocio = Configuracion.get_solo()
 
     context = {
         'venta': venta,
         'detalles': venta.detalles.all(),
-        'tasa': tasa_valor,
+        'tasa': tasa_uso,
         'total_bs': total_bs,
         'vuelto': float(venta.monto_recibido) - float(venta.total) - float(venta.propina),
         'config': config_negocio

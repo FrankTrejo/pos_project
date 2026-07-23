@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
 </head>
 <body>
-    <div class="app-container">
+    <div class="app-container animate-fade-in" id="pos-wrapper">
         <header class="app-header">
             <h1>Sistema POS - Vista de Mesas</h1>
             
@@ -217,6 +217,24 @@
         // Ejecutar al abrir para setear el estado inicial del botón
         document.addEventListener('DOMContentLoaded', function() {
             toggleExternalFields();
+        });
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Animar salida al clickear links
+            document.querySelectorAll('a').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    const href = this.getAttribute('href');
+                    if (!href || href.startsWith('#') || href.startsWith('javascript') || this.target === '_blank' || e.ctrlKey || e.metaKey) return;
+                    
+                    e.preventDefault();
+                    const wrapper = document.getElementById('pos-wrapper');
+                    if (wrapper) wrapper.classList.add('animate-fade-out');
+                    setTimeout(() => {
+                        window.location.href = href;
+                    }, 300);
+                });
+            });
         });
     </script>
 </body>

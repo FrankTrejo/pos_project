@@ -201,40 +201,28 @@ def reporte_ventas_detalle(request):
     total_periodo = 0
     total_propina = 0
     total_financiado_cashea = 0
+    total_periodo_bs = 0
 
-    if estado_filtro == 'anuladas':
-        # CASO A: Solo ver las canceladas
-        ventas_list = ventas_list.filter(anulada=True)
-        # El total muestra cuánto dinero se "perdió" en anulaciones
-        total_periodo = ventas_list.aggregate(Sum('total'))['total__sum'] or 0
-        total_propina = ventas_list.aggregate(Sum('propina'))['propina__sum'] or 0
-
-    elif estado_filtro == 'validas':
-        # CASO B: Solo ver las cobradas
-        ventas_list = ventas_list.filter(anulada=False)
-        total_periodo = ventas_list.aggregate(Sum('total'))['total__sum'] or 0
-        total_propina = ventas_list.aggregate(Sum('propina'))['propina__sum'] or 0
-        # Sumar lo financiado solo de las ventas válidas
-        for v in ventas_list:
-            pago_cashea = v.pagos.filter(metodo='CASHEA').first()
-            if pago_cashea:
-                total_financiado_cashea += float(v.total) - float(pago_cashea.monto)
-
-    else:
-        # CASO C: Ver todas (Mix)
-        # Aquí mostramos la lista completa, pero el total SUMA SOLO LO REAL (No anulado)
-        ventas_validas = ventas_list.filter(anulada=False)
-        total_periodo = ventas_validas.aggregate(Sum('total'))['total__sum'] or 0
-        total_propina = ventas_validas.aggregate(Sum('propina'))['propina__sum'] or 0
-        for v in ventas_validas:
-            pago_cashea = v.pagos.filter(metodo='CASHEA').first()
-            if pago_cashea:
-                total_financiado_cashea += float(v.total) - float(pago_cashea.monto)
-
-    # Calcular equivalente en bolívares usando la tasa actual
     tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
     tasa_valor = float(tasa_obj.precio) if tasa_obj else 0
-    total_periodo_bs = float(total_periodo) * tasa_valor
+
+    if estado_filtro == 'anuladas':
+        ventas_iter = ventas_list.filter(anulada=True)
+    elif estado_filtro == 'validas':
+        ventas_iter = ventas_list.filter(anulada=False)
+    else:
+        # Caso 'todas' suma solo lo real (No anulado)
+        ventas_iter = ventas_list.filter(anulada=False)
+
+    for v in ventas_iter:
+        total_periodo += float(v.total)
+        total_propina += float(v.propina)
+        tasa_uso = float(v.tasa_aplicada) if v.tasa_aplicada else tasa_valor
+        total_periodo_bs += float(v.total) * tasa_uso
+
+        pago_cashea = v.pagos.filter(metodo='CASHEA').first()
+        if pago_cashea:
+            total_financiado_cashea += float(v.total) - float(pago_cashea.monto)
 
     # Detectamos si el usuario presionó el botón de exportar
     if request.GET.get('exportar') == 'csv':
@@ -300,8 +288,9 @@ def reporte_ventas_detalle(request):
 
     # Agregamos el cálculo en Bs a cada venta de esta página
     for v in ventas:
-        v.total_bs = float(v.total) * tasa_valor
-        v.propina_bs = float(v.propina) * tasa_valor
+        tasa_uso = float(v.tasa_aplicada) if v.tasa_aplicada else tasa_valor
+        v.total_bs = float(v.total) * tasa_uso
+        v.propina_bs = float(v.propina) * tasa_uso
         v.es_cashea = v.pagos.filter(metodo='CASHEA').exists()
 
         # --- LÓGICA ESPECIAL PARA CASHEA (REQUERIMIENTO DEL USUARIO) ---
@@ -356,9 +345,10 @@ def detalle_venta_view(request, venta_id):
 
     tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
     tasa_valor = float(tasa_obj.precio) if tasa_obj else 0
+    tasa_uso = float(venta.tasa_aplicada) if venta.tasa_aplicada else tasa_valor
 
     # Calcular total de la propina en bolívares
-    propina_bs = float(venta.propina) * tasa_valor
+    propina_bs = float(venta.propina) * tasa_uso
 
     context = {
         'venta': venta,
@@ -442,14 +432,15 @@ def reporte_propinas(request):
         return response
 
     total_propina = ventas_list.aggregate(Sum('propina'))['propina__sum'] or 0
-    total_propina_bs = float(total_propina) * tasa_valor
+    total_propina_bs = sum(float(v.propina) * (float(v.tasa_aplicada) if v.tasa_aplicada else tasa_valor) for v in ventas_list)
 
     paginator = Paginator(ventas_list, 10)
     page_number = request.GET.get('page')
     ventas = paginator.get_page(page_number)
     
     for v in ventas:
-        v.propina_bs = float(v.propina) * tasa_valor
+        tasa_uso = float(v.tasa_aplicada) if v.tasa_aplicada else tasa_valor
+        v.propina_bs = float(v.propina) * tasa_uso
 
     context = {
         'ventas': ventas,
@@ -532,7 +523,8 @@ def ventas_pago(request):
                     tasa_para_recalculo = tasa_cashea_especial if tasa_cashea_especial > 0 else tasas_por_dia.get(venta.fecha.date())
                     if tasa_para_recalculo and tasa_para_recalculo > 0:
                         # El monto del pago en Bs se divide entre la tasa del día
-                        monto_pago_en_bs = float(pago.monto) * float(venta.tasa_aplicada)
+                        tasa_venta_cashea = float(venta.tasa_aplicada) if venta.tasa_aplicada else tasa_valor
+                        monto_pago_en_bs = float(pago.monto) * tasa_venta_cashea
                         monto_pago_usd = monto_pago_en_bs / tasa_para_recalculo
 
                 monto_pago = monto_pago_usd
@@ -540,11 +532,15 @@ def ventas_pago(request):
                 monto_a_sumar = min(monto_pago, monto_restante)
                 
                 if monto_a_sumar > 0:
+                    tasa_uso = float(venta.tasa_aplicada) if venta.tasa_aplicada else tasa_valor
+                    monto_a_sumar_bs = monto_a_sumar * tasa_uso
+
                     if metodo_nombre not in resultados_dict:
-                        resultados_dict[metodo_nombre] = {'transacciones': 0, 'total_dolares': 0}
+                        resultados_dict[metodo_nombre] = {'transacciones': 0, 'total_dolares': 0, 'total_bs': 0}
                     
                     resultados_dict[metodo_nombre]['transacciones'] += 1
                     resultados_dict[metodo_nombre]['total_dolares'] += monto_a_sumar
+                    resultados_dict[metodo_nombre]['total_bs'] += monto_a_sumar_bs
                     
                     monto_restante -= monto_a_sumar
                     
@@ -553,12 +549,15 @@ def ventas_pago(request):
             metodo_raw = venta.metodo_pago
             metodo_nombre = nombres_metodos.get(metodo_raw, str(metodo_raw).replace('_', ' ').title())
             monto_a_sumar = float(venta.total)
+            tasa_uso = float(venta.tasa_aplicada) if venta.tasa_aplicada else tasa_valor
+            monto_a_sumar_bs = monto_a_sumar * tasa_uso
             
             if metodo_nombre not in resultados_dict:
-                resultados_dict[metodo_nombre] = {'transacciones': 0, 'total_dolares': 0}
+                resultados_dict[metodo_nombre] = {'transacciones': 0, 'total_dolares': 0, 'total_bs': 0}
                 
             resultados_dict[metodo_nombre]['transacciones'] += 1
             resultados_dict[metodo_nombre]['total_dolares'] += monto_a_sumar
+            resultados_dict[metodo_nombre]['total_bs'] += monto_a_sumar_bs
 
     # Formatear para la vista
     resultados = []
@@ -571,7 +570,7 @@ def ventas_pago(request):
 
     for metodo_nombre, data in resultados_dict.items():
         total_usd = data['total_dolares']
-        total_bs = total_usd * tasa_valor
+        total_bs = data['total_bs']
         transacciones = data['transacciones']
 
         resultados.append({

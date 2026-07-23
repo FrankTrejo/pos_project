@@ -14,8 +14,10 @@
         <div class="main-app-container card-style">
 
             <aside class="sidebar">
-                <nav class="sidebar-nav">
-                    <div style="padding: 10px 20px; color: #aaa; font-size: 0.8em;">
+                <nav class="sidebar-nav" style="position: relative;">
+                    <div id="sidebar-active-pill" class="sidebar-active-pill"></div>
+                    
+                    <div style="padding: 10px 20px; color: #aaa; font-size: 0.8em; position: relative; z-index: 1;">
                             Logueado como: <strong style="color: grey;">{{ user.username|title }}</strong>
                     </div>
                     <a href="{% url 'panel_control' %}" class="sidebar-link">
@@ -45,7 +47,7 @@
                        <i class="fas fa-cash-register"></i> Punto de Venta
                     </a>
                     <a href="{% url 'cuadre_caja_list' %}" class="sidebar-link">
-                        <i class="fas fa-cash-register"></i> Caja
+                        <i class="fas fa-balance-scale"></i> Cuadre Caja
                     </a>
                     <a href="{% url 'configuracion_menu' %}" class="sidebar-link">
                         <i class="fas fa-cog"></i> Configuración
@@ -70,8 +72,10 @@
                     </button>
                 </div>
 
-                {% block content %}
-                {% endblock %}
+                <div class="standard-page-layout">
+                    {% block content %}
+                    {% endblock %}
+                </div>
 
                 {% if messages %}
                     <div style="position: fixed; top: 20px; right: 20px; z-index: 1050; min-width: 300px;">
@@ -146,6 +150,70 @@
                     localStorage.setItem("sidebar_oculta", "false");
                 }
             });
+        }
+
+        // 2. Resaltar módulo activo en el sidebar y animar píldora
+        const currentPath = window.location.pathname;
+        const sidebarLinks = document.querySelectorAll('.sidebar-link');
+        const pill = document.getElementById('sidebar-active-pill');
+        let bestMatch = null;
+        let maxLen = 0;
+        
+        sidebarLinks.forEach(link => {
+            const linkHref = link.getAttribute('href');
+            if (linkHref && currentPath.startsWith(linkHref)) {
+                if (linkHref.length > maxLen) {
+                    maxLen = linkHref.length;
+                    bestMatch = link;
+                }
+            }
+
+            // Animar al hacer click (para que el usuario vea el salto ANTES de cambiar de página)
+            link.addEventListener('click', function(e) {
+                // Ignore form submits (like logout)
+                if (this.type === 'submit') return;
+                
+                // Allow shift/ctrl clicks to open in new tab without animating the current page out
+                if (e.ctrlKey || e.shiftKey || e.metaKey || e.button === 1) return;
+
+                e.preventDefault(); // Pause navigation
+
+                // Move pill
+                if (pill) {
+                    pill.style.transform = `translateY(${this.offsetTop}px)`;
+                    pill.style.height = `${this.offsetHeight}px`;
+                    pill.style.opacity = '1';
+                }
+
+                // Add fade out to main content
+                const mainArea = document.querySelector('.main-content-area');
+                if (mainArea) {
+                    mainArea.style.animation = 'moduleFadeOut 0.3s forwards';
+                }
+
+                // Resume navigation after animation completes
+                setTimeout(() => {
+                    window.location.href = this.getAttribute('href');
+                }, 300);
+            });
+        });
+        
+        if (bestMatch) {
+            bestMatch.classList.add('active');
+            // Mover la píldora a la posición inicial al instante (sin animación)
+            if (pill) {
+                pill.style.transition = 'none';
+                pill.style.transform = `translateY(${bestMatch.offsetTop}px)`;
+                pill.style.height = `${bestMatch.offsetHeight}px`;
+                pill.style.opacity = '1';
+                
+                // Permitir que el navegador pinte el cambio, luego activar la animación para futuros clicks
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        pill.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                    });
+                });
+            }
         }
     });
 </script>

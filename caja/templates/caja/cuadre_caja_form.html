@@ -6,8 +6,58 @@
     }
     .total-display h2 { margin: 0; font-size: 1.2rem; opacity: 0.8; }
     .total-display .amount { font-size: 3rem; font-weight: bold; letter-spacing: -2px; }
-    .input-group-text { background-color: #e9ecef; border-right: 0; font-weight: bold; }
-    .form-control { border-left: 0; }
+    
+    .cuadre-table { width: 100%; border-collapse: separate; border-spacing: 0 10px; }
+    .cuadre-table th { background: transparent; text-align: center; font-size: 1.1rem; color: var(--text-color); padding-bottom: 10px; font-weight: 600; }
+    .cuadre-table td { vertical-align: middle; padding: 5px; }
+    .cuadre-table .label-col { font-weight: bold; text-align: right; text-transform: uppercase; width: 35%; padding-right: 15px; color: var(--text-color); font-size: 0.9rem; }
+    
+    .cuadre-input {
+        background-color: var(--light-bg);
+        color: var(--text-color);
+        border: 1px solid rgba(0,0,0,0.1);
+        border-radius: 8px;
+        font-weight: bold;
+        text-align: center;
+        padding: 12px;
+        transition: all 0.3s;
+    }
+    .cuadre-input:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+        outline: none;
+    }
+    
+    .input-bs { border-left: 4px solid var(--primary-color); }
+    .input-usd { border-left: 4px solid #10b981; }
+    .input-gastos-bs { border-left: 4px solid #ef4444; }
+    .input-cashea { border-left: 4px solid #f59e0b; }
+    
+    .calc-cell { 
+        background-color: var(--light-bg); 
+        text-align: center; 
+        font-weight: bold; 
+        color: var(--text-muted, #6b7280); 
+        border-radius: 8px;
+        padding: 12px;
+        border: 1px dashed rgba(0,0,0,0.1);
+    }
+    
+    .total-green { 
+        background: linear-gradient(135deg, #10b981, #059669) !important; 
+        color: white !important; 
+        font-weight: bold; 
+        text-align: center; 
+        font-size: 1.2rem;
+        border-radius: 8px;
+        padding: 12px;
+        border: none;
+        box-shadow: var(--shadow-soft);
+    }    
+    /* Eliminar flechas de inputs numéricos */
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
 </style>
 
 <div class="app-container">
@@ -16,79 +66,103 @@
         <a href="{% url 'cuadre_caja_list' %}" class="btn-secondary">Volver al Historial</a>
     </div>
 
-    <div class="card-style" style="max-width: 800px; margin: auto;">
-        <form method="GET" class="mb-4" style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
-            <label><strong>Fecha a Cuadrar:</strong></label>
-            <div style="display: flex; gap: 10px; max-width: 300px; margin-top: 5px;">
-                <input type="date" name="fecha" value="{{ fecha_str }}" class="form-control" onchange="this.form.submit()">
+    <div class="card-style" style="max-width: 900px; margin: auto; padding: 30px;">
+        
+        <form method="GET" class="mb-4 card-style-inner" style="display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--primary-color);">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <label style="margin: 0; font-weight: bold; color: var(--text-color);">Fecha a Cuadrar:</label>
+                <input type="date" name="fecha" value="{{ fecha_str }}" class="form-control cuadre-input" style="width: auto; padding: 8px;" onchange="this.form.submit()">
+            </div>
+            <div style="display: flex; gap: 20px; font-size: 1.1rem;">
+                <div style="background: rgba(37,99,235,0.1); padding: 8px 15px; border-radius: 8px; color: var(--primary-color); font-weight: bold;">
+                    Tasa General: {{ tasa_general|floatformat:2 }} Bs/$
+                </div>
+                <div style="background: rgba(245,158,11,0.1); padding: 8px 15px; border-radius: 8px; color: #f59e0b; font-weight: bold;">
+                    Tasa Cashea: {{ tasa_cashea|floatformat:2 }} Bs/$
+                </div>
             </div>
         </form>
 
-        <!-- TOTAL A CUADRAR -->
-        <div class="total-display">
-            <h2>Total a Justificar (Ventas + Fondo - Gastos)</h2>
-            <div class="amount" id="total-a-justificar">${{ total_ventas_dia|floatformat:2 }}</div>
-        </div>
-
         <form method="POST">
             {% csrf_token %}
+            
+            <table class="cuadre-table">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>Bolívares (BS)</th>
+                        <th>Dólares ($)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="label-col">Total Venta Sistema</td>
+                        <td class="calc-cell" style="background: transparent; border: none;"></td>
+                        <td class="total-green" id="display-total-sistema">${{ total_ventas_sistema|floatformat:2 }}</td>
+                    </tr>
+                    <tr>
+                        <td class="label-col">Fondo de Caja (Inicial)</td>
+                        <td class="calc-cell" style="background: transparent; border: none;"></td>
+                        <td><input type="number" step="0.01" name="fondo_caja_usd" id="fondo_caja_usd" class="form-control cuadre-input input-usd" value="0.00" oninput="calcularCuadre()"></td>
+                    </tr>
+                    <tr>
+                        <td class="label-col">Punto de Venta</td>
+                        <td><input type="number" step="0.01" name="punto_venta_bs" id="punto_venta_bs" class="form-control cuadre-input input-bs" value="0.00" oninput="calcularCuadre()"></td>
+                        <td class="calc-cell" id="calc-punto-venta-usd">0.00</td>
+                    </tr>
+                    <tr>
+                        <td class="label-col">Dólares (Efectivo)</td>
+                        <td class="calc-cell" style="background: transparent; border: none;"></td>
+                        <td><input type="number" step="0.01" name="dolares_usd" id="dolares_usd" class="form-control cuadre-input input-usd" value="0.00" oninput="calcularCuadre()"></td>
+                    </tr>
+                    <tr>
+                        <td class="label-col">Efectivo BS</td>
+                        <td><input type="number" step="0.01" name="efectivo_bs" id="efectivo_bs" class="form-control cuadre-input input-bs" value="0.00" oninput="calcularCuadre()"></td>
+                        <td class="calc-cell" id="calc-efectivo-usd">0.00</td>
+                    </tr>
+                    <tr>
+                        <td class="label-col">Pago Móvil</td>
+                        <td><input type="number" step="0.01" name="pago_movil_bs" id="pago_movil_bs" class="form-control cuadre-input input-bs" value="0.00" oninput="calcularCuadre()"></td>
+                        <td class="calc-cell" id="calc-pago-movil-usd">0.00</td>
+                    </tr>
+                    <tr>
+                        <td class="label-col">Gastos BS</td>
+                        <td><input type="number" step="0.01" name="gastos_bs" id="gastos_bs" class="form-control cuadre-input input-gastos-bs" value="0.00" oninput="calcularCuadre()"></td>
+                        <td class="calc-cell" id="calc-gastos-bs-usd">0.00</td>
+                    </tr>
+                    <tr>
+                        <td class="label-col">Cashea Recibido</td>
+                        <td class="calc-cell" id="calc-cashea-rec-bs">0.00</td>
+                        <td><input type="number" step="0.01" name="cashea_recibido_usd" id="cashea_recibido_usd" class="form-control cuadre-input input-cashea" value="0.00" oninput="calcularCuadre()"></td>
+                    </tr>
+                    <tr>
+                        <td class="label-col">Cashea Financiado</td>
+                        <td class="calc-cell" id="calc-cashea-fin-bs">0.00</td>
+                        <td><input type="number" step="0.01" name="cashea_financiado_usd" id="cashea_financiado_usd" class="form-control cuadre-input input-cashea" value="0.00" oninput="calcularCuadre()"></td>
+                    </tr>
+                    <tr>
+                        <td class="label-col">Gastos $</td>
+                        <td class="calc-cell" style="background: transparent; border: none;"></td>
+                        <td><input type="number" step="0.01" name="gastos_usd" id="gastos_usd" class="form-control cuadre-input input-gastos-bs" value="0.00" oninput="calcularCuadre()"></td>
+                    </tr>
+                    <tr>
+                        <td class="label-col">Total Físico Recibido</td>
+                        <td class="calc-cell" style="background: transparent; border: none;"></td>
+                        <td class="total-green" id="display-total-recibido" style="background: linear-gradient(135deg, #4b5563, #374151) !important;">0.00</td>
+                    </tr>
+                    <tr>
+                        <td class="label-col">Diferencia</td>
+                        <td class="calc-cell" style="background: transparent; border: none;"></td>
+                        <td class="calc-cell" id="display-diferencia" style="font-size: 1.4rem; font-weight: bold; border: 2px solid transparent;">0.00</td>
+                    </tr>
+                </tbody>
+            </table>
 
-            <!-- CAMPOS DE ENTRADA -->
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <label>Fondo de Caja Inicial ($)</label>
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="fas fa-wallet text-success"></i></span>
-                        <input type="number" step="0.01" name="fondo_caja_usd" id="fondo_caja_usd" class="form-control" value="0.00" oninput="calcularCuadre()">
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <label>Gastos del Turno ($)</label>
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="fas fa-receipt text-danger"></i></span>
-                        <input type="number" step="0.01" name="gastos_turno_usd" id="gastos_turno_usd" class="form-control" value="0.00" oninput="calcularCuadre()">
-                    </div>
-                </div>
-                <hr class="my-3">
-                <div class="col-md-6">
-                    <label>Recibido en Efectivo ($)</label>
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="fas fa-dollar-sign"></i></span>
-                        <input type="number" step="0.01" name="recibido_efectivo_usd" id="recibido_efectivo_usd" class="form-control" value="0.00" oninput="calcularCuadre()">
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <label>Recibido en Efectivo (Bs)</label>
-                    <div class="input-group">
-                        <span class="input-group-text">Bs</span>
-                        <input type="number" step="0.01" name="recibido_efectivo_bs" id="recibido_efectivo_bs" class="form-control" value="0.00" oninput="calcularCuadre()">
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <label>Recibido Electrónico ($)</label>
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="fas fa-globe"></i></span>
-                        <input type="number" step="0.01" name="recibido_electronico_usd" id="recibido_electronico_usd" class="form-control" value="0.00" oninput="calcularCuadre()">
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <label>Recibido Electrónico (Bs)</label>
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="fas fa-credit-card"></i></span>
-                        <input type="number" step="0.01" name="recibido_electronico_bs" id="recibido_electronico_bs" class="form-control" value="0.00" oninput="calcularCuadre()">
-                    </div>
-                </div>
-            </div>
-
-            <!-- RESULTADO -->
-            <div class="total-display mt-4" id="resultado-cuadre" style="background: #6c757d;">
-                <h2>Diferencia</h2>
-                <div class="amount" id="diferencia-final">$0.00</div>
-            </div>
-
-            <div class="mb-4">
-                <label for="notas"><strong>Notas / Justificación (Obligatorio si hay faltante):</strong></label>
-                <textarea name="notas" id="notas" class="form-control" rows="3" placeholder="Ej: Faltó $1 porque se compró hielo..."></textarea>
+            <div class="mb-4 mt-4 card-style-inner">
+                <label for="notas" style="font-weight: bold; color: var(--text-color); margin-bottom: 8px; display: block;">
+                    <i class="fas fa-comment-dots"></i> Notas / Justificación (Obligatorio si hay faltante):
+                </label>
+                <textarea name="notas" id="notas" class="form-control cuadre-input" rows="3" placeholder="Ej: Faltó $1 porque se compró hielo..." style="text-align: left; resize: vertical; border-left: 4px solid var(--text-muted);"></textarea>
             </div>
 
             <div class="text-center">
@@ -99,53 +173,87 @@
         </form>
     </div>
 </div>
+
 <script>
-    const VENTAS_DIA = parseFloat("{{ total_ventas_dia|stringformat:'f' }}");
-    const TASA = parseFloat("{{ tasa_bcv|stringformat:'f' }}");
+    const tasaGeneral = parseFloat("{{ tasa_general|stringformat:'f'|default:'1' }}".replace(',', '.'));
+    const tasaCashea = parseFloat("{{ tasa_cashea|stringformat:'f'|default:'1' }}".replace(',', '.'));
+    const totalVentasSistema = parseFloat("{{ total_ventas_sistema|stringformat:'f'|default:'0' }}".replace(',', '.'));
+
+    function getVal(id) {
+        let val = parseFloat(document.getElementById(id).value);
+        return isNaN(val) ? 0 : val;
+    }
+
+    function setHtml(id, val, addDollar = false) {
+        document.getElementById(id).innerHTML = (addDollar ? '$' : '') + val.toFixed(2);
+    }
+
     const notaTextarea = document.getElementById('notas');
     const btnProcesar = document.getElementById('btn-procesar-cuadre');
-    
+
     function calcularCuadre() {
-        const fondo = parseFloat(document.getElementById('fondo_caja_usd').value) || 0;
-        const gastos = parseFloat(document.getElementById('gastos_turno_usd').value) || 0;
+        // BS a USD
+        let punto_usd = getVal('punto_venta_bs') / tasaGeneral;
+        let efectivo_usd = getVal('efectivo_bs') / tasaGeneral;
+        let pago_movil_usd = getVal('pago_movil_bs') / tasaGeneral;
+        let gastos_bs_usd = getVal('gastos_bs') / tasaGeneral;
+
+        setHtml('calc-punto-venta-usd', punto_usd);
+        setHtml('calc-efectivo-usd', efectivo_usd);
+        setHtml('calc-pago-movil-usd', pago_movil_usd);
+        setHtml('calc-gastos-bs-usd', gastos_bs_usd);
+
+        // USD a BS (Para Cashea)
+        let cashea_rec_bs = getVal('cashea_recibido_usd') * tasaCashea;
+        let cashea_fin_bs = getVal('cashea_financiado_usd') * tasaCashea;
         
-        const recEfectivoUsd = parseFloat(document.getElementById('recibido_efectivo_usd').value) || 0;
-        const recEfectivoBs = parseFloat(document.getElementById('recibido_efectivo_bs').value) || 0;
-        const recElectroUsd = parseFloat(document.getElementById('recibido_electronico_usd').value) || 0;
-        const recElectroBs = parseFloat(document.getElementById('recibido_electronico_bs').value) || 0;
+        setHtml('calc-cashea-rec-bs', cashea_rec_bs);
+        setHtml('calc-cashea-fin-bs', cashea_fin_bs);
 
-        const totalEsperado = VENTAS_DIA + fondo - gastos;
-        const totalRecibido = recEfectivoUsd + (recEfectivoBs / TASA) + recElectroUsd + (recElectroBs / TASA);
-        const diferencia = totalRecibido - totalEsperado;
+        // Sumatoria
+        let total_recibido = (
+            punto_usd + 
+            efectivo_usd + 
+            pago_movil_usd + 
+            getVal('dolares_usd') + 
+            getVal('cashea_recibido_usd') + 
+            getVal('cashea_financiado_usd') + 
+            getVal('gastos_usd') + 
+            gastos_bs_usd
+        );
 
-        // Actualizar displays
-        document.getElementById('total-a-justificar').innerText = `$${totalEsperado.toFixed(2)}`;
-        const difDisplay = document.getElementById('diferencia-final');
-        const resultadoBox = document.getElementById('resultado-cuadre');
+        let fondo = getVal('fondo_caja_usd');
+        let total_esperado = totalVentasSistema + fondo;
+        let diferencia = total_recibido - total_esperado;
 
-        difDisplay.innerText = `$${diferencia.toFixed(2)}`;
-
+        setHtml('display-total-recibido', total_recibido, true);
+        
+        let diffEl = document.getElementById('display-diferencia');
+        diffEl.innerHTML = diferencia.toFixed(2);
+        
         if (Math.abs(diferencia) < 0.01) {
-            resultadoBox.style.background = '#198754'; // Verde
-            difDisplay.innerText = '¡CUADRADO!';
+            diffEl.style.color = '#10b981'; // success
+            diffEl.style.borderColor = '#10b981';
+            diffEl.style.backgroundColor = 'rgba(16, 185, 129, 0.1)';
             notaTextarea.required = false;
             btnProcesar.disabled = false;
-        } else if (diferencia < 0) {
-            resultadoBox.style.background = '#dc3545'; // Rojo
-            difDisplay.innerText = `FALTANTE: $${Math.abs(diferencia).toFixed(2)}`;
-            notaTextarea.required = true;
-            // Deshabilitar botón si no hay nota
-            btnProcesar.disabled = !notaTextarea.value.trim();
+        } else if (diferencia > 0) {
+            diffEl.style.color = '#f59e0b'; // warning
+            diffEl.style.borderColor = '#f59e0b';
+            diffEl.style.backgroundColor = 'rgba(245, 158, 11, 0.1)';
+            diffEl.innerHTML = '+' + diferencia.toFixed(2);
+            notaTextarea.required = false;
+            btnProcesar.disabled = false;
         } else {
-            resultadoBox.style.background = '#ffc107'; // Amarillo
-            resultadoBox.style.color = '#343a40';
-            difDisplay.innerText = `SOBRANTE: $${diferencia.toFixed(2)}`;
-            notaTextarea.required = false;
-            btnProcesar.disabled = false;
+            diffEl.style.color = '#ef4444'; // danger
+            diffEl.style.borderColor = '#ef4444';
+            diffEl.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+            notaTextarea.required = true;
+            btnProcesar.disabled = !notaTextarea.value.trim();
         }
     }
 
     notaTextarea.addEventListener('input', calcularCuadre);
-    window.onload = calcularCuadre;
+    document.addEventListener('DOMContentLoaded', calcularCuadre);
 </script>
 {% endblock %}

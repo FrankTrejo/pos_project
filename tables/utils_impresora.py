@@ -15,16 +15,15 @@ def to_decimal(valor):
         return Decimal('0.00')
 
 def obtener_tasa_real():
-    """ 
-    Busca la tasa en la tabla TasaBCV. 
-    Si no hay ninguna registrada, usa la de Configuracion como respaldo.
-    """
-    tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
-    if tasa_obj:
-        return to_decimal(tasa_obj.precio)
-    
-    # Respaldo si la tabla de tasas está vacía
+    from core.models import Configuracion
     config = Configuracion.get_solo()
+    
+    if config.usar_scraping_bcv:
+        tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
+        if tasa_obj:
+            return to_decimal(tasa_obj.precio)
+            
+    # Respaldo si la tabla está vacía o el scraping está desactivado
     return to_decimal(config.tasa_dolar)
 
 def obtener_logo_bytes(config):
@@ -84,8 +83,8 @@ def mandar_a_tickera(venta):
         return False, "Impresora no configurada"
 
     try:
-        # --- CAMBIO CLAVE: Usamos la tasa real del BCV ---
-        tasa = obtener_tasa_real()
+        # --- CAMBIO CLAVE: Usamos la tasa guardada en la venta ---
+        tasa = to_decimal(venta.tasa_aplicada) if venta.tasa_aplicada else obtener_tasa_real()
         
         total_usd = to_decimal(venta.total)
         monto_recibido = to_decimal(venta.monto_recibido)

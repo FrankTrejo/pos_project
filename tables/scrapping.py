@@ -16,11 +16,8 @@ def obtener_tasa_bcv():
     """
     config = Configuracion.get_solo()
     
-    if not config.usar_scraping_bcv:
-        # Si el scraping está desactivado, usamos la tasa guardada manualmente
-        ultima_tasa = TasaBCV.objects.order_by('-fecha_actualizacion').first()
-        if not ultima_tasa or ultima_tasa.precio != config.tasa_dolar:
-            TasaBCV.objects.create(precio=config.tasa_dolar)
+    # Si NINGUNO de los dos necesita scraping, no hacemos nada con la BD
+    if not config.usar_scraping_bcv and not config.usar_tasa_bcv_para_cashea:
         return f"{config.tasa_dolar} Bs/S (Manual)"
     
     # --- 1. INTENTO DE BASE DE DATOS ---
@@ -33,9 +30,8 @@ def obtener_tasa_bcv():
         # Esto evita que el BCV bloquee tu IP por exceso de peticiones.
         tiempo_transcurrido = timezone.now() - ultima_tasa.fecha_actualizacion
         if tiempo_transcurrido.total_seconds() < 3600:
-            # Excepción: Si el precio en BD es idéntico al manual, forzamos la actualización inmediata.
-            if ultima_tasa.precio != config.tasa_dolar:
-                return f"{ultima_tasa.precio}"
+            # Ya tenemos una tasa reciente (< 1 hora), no hace falta hacer scraping
+            return f"{ultima_tasa.precio}"
 
     # --- 2. INTENTO DE SCRAPING (Conexión a Internet) ---
     print("Actualizando tasa desde BCV (Internet)...")

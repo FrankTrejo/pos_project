@@ -249,6 +249,9 @@ class Venta(models.Model):
     motivo_anulacion = models.CharField(max_length=200, blank=True, null=True)
     fecha_anulacion = models.DateTimeField(blank=True, null=True)
     usuario_anulacion = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='ventas_anuladas')
+    
+    # === TASA DE CAMBIO HISTÓRICA ===
+    tasa_aplicada = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True, help_text="Tasa en el momento de la venta")
     # =======================
 
     def __str__(self):

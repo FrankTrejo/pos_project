@@ -57,6 +57,8 @@ class ConfigProcesosForm(forms.ModelForm):
         fields = [
             'tasa_dolar',
             'usar_scraping_bcv',
+            'tasa_cashea',
+            'usar_tasa_bcv_para_cashea',
             'enviar_alerta_stock_correo',
             'correo_destino_alertas',
             'codigo_producto_automatico',
@@ -67,6 +69,8 @@ class ConfigProcesosForm(forms.ModelForm):
         labels = {
             'tasa_dolar': 'Tasa del Dólar (Manual/Fallback)',
             'usar_scraping_bcv': '¿Actualizar Tasa BCV automáticamente?',
+            'tasa_cashea': 'Tasa Especial Cashea (Manual)',
+            'usar_tasa_bcv_para_cashea': '¿Cashea usa Tasa BCV Automática?',
             'enviar_alerta_stock_correo': '¿Enviar alerta de stock por correo?',
             'correo_destino_alertas': 'Correo Destino de Alertas',
             'codigo_producto_automatico': '¿Código de producto automático?',
@@ -77,6 +81,8 @@ class ConfigProcesosForm(forms.ModelForm):
         widgets = {
             'tasa_dolar': forms.NumberInput(attrs={'class': 'form-control-card', 'step': '0.01'}),
             'usar_scraping_bcv': forms.CheckboxInput(attrs={'class': 'form-check-input', 'style': 'width: 20px; height: 20px;'}),
+            'tasa_cashea': forms.NumberInput(attrs={'class': 'form-control-card', 'step': '0.01'}),
+            'usar_tasa_bcv_para_cashea': forms.CheckboxInput(attrs={'class': 'form-check-input', 'style': 'width: 20px; height: 20px;'}),
             'enviar_alerta_stock_correo': forms.CheckboxInput(attrs={'class': 'form-check-input', 'style': 'width: 20px; height: 20px;'}),
             'correo_destino_alertas': forms.EmailInput(attrs={'class': 'form-control-card', 'placeholder': 'ejemplo@correo.com'}),
             'codigo_producto_automatico': forms.CheckboxInput(attrs={'class': 'form-check-input', 'style': 'width: 20px; height: 20px;'}),

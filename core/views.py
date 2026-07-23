@@ -102,6 +102,8 @@ def conf_procesos(request):
     # Guardar valores anteriores para la auditoría
     old_scraping = config.usar_scraping_bcv
     old_tasa = config.tasa_dolar
+    old_cashea_scraping = config.usar_tasa_bcv_para_cashea
+    old_tasa_cashea = config.tasa_cashea
     
     if request.method == 'POST':
         form = ConfigProcesosForm(request.POST, instance=config)
@@ -116,6 +118,13 @@ def conf_procesos(request):
             
             if Decimal(str(old_tasa)) != Decimal(str(nuevo_config.tasa_dolar)):
                 cambios.append(f"Tasa manual cambiada de {old_tasa:g} a {nuevo_config.tasa_dolar:g}")
+                
+            if old_cashea_scraping != nuevo_config.usar_tasa_bcv_para_cashea:
+                estado = "Activado" if nuevo_config.usar_tasa_bcv_para_cashea else "Desactivado"
+                cambios.append(f"Scraping Cashea {estado}")
+            
+            if Decimal(str(old_tasa_cashea)) != Decimal(str(nuevo_config.tasa_cashea)):
+                cambios.append(f"Tasa Cashea manual cambiada de {old_tasa_cashea:g} a {nuevo_config.tasa_cashea:g}")
             
             nuevo_config.save()
             
