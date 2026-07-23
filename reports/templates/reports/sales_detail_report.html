@@ -247,10 +247,16 @@
                     </td>
                     <td style="padding: 12px; text-align: right; vertical-align: top;">
                         {% if venta.anulada %}
-                            <del style="color: #999;">${{ venta.total|floatformat:2 }}</del>
+                            <del style="color: #999;">${{ venta.total_recalculado_usd|floatformat:2 }}</del>
                             <div style="font-size: 0.85em; color: #999; margin-top: 2px;"><del>Bs. {{ venta.total_bs|floatformat:2 }}</del></div>
                         {% else %}
-                            <b style="color: #28a745; font-size: 1.1em;">${{ venta.total|floatformat:2 }}</b>
+                            <b style="color: #28a745; font-size: 1.1em;">
+                                ${{ venta.total_recalculado_usd|floatformat:2 }}
+                                {% if venta.es_cashea and venta.tasa_usada_calculo > 0 %}
+                                    <i class="fas fa-calculator" style="font-size: 0.7em; color: #17a2b8;" 
+                                       title="Monto ajustado a la tasa BCV del día (Bs. {{ venta.tasa_usada_calculo|floatformat:2 }})"></i>
+                                {% endif %}
+                            </b>
                             <div style="font-size: 0.85em; color: #666; margin-top: 2px; font-weight: 500;">Bs. {{ venta.total_bs|floatformat:2 }}</div>
                         {% endif %}
                     </td>

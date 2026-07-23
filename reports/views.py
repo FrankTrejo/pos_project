@@ -8,6 +8,7 @@ from django.core.paginator import Paginator
 from .models import AuditoriaEliminacion, AuditoriaConfiguracion
 from decimal import Decimal
 from django.http import HttpResponse
+from core.models import Configuracion
 
 # Importamos modelos de ambas aplicaciones (Inventario y Ventas)
 from inventory.models import Insumo, MovimientoInventario
@@ -280,13 +281,46 @@ def reporte_ventas_detalle(request):
     page_number = request.GET.get('page')
     ventas = paginator.get_page(page_number)
 
+    # --- OPTIMIZACIÓN: OBTENER TODAS LAS TASAS NECESARIAS EN UNA SOLA CONSULTA ---
+    # Creamos un diccionario para mapear fechas a tasas para un acceso rápido.
+    fechas_ventas = [v.fecha.date() for v in ventas]
+    tasas_del_periodo = TasaBCV.objects.filter(fecha_actualizacion__date__in=fechas_ventas).order_by('fecha_actualizacion')
+    
+    tasas_por_dia = {}
+    for tasa in tasas_del_periodo:
+        tasas_por_dia[tasa.fecha_actualizacion.date()] = tasa.precio
+    
+    # --- LÓGICA DE TASA CASHEA ---
+    config = Configuracion.get_solo()
+    tasa_cashea_especial = 0
+    if not config.usar_tasa_bcv_para_cashea and config.tasa_cashea > 0:
+        tasa_cashea_especial = float(config.tasa_cashea)
+    else:
+        tasa_cashea_especial = tasa_valor # Usa la tasa BCV del día si no hay especial
+
     # Agregamos el cálculo en Bs a cada venta de esta página
     for v in ventas:
         v.total_bs = float(v.total) * tasa_valor
         v.propina_bs = float(v.propina) * tasa_valor
-        
-        # --- NUEVA LÓGICA PARA CASHEA ---
         v.es_cashea = v.pagos.filter(metodo='CASHEA').exists()
+
+        # --- LÓGICA ESPECIAL PARA CASHEA (REQUERIMIENTO DEL USUARIO) ---
+        # Si la venta es de Cashea, recalculamos el total en USD basado en el total en Bs.
+        # y la tasa del día de la venta, para reflejar el valor a tasa BCV oficial.
+        tasa_dia_venta = tasas_por_dia.get(v.fecha.date())
+        if v.es_cashea:
+            # Usamos la tasa especial de Cashea si está activa, si no, la del día de la venta
+            tasa_para_recalculo = tasa_cashea_especial if tasa_cashea_especial > 0 else tasa_dia_venta
+
+            if tasa_para_recalculo and tasa_para_recalculo > 0:
+                # Recalculamos el total en USD usando la tasa correspondiente
+                # Esto "corrige" el total si se cobró a una tasa no oficial.
+                v.total_recalculado_usd = float(v.total_bs) / float(tasa_para_recalculo)
+                v.tasa_usada_calculo = tasa_para_recalculo # Guardamos para mostrar en el tooltip
+            v.tasa_usada_calculo = tasa_dia_venta # Guardamos para mostrar en el tooltip
+        else:
+            # Si no es Cashea, el total es el que ya está guardado.
+            v.total_recalculado_usd = float(v.total)
         v.monto_financiado = 0
         if v.es_cashea:
             pago_cashea = v.pagos.filter(metodo='CASHEA').first()
@@ -441,9 +475,25 @@ def ventas_pago(request):
         anulada=False
     ).prefetch_related('pagos')
 
+    # --- OPTIMIZACIÓN: OBTENER TODAS LAS TASAS NECESARIAS EN UNA SOLA CONSULTA ---
+    # Creamos un diccionario para mapear fechas a tasas para un acceso rápido.
+    fechas_ventas = [v.fecha.date() for v in ventas_validas]
+    tasas_del_periodo = TasaBCV.objects.filter(fecha_actualizacion__date__in=fechas_ventas).order_by('fecha_actualizacion')
+    tasas_por_dia = {}
+    for tasa in tasas_del_periodo:
+        tasas_por_dia[tasa.fecha_actualizacion.date()] = float(tasa.precio)
+
     # Obtenemos la tasa actual
     tasa_obj = TasaBCV.objects.order_by('-fecha_actualizacion').first()
     tasa_valor = float(tasa_obj.precio) if tasa_obj else 0
+
+    # --- LÓGICA DE TASA CASHEA ---
+    config = Configuracion.get_solo()
+    tasa_cashea_especial = 0
+    if not config.usar_tasa_bcv_para_cashea and config.tasa_cashea > 0:
+        tasa_cashea_especial = float(config.tasa_cashea)
+    else:
+        tasa_cashea_especial = tasa_valor # Usa la tasa BCV del día si no hay especial
 
     # Diccionario para acumular resultados
     resultados_dict = {}
@@ -475,7 +525,17 @@ def ventas_pago(request):
                 metodo_raw = pago.metodo
                 metodo_nombre = nombres_metodos.get(metodo_raw, str(metodo_raw).replace('_', ' ').title())
                 
-                monto_pago = float(pago.monto)
+                # --- LÓGICA ESPECIAL PARA CASHEA (REQUERIMIENTO DEL USUARIO) ---
+                # Si el pago es de Cashea, recalculamos su valor en USD a tasa BCV.
+                monto_pago_usd = float(pago.monto) # Por defecto
+                if metodo_raw == 'CASHEA':
+                    tasa_para_recalculo = tasa_cashea_especial if tasa_cashea_especial > 0 else tasas_por_dia.get(venta.fecha.date())
+                    if tasa_para_recalculo and tasa_para_recalculo > 0:
+                        # El monto del pago en Bs se divide entre la tasa del día
+                        monto_pago_en_bs = float(pago.monto) * float(venta.tasa_aplicada)
+                        monto_pago_usd = monto_pago_en_bs / tasa_para_recalculo
+
+                monto_pago = monto_pago_usd
                 # Solo tomamos lo necesario para cubrir la venta, ignorando vueltos o propinas
                 monto_a_sumar = min(monto_pago, monto_restante)
                 

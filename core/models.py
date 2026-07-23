@@ -16,9 +16,15 @@ class Configuracion(models.Model):
 
     # --- 2. MONEDA E IMPUESTOS ---
     tasa_dolar = models.DecimalField(max_digits=10, decimal_places=2, default=40.00, verbose_name="Tasa BCV ($)")
+    tasa_cashea = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Tasa Especial Cashea ($)", help_text="Si es mayor a 0, esta será la tasa usada para calcular montos con Cashea. Si es 0, usará la tasa BCV general.", blank=True)
     
     # --- 3. AUTOMATIZACIÓN Y PROCESOS ---
     usar_scraping_bcv = models.BooleanField(default=True, verbose_name="¿Actualizar Tasa BCV automáticamente?", help_text="Si se desactiva, el sistema utilizará la tasa manual ingresada arriba.")
+    usar_tasa_bcv_para_cashea = models.BooleanField(
+        default=True,
+        verbose_name="¿Cashea usa Tasa BCV?",
+        help_text="Si está marcado, Cashea usará la tasa BCV automática. Si está desmarcado, usará la Tasa Especial Cashea que definas manualmente."
+    )
     enviar_alerta_stock_correo = models.BooleanField(default=False, verbose_name="¿Enviar alerta de stock por correo?")
     correo_destino_alertas = models.EmailField(blank=True, null=True, verbose_name="Correo para alertas", help_text="Correo donde llegará el PDF de insumos agotados.")
     codigo_producto_automatico = models.BooleanField(

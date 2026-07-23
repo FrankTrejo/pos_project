@@ -1280,7 +1280,7 @@
                 const minimoCashea = totalMesaFacturacion * 0.40;
                 
                 // VALIDACIÓN DEL 40%
-                if (casheaInicial < minimoCashea) {
+                if (casheaInicial < (minimoCashea - 0.001)) {
                     casheaHint.innerText = `Mínimo requerido: $${minimoCashea.toFixed(2)}`;
                     casheaHint.style.color = '#dc3545'; // Rojo
                     btn.classList.remove('ready');
