@@ -38,6 +38,9 @@
         z-index: 9999; 
         justify-content: center; 
         align-items: center;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.25s ease, visibility 0.25s ease;
     }
     .modal-content {
         background: white; 
@@ -46,6 +49,8 @@
         width: 400px; 
         text-align: center;
         box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        transform: scale(0.95);
+        transition: transform 0.25s ease;
     }
     /* Estilos para los botones de filtro */
     .btn-filtro {
@@ -312,7 +317,9 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
 
+{% block modals %}
 <div id="modalAnular" class="modal-overlay">
     <div class="modal-content">
         <h3 style="color: #dc3545; margin-top: 0;"><i class="fas fa-exclamation-triangle"></i> Anular Venta</h3>
@@ -359,27 +366,43 @@
 
 <script>
     function abrirModalAnular(id, codigo) {
-        // Ponemos el número de factura en el texto
         document.getElementById('lblFactura').innerText = "#" + codigo;
-        
-        // Construimos la URL dinámicamente. 
-        // IMPORTANTE: Asegúrate de que tu URL en urls.py sea: path('venta/anular/<int:venta_id>/', ...)
-        // Si tienes un prefijo 'pos/', agrégalo abajo.
         document.getElementById('formAnular').action = "/venta/anular/" + id + "/"; 
         
-        document.getElementById('modalAnular').style.display = 'flex';
-        document.body.style.overflow = 'hidden'; // Oculta el scroll de la página de fondo
+        const modal = document.getElementById('modalAnular');
+        modal.style.display = 'flex';
+        setTimeout(() => {
+            modal.style.opacity = '1';
+            modal.style.visibility = 'visible';
+            const content = modal.querySelector('.modal-content');
+            if (content) content.style.transform = 'scale(1)';
+        }, 10);
+        document.body.style.overflow = 'hidden';
     }
 
     function cerrarModalAnular() {
-        document.getElementById('modalAnular').style.display = 'none';
-        document.body.style.overflow = ''; // Restaura el scroll
+        const modal = document.getElementById('modalAnular');
+        modal.style.opacity = '0';
+        modal.style.visibility = 'hidden';
+        const content = modal.querySelector('.modal-content');
+        if (content) content.style.transform = 'scale(0.95)';
+        setTimeout(() => {
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+        }, 250);
     }
 
     function abrirModalDetalle(url) {
-        document.getElementById('modalDetalleOverlay').style.display = 'flex';
+        const modal = document.getElementById('modalDetalleOverlay');
+        modal.style.display = 'flex';
         document.getElementById('modalDetalleContent').innerHTML = '<div style="padding: 50px; text-align: center;"><i class="fas fa-spinner fa-spin fa-3x" style="color: #0d6efd;"></i><p style="margin-top: 15px; color: #555;">Cargando detalles...</p></div>';
-        document.body.style.overflow = 'hidden'; // Oculta el scroll de la página de fondo
+        setTimeout(() => {
+            modal.style.opacity = '1';
+            modal.style.visibility = 'visible';
+            const content = modal.querySelector('.modal-content');
+            if (content) content.style.transform = 'scale(1)';
+        }, 10);
+        document.body.style.overflow = 'hidden';
         
         fetch(url)
         .then(response => response.text())
@@ -389,7 +412,6 @@
             const content = doc.getElementById('detalle-contenido-unico');
             
             if (content) {
-                // Ocultamos el link de 'Volver al reporte' porque ya estamos en un modal
                 const backLink = content.querySelector('.volver-link-wrapper');
                 if (backLink) backLink.style.display = 'none';
                 const mainContainer = content.querySelector('.contenedor-principal-detalle');
@@ -406,9 +428,16 @@
     }
 
     function cerrarModalDetalle() {
-        document.getElementById('modalDetalleOverlay').style.display = 'none';
-        document.getElementById('modalDetalleContent').innerHTML = ''; // Limpiar memoria
-        document.body.style.overflow = ''; // Restaura el scroll
+        const modal = document.getElementById('modalDetalleOverlay');
+        modal.style.opacity = '0';
+        modal.style.visibility = 'hidden';
+        const content = modal.querySelector('.modal-content');
+        if (content) content.style.transform = 'scale(0.95)';
+        setTimeout(() => {
+            modal.style.display = 'none';
+            document.getElementById('modalDetalleContent').innerHTML = '';
+            document.body.style.overflow = '';
+        }, 250);
     }
 
     window.onclick = function(event) {
@@ -416,18 +445,14 @@
         if (event.target == document.getElementById('modalDetalleOverlay')) cerrarModalDetalle();
     }
 
-    // Animación para el botón de exportar a Excel
     function animarBotonExcel(btn) {
-        // Guardamos el contenido original
         const contenidoOriginal = btn.innerHTML;
-        // Cambiamos el icono por un spinner girando
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exportando...';
-        btn.style.transform = 'scale(0.95)'; // Efecto de hundimiento
+        btn.style.transform = 'scale(0.95)';
         
-        // Restauramos el botón después de 2 segundos (tiempo estimado para que inicie la descarga)
         setTimeout(() => {
             btn.innerHTML = contenidoOriginal;
-            btn.style.transform = 'scale(1)'; // Restaura el tamaño
+            btn.style.transform = 'scale(1)';
         }, 2000);
     }
 </script>

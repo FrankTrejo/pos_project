@@ -135,7 +135,7 @@ class Producto(models.Model):
 class Table(models.Model):
     number = models.CharField(max_length=10, unique=True, verbose_name="Número de Mesa")
     name = models.CharField(max_length=50, blank=True, null=True, verbose_name="Área / Nombre")
-    color = models.CharField(max_length=7, default="#28a745", verbose_name="Color")
+    color = models.CharField(max_length=7, default="#0d6efd", verbose_name="Color")
     is_occupied = models.BooleanField(default=False, verbose_name="¿Ocupada?")
     is_external = models.BooleanField(default=False, verbose_name="¿Es Externa?")
     
