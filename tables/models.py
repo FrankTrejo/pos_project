@@ -1,13 +1,9 @@
 from django.db import models
 from django.contrib.auth.models import User
-from inventory.models import Insumo
-from decimal import Decimal
-from inventory.models import Insumo
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
-from django.contrib.auth.models import User
-from inventory.models import Insumo 
-from django.db import models
+from decimal import Decimal
+from inventory.models import Insumo
 
 # 1. Modelo para optimizar el BCV (Punto 1)
 class TasaBCV(models.Model):

@@ -15,6 +15,7 @@ class CuadreCaja(models.Model):
     ventas_sistema_general = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text="Total ventas sin Cashea")
     ventas_sistema_cashea = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text="Total ventas por Cashea")
     total_ventas_sistema = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_propinas_sistema = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text="Total propinas registradas")
     fondo_caja_usd = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Fondo de Caja USD")
     
     # --- VALORES CONTADOS POR EL CAJERO ($) ---
@@ -45,3 +46,7 @@ class CuadreCaja(models.Model):
     @property
     def diferencia_efectivo_usd(self):
         return self.diferencia_usd
+
+    @property
+    def diferencia_efectivo_bs(self):
+        return round(self.diferencia_usd * self.tasa_general, 2) if self.tasa_general else 0

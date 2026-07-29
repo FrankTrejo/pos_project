@@ -1418,19 +1418,84 @@
             });
         }
         function pedirCuenta() {
+            if (carrito.length === 0) { Swal.fire('Mesa Vacía', 'Agrega productos antes de emitir la cuenta.', 'warning'); return; }
+            const meseroNombre = document.getElementById('input-mesero').value;
+            if (!meseroNombre || meseroNombre.trim() === "") {
+                Swal.fire({
+                    title: 'Falta Mesero', text: '⚠️ No puedes emitir la cuenta sin asignar un mesero responsable.', icon: 'warning',
+                    confirmButtonText: 'Seleccionar Mesero Ahora', confirmButtonColor: '#3085d6'
+                }).then((result) => { if (result.isConfirmed) { abrirModalMeseros(); } });
+                return;
+            }
+
             Swal.fire({
-                title: '¿Emitir Cuenta?', text: "La mesa cambiará a estado 'En proceso de pago' (Amarillo).", icon: 'question',
+                title: '¿Emitir Cuenta?', text: "Se guardará la orden, se enviará la comanda a cocina y la mesa cambiará a estado 'En proceso de pago' (Amarillo).", icon: 'question',
                 showCancelButton: true, confirmButtonColor: '#ffc107', confirmButtonText: 'Sí, Imprimir Cuenta', cancelButtonText: 'Cancelar'
             }).then((result) => {
                 if (result.isConfirmed) {
+                    ejecutarPedirCuenta(false);
+                }
+            });
+        }
+
+        function ejecutarPedirCuenta(ignorarStock = false) {
+            const meseroNombre = document.getElementById('input-mesero').value;
+            const esOrdenNueva = !{{ orden_activa.id|default:0 }};
+            const noHaSidoImpresa = {{ orden_activa.id|default:0 }} && '{{ orden_activa.impreso|yesno:"true,false" }}' === 'false';
+            const debeImprimir = esOrdenNueva || noHaSidoImpresa || carritoModificado;
+
+            const data = { carrito: carrito, mesero: meseroNombre, imprimir_ticket: debeImprimir, ignorar_stock: ignorarStock, is_sync: false };
+            Swal.fire({ title: 'Guardando e imprimiendo...', didOpen: () => Swal.showLoading(), timerProgressBar: true, allowOutsideClick: false });
+
+            fetch("{% url 'grabar_mesa' table.id %}", {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }, body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.status === 'ok') {
                     const url = "{% url 'generar_cuenta_pdf' table.id %}";
-                    Swal.fire({ title: 'Imprimiendo...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-                    
                     fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
                     .then(() => {
+                        Swal.fire({ icon: 'success', title: '¡Cuenta Emitida!', text: 'Mesa guardada y cuenta generada.', showConfirmButton: false, timer: 700 });
+                        setTimeout(() => { window.location.href = "{% url 'index' %}"; }, 300);
+                    })
+                    .catch(err => {
+                        console.error('Error al generar cuenta:', err);
                         window.location.href = "{% url 'index' %}";
                     });
+                } else if (result.status === 'warning_stock' || (result.message && result.message.includes('STOCK_INSUFICIENTE'))) {
+                    let mensajeError = result.message.replace('STOCK_INSUFICIENTE|', '').replace(/\n/g, '<br>');
+                    Swal.fire({
+                        title: 'Faltan Ingredientes',
+                        html: mensajeError,
+                        icon: 'warning',
+                        showCancelButton: true,
+                        showDenyButton: true,
+                        confirmButtonColor: '#d33',
+                        denyButtonColor: '#ffc107',
+                        cancelButtonColor: '#6c757d',
+                        confirmButtonText: 'Sí, enviar igual',
+                        denyButtonText: 'Sustituir Ingrediente',
+                        cancelButtonText: 'Cancelar'
+                    }).then((res) => {
+                        if (res.isConfirmed) {
+                            ejecutarPedirCuenta(true);
+                        } else if (res.isDenied) {
+                            if (carrito.length === 1) {
+                                abrirModalPersonalizar(0);
+                                mostrarOpcionesSustituir();
+                            } else {
+                                Swal.fire({icon: 'info', title: 'Selecciona el producto', text: 'Como tienes varios productos en la orden, haz clic en el botón "Personalizar" del producto específico que deseas modificar para sustituir el ingrediente.', timer: 4500, showConfirmButton: false});
+                            }
+                        }
+                    });
+                } else {
+                    Swal.fire('Error', 'El servidor respondió: ' + result.message, 'error');
                 }
+            })
+            .catch(error => { 
+                console.error('Error:', error); 
+                Swal.fire('Error Técnico', 'No se pudo conectar con el servidor.', 'error'); 
             });
         }
     </script>

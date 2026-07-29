@@ -1,9 +1,6 @@
 from django import forms
 from .models import Insumo, IngredienteCompuesto, MovimientoInventario
 
-from django import forms
-from .models import Insumo
-
 # Formulario LIGERO solo para crear Recetas (Sin precios de compra)
 class RecetaInsumoForm(forms.ModelForm):
     class Meta:

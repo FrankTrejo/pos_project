@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect
 from django.contrib.admin.views.decorators import staff_member_required
 from django.utils import timezone
-from django.db.models import Sum
+from django.utils.dateparse import parse_date
 from django.core.paginator import Paginator
 from django.contrib import messages
 from decimal import Decimal
@@ -20,8 +20,6 @@ def cuadre_caja_list(request):
 
 @staff_member_required
 def cuadre_caja_nuevo(request):
-    from django.utils.dateparse import parse_date
-    
     hoy = timezone.localtime().date()
     fecha_str = request.GET.get('fecha', hoy.strftime('%Y-%m-%d'))
     fecha_obj = parse_date(fecha_str) if fecha_str else hoy
@@ -52,20 +50,51 @@ def cuadre_caja_nuevo(request):
     else:
         tasa_cashea = tasa_general
 
-    # 2. Obtener ventas y separar Cashea de General
+    # 2. Obtener ventas y separar Cashea de General y automatizar totales por método de pago y propinas
     ventas_validas = Venta.objects.filter(fecha__date=fecha_obj, anulada=False)
     
     ventas_sistema_cashea = Decimal('0.0')
     ventas_sistema_general = Decimal('0.0')
+    total_propinas_sistema = Decimal('0.0')
 
-    # Sumar ventas según si tienen algún pago con Cashea
-    # (Para simplificar: si el método incluye Cashea, lo sumamos a Cashea, sino a General)
+    auto_punto_venta_bs = Decimal('0.0')
+    auto_efectivo_bs = Decimal('0.0')
+    auto_pago_movil_bs = Decimal('0.0')
+    auto_dolares_usd = Decimal('0.0')
+    auto_cashea_recibido_usd = Decimal('0.0')
+    auto_cashea_financiado_usd = Decimal('0.0')
+
     for v in ventas_validas:
-        pagos_cashea = v.pagos.filter(metodo__icontains='cashea').exists()
-        if pagos_cashea:
-            ventas_sistema_cashea += v.total
+        pagos = v.pagos.all()
+        tiene_cashea = any(p.metodo == 'CASHEA' or 'cashea' in str(p.metodo).lower() for p in pagos)
+        total_propinas_sistema += Decimal(str(v.propina or 0))
+        
+        # Tasa a utilizar para convertir los montos en USD de los pagos en BS a Bolívares
+        tasa_uso = Decimal(str(v.tasa_aplicada)) if v.tasa_aplicada and Decimal(str(v.tasa_aplicada)) > 0 else tasa_general
+        
+        total_pagado_cashea_en_venta = Decimal('0.0')
+
+        for p in pagos:
+            monto_pago = Decimal(str(p.monto))
+            if p.metodo == 'PUNTO':
+                auto_punto_venta_bs += monto_pago * tasa_uso
+            elif p.metodo == 'EFECTIVO_BS':
+                auto_efectivo_bs += monto_pago * tasa_uso
+            elif p.metodo == 'PAGO_MOVIL':
+                auto_pago_movil_bs += monto_pago * tasa_uso
+            elif p.metodo == 'EFECTIVO_USD':
+                auto_dolares_usd += monto_pago
+            elif p.metodo == 'CASHEA' or 'cashea' in str(p.metodo).lower():
+                auto_cashea_recibido_usd += monto_pago
+                total_pagado_cashea_en_venta += monto_pago
+
+        if tiene_cashea:
+            ventas_sistema_cashea += Decimal(str(v.total))
+            monto_fin = Decimal(str(v.total)) - total_pagado_cashea_en_venta
+            if monto_fin > 0:
+                auto_cashea_financiado_usd += monto_fin
         else:
-            ventas_sistema_general += v.total
+            ventas_sistema_general += Decimal(str(v.total))
 
     total_ventas_sistema = ventas_sistema_cashea + ventas_sistema_general
 
@@ -93,20 +122,20 @@ def cuadre_caja_nuevo(request):
         pago_movil_usd_calc = pago_movil_bs / tasa_general if tasa_general else 0
         gastos_bs_usd_calc = gastos_bs / tasa_general if tasa_general else 0
         
-        # TOTAL RECIBIDO: Se suma el físico/banco/cashea + Los Gastos (porque justifican el dinero faltante)
+        # TOTAL RECIBIDO: Se suma el físico/banco/cashea recibido + Los Gastos (porque justifican el dinero faltante)
+        # Nota: El Cashea Financiado no es dinero físico recibido, no debe sumarse al total recibido.
         total_recibido_usd = (
             punto_venta_usd_calc + 
             efectivo_usd_calc + 
             pago_movil_usd_calc + 
             dolares_usd + 
             cashea_recibido_usd + 
-            cashea_financiado_usd +
             gastos_usd + 
             gastos_bs_usd_calc
         )
         
-        # TOTAL ESPERADO: Lo que el sistema dice que vendiste + el fondo con el que empezaste
-        total_esperado_usd = total_ventas_sistema + fondo_caja_usd
+        # TOTAL ESPERADO: Lo que el sistema dice que vendiste + las propinas + el fondo con el que empezaste MENOS lo financiado por Cashea
+        total_esperado_usd = (total_ventas_sistema + total_propinas_sistema + fondo_caja_usd) - cashea_financiado_usd
         
         # DIFERENCIA
         diferencia = total_recibido_usd - total_esperado_usd
@@ -124,6 +153,7 @@ def cuadre_caja_nuevo(request):
             ventas_sistema_general=ventas_sistema_general,
             ventas_sistema_cashea=ventas_sistema_cashea,
             total_ventas_sistema=total_ventas_sistema,
+            total_propinas_sistema=total_propinas_sistema,
             fondo_caja_usd=fondo_caja_usd,
             dolares_usd=dolares_usd,
             cashea_recibido_usd=cashea_recibido_usd,
@@ -146,7 +176,15 @@ def cuadre_caja_nuevo(request):
         'fecha_obj': fecha_obj,
         'fecha_str': fecha_str,
         'total_ventas_sistema': total_ventas_sistema,
+        'total_propinas_sistema': total_propinas_sistema,
         'tasa_general': tasa_general,
-        'tasa_cashea': tasa_cashea
+        'tasa_cashea': tasa_cashea,
+        'auto_punto_venta_bs': f"{auto_punto_venta_bs:.2f}",
+        'auto_efectivo_bs': f"{auto_efectivo_bs:.2f}",
+        'auto_pago_movil_bs': f"{auto_pago_movil_bs:.2f}",
+        'auto_dolares_usd': f"{auto_dolares_usd:.2f}",
+        'auto_cashea_recibido_usd': f"{auto_cashea_recibido_usd:.2f}",
+        'auto_cashea_financiado_usd': f"{auto_cashea_financiado_usd:.2f}",
     }
     return render(request, 'caja/cuadre_caja_form.html', context)
+

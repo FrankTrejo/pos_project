@@ -5,6 +5,8 @@ from . import views
 urlpatterns = [
     path('', views.index, name='index'),
     path('mesas/nueva/', views.create_table, name='create_table'),
+    path('mesas/<int:table_id>/editar/', views.edit_table, name='edit_table'),
+    path('mesas/<int:table_id>/borrar/', views.delete_table, name='delete_table'),
     # Ruta específica para la petición AJAX de cambiar estado
     path('toggle/<int:table_id>/', views.toggle_status, name='toggle_status'),
     # Esta ruta captura el ID de la mesa en la URL, ej: /table/5/order/

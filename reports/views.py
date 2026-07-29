@@ -4,6 +4,7 @@ from django.utils import timezone
 from datetime import timedelta
 from django.views.decorators.cache import never_cache
 from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from .models import AuditoriaEliminacion, AuditoriaConfiguracion
 from decimal import Decimal
@@ -244,7 +245,10 @@ def reporte_ventas_detalle(request):
             productos_str = " | ".join(prods)
             
             if v.pagos.exists():
-                pagos_list = [f"{p.get_metodo_display()} (${p.monto})" for p in v.pagos.all()]
+                pagos_list = [
+                    f"{p.get_metodo_display()}" + (f" (Ref: {p.referencia})" if p.referencia else "") + f" (${p.monto})"
+                    for p in v.pagos.all()
+                ]
                 pagos_str = " + ".join(pagos_list)
             else:
                 pagos_str = v.get_metodo_pago_display()
@@ -357,13 +361,6 @@ def detalle_venta_view(request, venta_id):
     }
 
     return render(request, 'reports/venta_detalle.html', context)
-
-
-# reports/views.py
-from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
-from django.db.models import F, ExpressionWrapper, DecimalField
-from inventory.models import Insumo
 
 @never_cache
 @login_required
@@ -501,7 +498,7 @@ def ventas_pago(request):
         'MIXTO': 'Mixto (Legacy)'
     }
 
-    # 2. Procesar cada venta individualmente para distribuir exactamente "venta.total"
+    # 2. Procesar cada venta individualmente para distribuir exactamente "venta.total + propina"
     for venta in ventas_validas:
         pagos = venta.pagos.all()
         
@@ -510,7 +507,7 @@ def ventas_pago(request):
             # Esto asume que si hay vuelto/cambio, se da en efectivo.
             pagos_ordenados = sorted(pagos, key=lambda p: 1 if 'EFECTIVO' in p.metodo else 0)
             
-            monto_restante = float(venta.total)
+            monto_restante = float(venta.total) + float(venta.propina or 0)
             
             for pago in pagos_ordenados:
                 metodo_raw = pago.metodo
@@ -528,7 +525,7 @@ def ventas_pago(request):
                         monto_pago_usd = monto_pago_en_bs / tasa_para_recalculo
 
                 monto_pago = monto_pago_usd
-                # Solo tomamos lo necesario para cubrir la venta, ignorando vueltos o propinas
+                # Incluimos total de la venta y propina, ignorando únicamente excesos que correspondan a vueltos/cambios
                 monto_a_sumar = min(monto_pago, monto_restante)
                 
                 if monto_a_sumar > 0:
@@ -548,7 +545,7 @@ def ventas_pago(request):
             # Ventas antiguas (legacy) que no tienen detalle de pagos
             metodo_raw = venta.metodo_pago
             metodo_nombre = nombres_metodos.get(metodo_raw, str(metodo_raw).replace('_', ' ').title())
-            monto_a_sumar = float(venta.total)
+            monto_a_sumar = float(venta.total) + float(venta.propina or 0)
             tasa_uso = float(venta.tasa_aplicada) if venta.tasa_aplicada else tasa_valor
             monto_a_sumar_bs = monto_a_sumar * tasa_uso
             

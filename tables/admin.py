@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils.html import format_html
 from .models import Table, Categoria, Producto, TasaBCV, IngredienteProducto, CostoAdicional, CostoAsignadoProducto
 
 # --- INLINE DE INGREDIENTES ---
@@ -64,8 +65,6 @@ class ProductoAdmin(admin.ModelAdmin):
         margen = obj.margen_ganancia
         style = "color: green; font-weight: bold;" if ganancia > 0 else "color: red; font-weight: bold;"
         
-        # Inyectamos un poco de HTML para que se vea verde o rojo
-        from django.utils.html import format_html
         return format_html(
             '<span style="{}">${:.2f} (Margen: {:.1f}%)</span>',
             style, ganancia, margen

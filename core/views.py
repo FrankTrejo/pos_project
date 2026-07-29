@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
+from decimal import Decimal
 from .models import Configuracion
 # Importamos los formularios que arreglamos antes
 from .forms import ConfigIdentidadForm, CostoAdicionalForm, ConfigVisualForm, ConfigProcesosForm
@@ -96,8 +97,6 @@ def conf_visual(request):
 # 5. VISTA PROCESOS Y AUTOMATIZACIÓN
 def conf_procesos(request):
     config, created = Configuracion.objects.get_or_create(id=1)
-    
-    from decimal import Decimal
 
     # Guardar valores anteriores para la auditoría
     old_scraping = config.usar_scraping_bcv

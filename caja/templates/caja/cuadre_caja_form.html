@@ -101,28 +101,33 @@
                         <td class="total-green" id="display-total-sistema">${{ total_ventas_sistema|floatformat:2 }}</td>
                     </tr>
                     <tr>
+                        <td class="label-col">Propinas Registradas <small style="display:block; font-size:0.75rem; color:#10b981; font-weight:normal;">(Suma al Total Esperado)</small></td>
+                        <td class="calc-cell" style="background: transparent; border: none;"></td>
+                        <td class="total-green" id="display-propinas-sistema" style="background: linear-gradient(135deg, #059669, #047857) !important;">${{ total_propinas_sistema|floatformat:2 }}</td>
+                    </tr>
+                    <tr>
                         <td class="label-col">Fondo de Caja (Inicial)</td>
                         <td class="calc-cell" style="background: transparent; border: none;"></td>
                         <td><input type="number" step="0.01" name="fondo_caja_usd" id="fondo_caja_usd" class="form-control cuadre-input input-usd" value="0.00" oninput="calcularCuadre()"></td>
                     </tr>
                     <tr>
                         <td class="label-col">Punto de Venta</td>
-                        <td><input type="number" step="0.01" name="punto_venta_bs" id="punto_venta_bs" class="form-control cuadre-input input-bs" value="0.00" oninput="calcularCuadre()"></td>
+                        <td><input type="number" step="0.01" name="punto_venta_bs" id="punto_venta_bs" class="form-control cuadre-input input-bs" value="{{ auto_punto_venta_bs|default:'0.00' }}" oninput="calcularCuadre()"></td>
                         <td class="calc-cell" id="calc-punto-venta-usd">0.00</td>
                     </tr>
                     <tr>
                         <td class="label-col">Dólares (Efectivo)</td>
                         <td class="calc-cell" style="background: transparent; border: none;"></td>
-                        <td><input type="number" step="0.01" name="dolares_usd" id="dolares_usd" class="form-control cuadre-input input-usd" value="0.00" oninput="calcularCuadre()"></td>
+                        <td><input type="number" step="0.01" name="dolares_usd" id="dolares_usd" class="form-control cuadre-input input-usd" value="{{ auto_dolares_usd|default:'0.00' }}" oninput="calcularCuadre()"></td>
                     </tr>
                     <tr>
                         <td class="label-col">Efectivo BS</td>
-                        <td><input type="number" step="0.01" name="efectivo_bs" id="efectivo_bs" class="form-control cuadre-input input-bs" value="0.00" oninput="calcularCuadre()"></td>
+                        <td><input type="number" step="0.01" name="efectivo_bs" id="efectivo_bs" class="form-control cuadre-input input-bs" value="{{ auto_efectivo_bs|default:'0.00' }}" oninput="calcularCuadre()"></td>
                         <td class="calc-cell" id="calc-efectivo-usd">0.00</td>
                     </tr>
                     <tr>
                         <td class="label-col">Pago Móvil</td>
-                        <td><input type="number" step="0.01" name="pago_movil_bs" id="pago_movil_bs" class="form-control cuadre-input input-bs" value="0.00" oninput="calcularCuadre()"></td>
+                        <td><input type="number" step="0.01" name="pago_movil_bs" id="pago_movil_bs" class="form-control cuadre-input input-bs" value="{{ auto_pago_movil_bs|default:'0.00' }}" oninput="calcularCuadre()"></td>
                         <td class="calc-cell" id="calc-pago-movil-usd">0.00</td>
                     </tr>
                     <tr>
@@ -133,12 +138,12 @@
                     <tr>
                         <td class="label-col">Cashea Recibido</td>
                         <td class="calc-cell" id="calc-cashea-rec-bs">0.00</td>
-                        <td><input type="number" step="0.01" name="cashea_recibido_usd" id="cashea_recibido_usd" class="form-control cuadre-input input-cashea" value="0.00" oninput="calcularCuadre()"></td>
+                        <td><input type="number" step="0.01" name="cashea_recibido_usd" id="cashea_recibido_usd" class="form-control cuadre-input input-cashea" value="{{ auto_cashea_recibido_usd|default:'0.00' }}" oninput="calcularCuadre()"></td>
                     </tr>
                     <tr>
-                        <td class="label-col">Cashea Financiado</td>
+                        <td class="label-col">Cashea Financiado <small style="display:block; font-size:0.75rem; color:#f59e0b; font-weight:normal;">(Resta de Venta Sistema)</small></td>
                         <td class="calc-cell" id="calc-cashea-fin-bs">0.00</td>
-                        <td><input type="number" step="0.01" name="cashea_financiado_usd" id="cashea_financiado_usd" class="form-control cuadre-input input-cashea" value="0.00" oninput="calcularCuadre()"></td>
+                        <td><input type="number" step="0.01" name="cashea_financiado_usd" id="cashea_financiado_usd" class="form-control cuadre-input input-cashea" value="{{ auto_cashea_financiado_usd|default:'0.00' }}" oninput="calcularCuadre()"></td>
                     </tr>
                     <tr>
                         <td class="label-col">Gastos $</td>
@@ -178,6 +183,7 @@
     const tasaGeneral = parseFloat("{{ tasa_general|stringformat:'f'|default:'1' }}".replace(',', '.'));
     const tasaCashea = parseFloat("{{ tasa_cashea|stringformat:'f'|default:'1' }}".replace(',', '.'));
     const totalVentasSistema = parseFloat("{{ total_ventas_sistema|stringformat:'f'|default:'0' }}".replace(',', '.'));
+    const totalPropinasSistema = parseFloat("{{ total_propinas_sistema|stringformat:'f'|default:'0' }}".replace(',', '.'));
 
     function getVal(id) {
         let val = parseFloat(document.getElementById(id).value);
@@ -210,20 +216,21 @@
         setHtml('calc-cashea-rec-bs', cashea_rec_bs);
         setHtml('calc-cashea-fin-bs', cashea_fin_bs);
 
-        // Sumatoria
+        // Sumatoria (sin sumar el cashea financiado, ya que no es dinero físico recibido)
         let total_recibido = (
             punto_usd + 
             efectivo_usd + 
             pago_movil_usd + 
             getVal('dolares_usd') + 
             getVal('cashea_recibido_usd') + 
-            getVal('cashea_financiado_usd') + 
             getVal('gastos_usd') + 
             gastos_bs_usd
         );
 
         let fondo = getVal('fondo_caja_usd');
-        let total_esperado = totalVentasSistema + fondo;
+        let cashea_financiado = getVal('cashea_financiado_usd');
+        // Al total esperado (ventas + propinas + fondo) se le resta lo financiado por Cashea para cuadrar con el físico real
+        let total_esperado = (totalVentasSistema + totalPropinasSistema + fondo) - cashea_financiado;
         let diferencia = total_recibido - total_esperado;
 
         setHtml('display-total-recibido', total_recibido, true);

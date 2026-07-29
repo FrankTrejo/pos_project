@@ -38,9 +38,6 @@ def maestro_create(request):
             except Exception as e:
                 messages.error(request, f"Error de base de datos: {e}")
         else:
-            # --- CORRECCIÓN IMPORTANTE ---
-            # Si no entra al if, cae aquí y te avisa por qué
-            print("⚠️ ERROR DE VALIDACIÓN:", form.errors) # Mira tu terminal negra
             messages.error(request, "El formulario tiene errores. Revisa los campos en rojo.")
     else:
         form = MaestroInsumoForm()
@@ -61,8 +58,6 @@ def maestro_edit(request, pk):
             except Exception as e:
                 messages.error(request, f"Error al guardar: {e}")
         else:
-            # --- CORRECCIÓN IMPORTANTE ---
-            print("⚠️ ERROR EN EDICIÓN:", form.errors)
             messages.error(request, "No se pudo actualizar. Verifica los datos ingresados.")
     else:
         form = MaestroInsumoForm(instance=insumo)

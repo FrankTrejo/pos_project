@@ -2,18 +2,19 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.admin.views.decorators import staff_member_required
 from django.views.decorators.cache import never_cache
 from django.contrib import messages
-from .models import Insumo, MovimientoInventario, CategoriaInsumo, IngredienteCompuesto, ConsumoInterno
-from .forms import InsumoForm, ComponenteForm, MovimientoInventarioForm
-from django.db import models
-import re
-from decimal import Decimal  # <--- IMPORTANTE: Importamos el tipo de dato correcto
-from django.db.models import ProtectedError 
+from django.db import models, transaction
+from django.db.models import ProtectedError, Sum
 from django.core.paginator import Paginator
-from django.db import transaction # Importante para que no descuente uno si falla el otro
-from .forms import ProduccionForm
-from django.db import transaction
-from django.db.models import Sum
-from django.http import HttpResponseRedirect, HttpResponse
+from django.urls import reverse
+from django.http import HttpResponseRedirect, HttpResponse, HttpResponseForbidden
+from django.template.loader import get_template
+from xhtml2pdf import pisa
+from decimal import Decimal
+
+from .models import Insumo, MovimientoInventario, CategoriaInsumo, IngredienteCompuesto, ConsumoInterno
+from .forms import InsumoForm, ComponenteForm, MovimientoInventarioForm, ProduccionForm
+from tables.models import PrecioExtra
+from tables.utils_impresora import imprimir_consumo_interno
 
 @never_cache
 def inventory_index(request):
@@ -744,7 +745,6 @@ def salidas_especiales_view(request):
                     for insumo_id in ids_extras:
                         insumo_extra = Insumo.objects.get(id=insumo_id)
                         
-                        from tables.models import PrecioExtra
                         precio_obj = PrecioExtra.objects.filter(
                             insumo=insumo_extra, 
                             tamano=producto_base.tamano
@@ -799,14 +799,12 @@ def salidas_especiales_view(request):
 
                 # --- IMPRESIÓN TICKERA ---
                 try:
-                    from tables.utils_impresora import imprimir_consumo_interno
                     imprimir_consumo_interno(registro)
                 except Exception as e_print:
                     print(f"Error tickera: {e_print}")
 
                 messages.success(request, "Salida registrada e inventario actualizado.")
                 
-                from django.urls import reverse
                 url_base = reverse('salidas_especiales')
                 return redirect(f"{url_base}?print_id={registro.id}")
 
@@ -815,7 +813,6 @@ def salidas_especiales_view(request):
             return redirect('salidas_especiales')
 
     # --- PAGINACIÓN ---
-    from django.core.paginator import Paginator
     historial_list = ConsumoInterno.objects.all().order_by('-fecha')
     paginator = Paginator(historial_list, 10)
     page_number = request.GET.get('page')
@@ -829,16 +826,11 @@ def salidas_especiales_view(request):
         'producto_personal_default': producto_personal_default, # <-- Enviamos el producto
     })
 
-from django.template.loader import get_template
-from xhtml2pdf import pisa
-from django.http import HttpResponse
-
 @never_cache
 def generar_comanda_interno_pdf(request, consumo_id):
     consumo = get_object_or_404(ConsumoInterno, id=consumo_id)
     
     if "[ANULADO]" in consumo.descripcion:
-        from django.http import HttpResponseForbidden
         return HttpResponseForbidden("<h1>Error: Este ticket fue anulado y no se puede reimprimir.</h1>")
 
     # Lógica para limpiar el texto

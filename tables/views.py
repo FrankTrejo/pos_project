@@ -16,7 +16,6 @@ from django.db.models.functions import Cast
 from django.db.models import IntegerField
 from django.core.serializers.json import DjangoJSONEncoder
 from xhtml2pdf import pisa
-from inventory.models import Insumo
 from core.models import Configuracion
 from .utils_impresora import mandar_a_tickera, imprimir_comanda, imprimir_precuenta
 
@@ -32,7 +31,7 @@ from .forms import (
     CostoAdicionalForm
 )
 # Importamos modelos de otras apps
-from inventory.models import MovimientoInventario, Insumo
+from inventory.models import Insumo, MovimientoInventario
 from reports.models import AuditoriaEliminacion
 from .scrapping import obtener_tasa_bcv
 
@@ -111,6 +110,47 @@ def create_table(request):
     return render(request, 'tables/create_table.html', {
         'next_number': next_number
     })
+
+def edit_table(request, table_id):
+    table = get_object_or_404(Table, id=table_id)
+    if request.method == 'POST':
+        number = request.POST.get('number', '').strip()
+        name = request.POST.get('name', '').strip()
+        color = request.POST.get('color', '#0d6efd').strip()
+        is_external = request.POST.get('is_external') == 'on'
+
+        if not number:
+            messages.error(request, "El número de mesa no puede estar vacío.")
+            return redirect('index')
+
+        # Validar que sea número y no colisione con otra mesa
+        if Table.objects.exclude(id=table.id).filter(number=number).exists():
+            messages.error(request, f"⚠️ Ya existe una mesa con el número '{number}'. Elige un número diferente.")
+            return redirect('index')
+
+        table.number = number
+        table.name = name if name else None
+        table.color = color
+        table.is_external = is_external
+        table.save()
+
+        messages.success(request, f"✅ Mesa #{table.number} actualizada correctamente.")
+        return redirect('index')
+    return redirect('index')
+
+def delete_table(request, table_id):
+    table = get_object_or_404(Table, id=table_id)
+    if request.method == 'POST':
+        # Verificación de seguridad: impedir borrado si está ocupada o con orden activa
+        if table.is_occupied or table.solicitud_pago or Orden.objects.filter(mesa=table).exists():
+            messages.error(request, f"⚠️ No se puede eliminar la Mesa #{table.number} porque está actualmente ocupada o tiene una orden en curso. Factura o libera la mesa primero.")
+            return redirect('index')
+
+        numero_mesa = table.number
+        table.delete()
+        messages.success(request, f"🗑️ Mesa #{numero_mesa} eliminada permanentemente del sistema.")
+        return redirect('index')
+    return redirect('index')
 
 def toggle_status(request, table_id):
     if request.method == 'POST':
@@ -913,7 +953,6 @@ def grabar_mesa_ajax(request, table_id):
             table.save()
             
             if not is_sync and imprimir_ticket: # Si NO es sincronización Y se solicitó imprimir
-                from .utils_impresora import imprimir_comanda
                 imprimir_comanda(orden)
             return JsonResponse({'status': 'ok', 'orden_id': orden.id, 'imprimir': imprimir_ticket})
             
@@ -1093,7 +1132,6 @@ def facturar_mesa_ajax(request, table_id):
                 return JsonResponse({'status': 'error', 'message': 'No hay orden.'})
 
             if not orden.impreso:
-                from .utils_impresora import imprimir_comanda
                 imprimir_comanda(orden)
 
             # --- 1. RECALCULAR TOTALES REALES (Base + Extras) ---
@@ -1147,7 +1185,8 @@ def facturar_mesa_ajax(request, table_id):
 
                 # Registrar Pagos
                 for p in lista_pagos:
-                    Pago.objects.create(venta=venta, metodo=p['metodo'], monto=p['monto'])
+                    ref = p.get('referencia', '').strip() if p.get('referencia') else None
+                    Pago.objects.create(venta=venta, metodo=p['metodo'], monto=p['monto'], referencia=ref)
 
                 # Procesar Detalles
                 for det in orden.detalles.all():

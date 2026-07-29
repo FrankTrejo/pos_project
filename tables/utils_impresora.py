@@ -15,7 +15,6 @@ def to_decimal(valor):
         return Decimal('0.00')
 
 def obtener_tasa_real():
-    from core.models import Configuracion
     config = Configuracion.get_solo()
     
     if config.usar_scraping_bcv:

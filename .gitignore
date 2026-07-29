@@ -8,4 +8,28 @@ Thumbs.db
 # Dependencias (node_modules, venv, etc.)
 node_modules/
 venv/
-__pycache__/
+.venv/
+env/
+**/__pycache__/
+*.py[cod]
+
+# Base de datos y reportes locales
+*.sqlite3
+*.sqlite3-journal
+db.sqlite3
+
+# Carga de medios de usuario locales
+media/
+
+# Archivos locales y temporales
+*.lnk
+*.tmp
+*.bak
+*.log
+codigo_completo.txt
+
+# Configuración de editores / IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
