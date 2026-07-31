@@ -801,6 +801,94 @@ def procesar_inventario_orden(orden, usuario, nota_base, tipo_movimiento):
             if caja_insumo:
                 MovimientoInventario.objects.create(insumo=caja_insumo, tipo=tipo_movimiento, cantidad=det.cantidad, unidad_movimiento=caja_insumo.unidad, usuario=usuario, nota=f"{nota_base} (Empaque)")
 
+def calcular_insumos_orden_existente(orden):
+    insumos_orden = {}
+    if not orden or not orden.detalles.exists():
+        return insumos_orden
+        
+    for det in orden.detalles.all():
+        removidos_dict = {}
+        if hasattr(det, 'ingredientes_removidos') and det.ingredientes_removidos.exists():
+            for r in det.ingredientes_removidos.all():
+                removidos_dict[int(r.id)] = Decimal('1.0')
+        if hasattr(det, 'removidos_detalles'):
+            for r in det.removidos_detalles.all():
+                if r.insumo:
+                    removidos_dict[int(r.insumo.id)] = r.porcion
+
+        if getattr(det, 'cuarto_2_producto', None) and getattr(det, 'cuarto_3_producto', None) and getattr(det, 'cuarto_4_producto', None):
+            ings_prod1 = {int(ing.insumo.id): ing for ing in det.producto.ingredientes.all()}
+            ings_prod2 = {int(ing.insumo.id): ing for ing in det.cuarto_2_producto.ingredientes.all()}
+            ings_prod3 = {int(ing.insumo.id): ing for ing in det.cuarto_3_producto.ingredientes.all()}
+            ings_prod4 = {int(ing.insumo.id): ing for ing in det.cuarto_4_producto.ingredientes.all()}
+            
+            all_i_ids = set(ings_prod1.keys()) | set(ings_prod2.keys()) | set(ings_prod3.keys()) | set(ings_prod4.keys())
+            for i_id in all_i_ids:
+                porcion_removida = removidos_dict.get(i_id, Decimal('0.0'))
+                if porcion_removida >= Decimal('1.0'): continue
+                
+                cantidades = []
+                if i_id in ings_prod1: cantidades.append(ings_prod1[i_id].cantidad)
+                if i_id in ings_prod2: cantidades.append(ings_prod2[i_id].cantidad)
+                if i_id in ings_prod3: cantidades.append(ings_prod3[i_id].cantidad)
+                if i_id in ings_prod4: cantidades.append(ings_prod4[i_id].cantidad)
+                
+                qty = min(cantidades) * (Decimal(len(cantidades)) / Decimal('4.0'))
+                qty = qty * (Decimal('1.0') - porcion_removida)
+                if qty > 0:
+                    insumos_orden[i_id] = insumos_orden.get(i_id, Decimal('0.0')) + (qty * det.cantidad)
+        elif getattr(det, 'mitad_producto', None):
+            ings_prod1 = {int(ing.insumo.id): ing for ing in det.producto.ingredientes.all()}
+            ings_prod2 = {int(ing.insumo.id): ing for ing in det.mitad_producto.ingredientes.all()}
+            for i_id in set(ings_prod1.keys()).union(set(ings_prod2.keys())):
+                porcion_removida = removidos_dict.get(i_id, Decimal('0.0'))
+                if porcion_removida >= Decimal('1.0'): continue
+                
+                cantidades = []
+                if i_id in ings_prod1: cantidades.append(ings_prod1[i_id].cantidad)
+                if i_id in ings_prod2: cantidades.append(ings_prod2[i_id].cantidad)
+                
+                qty = min(cantidades) * (Decimal(len(cantidades)) / Decimal('2.0'))
+                qty = qty * (Decimal('1.0') - porcion_removida)
+                if qty > 0:
+                    insumos_orden[i_id] = insumos_orden.get(i_id, Decimal('0.0')) + (qty * det.cantidad)
+        else:
+            for ing in det.producto.ingredientes.all():
+                ing_id = int(ing.insumo.id)
+                porcion_removida = removidos_dict.get(ing_id, Decimal('0.0'))
+                if porcion_removida >= Decimal('1.0'): continue
+                
+                qty = ing.cantidad * (Decimal('1.0') - porcion_removida)
+                if qty > 0:
+                    insumos_orden[ing_id] = insumos_orden.get(ing_id, Decimal('0.0')) + (qty * det.cantidad)
+
+        for extra in det.extras_elegidos.all():
+            if extra.precio == Decimal('0.00') or extra.precio == 0:
+                cantidad_a_descontar = extra.porcion
+            else:
+                cantidad_a_descontar = extra.insumo.cantidad_porcion_extra 
+                precio_obj = PrecioExtra.objects.filter(insumo=extra.insumo, tamano=det.producto.tamano).first()
+                if precio_obj and precio_obj.cantidad > 0:
+                    cantidad_a_descontar = precio_obj.cantidad
+                cantidad_a_descontar = cantidad_a_descontar * extra.porcion
+            
+            cantidad_a_descontar = cantidad_a_descontar * det.cantidad
+            if cantidad_a_descontar > 0:
+                extra_ins_id = int(extra.insumo.id)
+                insumos_orden[extra_ins_id] = insumos_orden.get(extra_ins_id, Decimal('0.0')) + cantidad_a_descontar
+        
+        if det.es_para_llevar:
+            config_global = Configuracion.get_solo()
+            caja_insumo = None
+            if det.producto.tamano == 'IND': caja_insumo = config_global.caja_individual
+            elif det.producto.tamano == 'MED': caja_insumo = config_global.caja_mediana
+            elif det.producto.tamano == 'FAM': caja_insumo = config_global.caja_familiar
+            if caja_insumo:
+                caja_id = int(caja_insumo.id)
+                insumos_orden[caja_id] = insumos_orden.get(caja_id, Decimal('0.0')) + det.cantidad
+
+    return insumos_orden
+
 def grabar_mesa_ajax(request, table_id):
     if request.method == 'POST':
         try:
@@ -816,12 +904,26 @@ def grabar_mesa_ajax(request, table_id):
                 # Usamos la función central que sí contempla mitades, cuartos, extras, etc.
                 insumos_requeridos = calcular_insumos_requeridos_json(items)
                 
+                # Si la mesa ya contaba con una orden grabada, calculamos qué insumos ya fueron
+                # confirmados y descontados previamente, evaluando únicamente la diferencia adicional.
+                insumos_previos = {}
+                orden_existente = Orden.objects.filter(mesa_id=table_id).first()
+                if orden_existente:
+                    insumos_previos = calcular_insumos_orden_existente(orden_existente)
+                
                 faltantes = []
                 for insumo_id, cant_requerida in insumos_requeridos.items():
                     try:
-                        insumo = Insumo.objects.get(id=insumo_id)
-                        if insumo.stock_actual < cant_requerida:
-                            faltantes.append(f"Falta {insumo.nombre}: Tienes {insumo.stock_actual:g}, necesitas {cant_requerida:g}")
+                        ins_id_int = int(insumo_id)
+                        insumo = Insumo.objects.get(id=ins_id_int)
+                        cant_previa = insumos_previos.get(ins_id_int, Decimal('0.0'))
+                        cant_adicional = cant_requerida - cant_previa
+                        
+                        if cant_adicional > 0 and insumo.stock_actual < cant_adicional:
+                            if cant_previa > 0:
+                                faltantes.append(f"Falta {insumo.nombre}: Tienes {insumo.stock_actual:g} en stock, necesitas {cant_adicional:g} adicional")
+                            else:
+                                faltantes.append(f"Falta {insumo.nombre}: Tienes {insumo.stock_actual:g}, necesitas {cant_adicional:g}")
                     except Insumo.DoesNotExist:
                         # Si un insumo no existe, lo ignoramos en la validación para no romper el flujo
                         continue
