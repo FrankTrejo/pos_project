@@ -1145,8 +1145,20 @@
         function actualizarBadge(input) {
             const item = input.closest('.payment-item');
             const badge = item.querySelector('.entered-badge');
-            let val = parseFloat(input.value) || 0;
             
+            if (item && item.id === 'item-cashea') {
+                const inc = parseFloat(document.getElementById('input-cashea-usd').value) || 0;
+                const prop = parseFloat(document.getElementById('input-cashea-propina').value) || 0;
+                if (inc > 0 || prop > 0) {
+                    badge.style.display = 'block';
+                    badge.innerText = `$${inc.toFixed(2)}` + (prop > 0 ? ` (+ $${prop.toFixed(2)} prop.)` : '');
+                } else {
+                    badge.style.display = 'none';
+                }
+                return;
+            }
+
+            let val = parseFloat(input.value) || 0;
             if (val > 0) {
                 badge.style.display = 'block';
                 if(input.classList.contains('bs-input')) { badge.innerText = `Bs. ${val.toFixed(2)}`; } 
@@ -1160,12 +1172,14 @@
             const puntoBs = parseFloat(document.getElementById('input-punto-bs').value) || 0;
             const efecBs = parseFloat(document.getElementById('input-efectivo-bs').value) || 0;
             const casheaInicial = parseFloat(document.getElementById('input-cashea-usd').value) || 0;
+            const casheaPropina = parseFloat(document.getElementById('input-cashea-propina').value) || 0;
 
             // Hints de conversión (UI)
             document.getElementById('hint-pm-usd').innerText = `USD: $${(pmBs / TASA_CAMBIO).toFixed(2)}`;
             document.getElementById('hint-punto-usd').innerText = `USD: $${(puntoBs / TASA_CAMBIO).toFixed(2)}`;
             document.getElementById('hint-efectivo-bs-usd').innerText = `USD: $${(efecBs / TASA_CAMBIO).toFixed(2)}`;
             document.getElementById('hint-cashea-bs').innerText = `Bs: ${(casheaInicial * TASA_CASHEA).toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('hint-cashea-propina-bs').innerText = `Bs: ${(casheaPropina * TASA_CASHEA).toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
 
             // Totales en USD
             const totalPagadoUsd = efecUsd + (pmBs / TASA_CAMBIO) + (puntoBs / TASA_CAMBIO) + (efecBs / TASA_CAMBIO) + casheaInicial;
@@ -1191,7 +1205,7 @@
                     casheaHint.style.color = '#dc3545'; // Rojo
                     btn.classList.remove('ready');
                     btn.disabled = true;
-                    montosPagos = { efecUsd, pmBs, puntoBs, efecBs, casheaInicial, totalPagadoUsd, restante };
+                    montosPagos = { efecUsd, pmBs, puntoBs, efecBs, casheaInicial, casheaPropina, totalPagadoUsd, restante };
                     return; // Detenemos el cálculo si no cumple
                 }
 
@@ -1240,7 +1254,7 @@
                 btn.disabled = false;
             }
 
-            montosPagos = { efecUsd, pmBs, puntoBs, efecBs, casheaInicial, totalPagadoUsd, restante };
+            montosPagos = { efecUsd, pmBs, puntoBs, efecBs, casheaInicial, casheaPropina, totalPagadoUsd, restante };
         }
 
         async function procesarPagoFinal() {
@@ -1281,14 +1295,21 @@
         if(montosPagos.pmBs > 0) lista.push({ metodo: 'PAGO_MOVIL', monto: montosPagos.pmBs / TASA_CAMBIO, referencia: document.getElementById('ref-pm').value });
         if(montosPagos.puntoBs > 0) lista.push({ metodo: 'PUNTO', monto: montosPagos.puntoBs / TASA_CAMBIO, referencia: document.getElementById('ref-punto').value });
         if(montosPagos.efecBs > 0) lista.push({ metodo: 'EFECTIVO_BS', monto: montosPagos.efecBs / TASA_CAMBIO });
-        if(montosPagos.casheaInicial > 0) lista.push({ metodo: 'CASHEA', monto: montosPagos.casheaInicial, referencia: document.getElementById('ref-cashea').value });
+        if((montosPagos.casheaInicial || 0) > 0 || (montosPagos.casheaPropina || 0) > 0) {
+            lista.push({ metodo: 'CASHEA', monto: (montosPagos.casheaInicial || 0) + (montosPagos.casheaPropina || 0), referencia: document.getElementById('ref-cashea').value });
+        }
 
         Swal.fire({ title: 'Procesando...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
         const urlFacturar = "{% url 'facturar_mesa' table.id %}";
         fetch(urlFacturar, {
             method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify({ lista_pagos: lista, monto_recibido_total: montosPagos.totalPagadoUsd, es_propina: esPropina })
+            body: JSON.stringify({ 
+                lista_pagos: lista, 
+                monto_recibido_total: montosPagos.totalPagadoUsd + (montosPagos.casheaPropina || 0), 
+                es_propina: esPropina, 
+                propina_monto: montosPagos.casheaPropina || 0 
+            })
         })
         .then(r => r.json())
         .then(data => {
@@ -1588,6 +1609,10 @@
                         </div>
                         <div class="conversion-hint" id="hint-cashea-financiado" style="margin-top: 5px; font-weight: bold; color: #e67e22;">Financiado: $0.00</div>
                         <input type="text" id="ref-cashea" class="ref-input" placeholder="Referencia (Opcional)">
+                        <div class="input-row" style="margin-top: 12px; border-top: 1px dashed #f39c12; padding-top: 12px;">
+                            <input type="number" id="input-cashea-propina" class="payment-input" placeholder="Propina Cashea (USD)" step="0.01" style="background-color: #fffdf5; border-color: #f1c40f;">
+                            <div class="conversion-hint" id="hint-cashea-propina-bs" style="margin-left:10px; align-self:center; font-weight: bold; color: #27ae60;">Bs: 0.00</div>
+                        </div>
                     </div>
                 </div>
 

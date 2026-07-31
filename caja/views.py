@@ -90,7 +90,8 @@ def cuadre_caja_nuevo(request):
 
         if tiene_cashea:
             ventas_sistema_cashea += Decimal(str(v.total))
-            monto_fin = Decimal(str(v.total)) - total_pagado_cashea_en_venta
+            pago_inicial_cashea = max(Decimal('0.0'), total_pagado_cashea_en_venta - Decimal(str(v.propina or 0)))
+            monto_fin = Decimal(str(v.total)) - pago_inicial_cashea
             if monto_fin > 0:
                 auto_cashea_financiado_usd += monto_fin
         else:

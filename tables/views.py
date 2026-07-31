@@ -1226,6 +1226,7 @@ def facturar_mesa_ajax(request, table_id):
             lista_pagos = data.get('lista_pagos', []) 
             monto_total_recibido = float(data.get('monto_recibido_total', 0))
             es_propina = data.get('es_propina', False)
+            propina_monto = float(data.get('propina_monto', 0))
             
             table = get_object_or_404(Table, id=table_id)
             orden = Orden.objects.filter(mesa=table).first()
@@ -1245,7 +1246,10 @@ def facturar_mesa_ajax(request, table_id):
                 total_venta_real += subtotal_linea
             
             diferencia = monto_total_recibido - total_venta_real
-            propina_calc = diferencia if (diferencia > 0 and es_propina) else 0
+            if propina_monto > 0:
+                propina_calc = propina_monto
+            else:
+                propina_calc = diferencia if (diferencia > 0 and es_propina) else 0
 
             # --- 3. TRANSACCIÓN DE GUARDADO ---
             with transaction.atomic():
